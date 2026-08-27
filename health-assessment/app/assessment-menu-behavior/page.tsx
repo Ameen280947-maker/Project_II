@@ -4,7 +4,6 @@ import Link from "next/link";
 import Sidebar from "@/app/components/Sidebar";
 
 import {
-  Activity,
   ArrowLeft,
   ArrowRight,
   Cigarette,
@@ -244,38 +243,7 @@ export default function BehaviorAssessmentPage() {
               INFORMATION BANNER
           ================================================= */}
 
-          <section className="mt-7 rounded-[24px] border border-[#e3eedf] bg-[#f5faf2] p-5 sm:p-6">
-
-            <div className="flex items-start gap-4">
-
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-white text-[#65a05b] shadow-sm">
-
-                <Activity
-                  size={25}
-                  strokeWidth={1.8}
-                />
-
-              </div>
-
-              <div>
-
-                <h2 className="font-bold text-[#3f5540]">
-                  คำแนะนำ
-                </h2>
-
-                <p className="mt-1 text-sm leading-7 text-[#737b73]">
-                  ควรประเมินพฤติกรรมสุขภาพอย่างสม่ำเสมอ
-                  เพื่อให้ทราบถึงปัจจัยเสี่ยง
-                  และสามารถปรับเปลี่ยนพฤติกรรม
-                  ให้เหมาะสมกับสุขภาพของตนเอง
-                </p>
-
-              </div>
-
-            </div>
-
-          </section>
-
+       
           {/* =================================================
               BACK BUTTON
           ================================================= */}
