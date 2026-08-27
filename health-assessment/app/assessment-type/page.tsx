@@ -35,7 +35,7 @@ const assessmentTypes = [
       "การออกกำลังกาย",
       "การรับประทานอาหาร",
     ],
-    href: "/behavior-assessment",
+    href: "/assessment-menu-behavior",
     theme: "green" as const,
   },
   {
