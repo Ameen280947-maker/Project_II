@@ -54,8 +54,11 @@ export default function Sidebar() {
   const isAssessmentActive =
     pathname === "/assessment-type" ||
     pathname.startsWith("/assessment-type/") ||
+    pathname.startsWith("/assessment-menu") ||
     pathname.startsWith("/assessment_CVD") ||
     pathname.startsWith("/assessment_DB") ||
+    pathname.startsWith("/assessment_diabetes") ||
+    pathname.startsWith("/assessment_smoking") ||
     pathname.startsWith("/assessment/");
 
   const isResultActive =
@@ -70,7 +73,9 @@ export default function Sidebar() {
     pathname === "/recommendation" ||
     pathname.startsWith("/recommendation/") ||
     pathname.startsWith("/recommendation-health") ||
-    pathname.startsWith("/recommendation_DB");
+    pathname.startsWith("/recommendation_DB") ||
+    pathname.startsWith("/recommendation_diabetes") ||
+    pathname.startsWith("/recommendation_smoking");
 
   const isSettingsActive =
     pathname === "/settings" ||

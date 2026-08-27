@@ -11,6 +11,7 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 import {
+  Suspense,
   useEffect,
   useMemo,
   useState,
@@ -79,6 +80,25 @@ type RecommendationResponse = {
 ========================================================= */
 
 export default function SmokingRecommendationPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="flex min-h-screen items-center justify-center bg-[#fbf9f9]">
+          <div className="text-center">
+            <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#f0dadd] border-t-[#b91c2b]" />
+            <p className="mt-4 text-sm font-semibold text-[#777780]">
+              กำลังโหลด...
+            </p>
+          </div>
+        </main>
+      }
+    >
+      <SmokingRecommendationContent />
+    </Suspense>
+  );
+}
+
+function SmokingRecommendationContent() {
   const searchParams =
     useSearchParams();
 
@@ -123,7 +143,7 @@ export default function SmokingRecommendationPage() {
 
         const response =
           await fetch(
-            `/api/assessment/smoking?assessmentId=${encodeURIComponent(
+            `/api/assessments/smoking?assessmentId=${encodeURIComponent(
               assessmentId,
             )}`,
             {
