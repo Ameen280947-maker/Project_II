@@ -62,7 +62,7 @@ const assessmentCards = [
       "bg-[#eef8e9] text-[#65a06f]",
     buttonClass:
       "bg-gradient-to-r from-[#86bb8c] to-[#65a06f] shadow-[0_12px_26px_rgba(101,160,111,0.22)]",
-    href: "/assessment/obesity",
+    href: "/assessment_BMI",
   },
 ];
 
