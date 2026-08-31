@@ -1387,6 +1387,24 @@ function getDetailHref(
       return `/recommendation_diet?assessmentId=${item.assessment_id}`;
 
     /* =================================================
+       STRESS
+    ================================================== */
+
+    case "Stress":
+    case "ความเครียด":
+    case "แบบประเมินความเครียด":
+      return `/recommendation_stress?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
+       SLEEP
+    ================================================== */
+
+    case "Sleep":
+    case "การนอนหลับ":
+    case "แบบประเมินการนอนหลับ":
+      return `/recommendation_sleep?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
        OTHER
     ================================================== */
 

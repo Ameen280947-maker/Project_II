@@ -38,7 +38,7 @@ const mentalHealthAssessments: MentalHealthAssessment[] = [
         description:
             "ประเมินระดับความเครียดที่เกิดขึ้นในชีวิตประจำวัน เพื่อเฝ้าระวังความเครียดสะสมที่อาจส่งผลกระทบต่อสุขภาพกายและสุขภาพจิต",
 
-        href: "/stress-assessment",
+        href: "/assessment_stress",
 
         icon: Brain,
 
