@@ -14,7 +14,7 @@ import {
   Utensils,
 } from "lucide-react";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 /* =====================================================
    TYPES
@@ -51,6 +51,20 @@ type ResultResponse = {
 ===================================================== */
 
 export default function DietRecommendationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#f4d6df] border-t-[#ed3564]" />
+        </div>
+      }
+    >
+      <DietRecommendationContent />
+    </Suspense>
+  );
+}
+
+function DietRecommendationContent() {
   const searchParams = useSearchParams();
 
   const assessmentId = searchParams.get("assessmentId");
