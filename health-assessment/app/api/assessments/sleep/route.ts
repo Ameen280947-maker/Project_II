@@ -11,7 +11,12 @@ export const dynamic = "force-dynamic";
 type SubmitBody = {
     userId?: number;
     user_id?: number;
-    answers: Record<string | number, string>;
+    answers: Array<{
+        questionId: number;
+        optionId: number;
+        answer: string;
+        score: number;
+    }>;
 };
 
 /* =========================================================
@@ -219,12 +224,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const answers = body.answers as Array<{
-            questionId: number;
-            optionId: number;
-            answer: string;
-            score: number;
-        }>;
+        const answers = body.answers;
 
         if (!Array.isArray(answers) || answers.length === 0) {
             return NextResponse.json(
