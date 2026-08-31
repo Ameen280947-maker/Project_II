@@ -23,11 +23,11 @@ type BehaviorAssessment = {
   href: string;
 
   icon:
-    | typeof Cigarette
-    | typeof Wine
-    | typeof Dumbbell
-    | typeof Moon
-    | typeof Utensils;
+  | typeof Cigarette
+  | typeof Wine
+  | typeof Dumbbell
+  | typeof Moon
+  | typeof Utensils;
 
   iconClass: string;
   buttonClass: string;
@@ -95,7 +95,7 @@ const behaviorAssessments: BehaviorAssessment[] = [
     description:
       "ประเมินระยะเวลา คุณภาพ และความสม่ำเสมอของการนอนหลับ เพื่อเฝ้าระวังปัญหาการนอน",
 
-    href: "/assessment-menu-behavior/sleep",
+    href: "/sleep-assessment",
 
     icon: Moon,
 
@@ -243,7 +243,7 @@ export default function BehaviorAssessmentPage() {
               INFORMATION BANNER
           ================================================= */}
 
-       
+
           {/* =================================================
               BACK BUTTON
           ================================================= */}
