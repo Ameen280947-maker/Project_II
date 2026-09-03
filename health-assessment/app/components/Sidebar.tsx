@@ -178,7 +178,7 @@ export default function Sidebar() {
         --------------------------------------------------- */}
 
         <SidebarItem
-          href="/result"
+          href="/dashboard"
           icon={
             <BarChart3 size={21} />
           }
