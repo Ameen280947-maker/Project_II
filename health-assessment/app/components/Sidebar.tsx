@@ -47,9 +47,17 @@ export default function Sidebar() {
      ACTIVE ROUTES
   ========================================================= */
 
+  // ---------------------------------------------------------
+  // PROFILE
+  // ---------------------------------------------------------
+
   const isProfileActive =
     pathname === "/profile" ||
     pathname.startsWith("/profile/");
+
+  // ---------------------------------------------------------
+  // ASSESSMENT
+  // ---------------------------------------------------------
 
   const isAssessmentActive =
     pathname === "/assessment-type" ||
@@ -61,21 +69,40 @@ export default function Sidebar() {
     pathname.startsWith("/assessment_smoking") ||
     pathname.startsWith("/assessment/");
 
+  // ---------------------------------------------------------
+  // DASHBOARD / RESULT
+  // ---------------------------------------------------------
+
   const isResultActive =
     pathname === "/result" ||
     pathname.startsWith("/result/");
 
+  // ---------------------------------------------------------
+  // HISTORY
+  // ---------------------------------------------------------
+
   const isHistoryActive =
     pathname === "/history" ||
     pathname.startsWith("/history/");
+
+  // ---------------------------------------------------------
+  // RECOMMENDATION
+  //
+  // IMPORTANT:
+  // /recommendation_smoking จะไม่ Active
+  // เพราะเป็นหน้าผลการประเมินการสูบบุหรี่
+  // ---------------------------------------------------------
 
   const isRecommendationActive =
     pathname === "/recommendation" ||
     pathname.startsWith("/recommendation/") ||
     pathname.startsWith("/recommendation-health") ||
     pathname.startsWith("/recommendation_DB") ||
-    pathname.startsWith("/recommendation_diabetes") ||
-    pathname.startsWith("/recommendation_smoking");
+    pathname.startsWith("/recommendation_diabetes");
+
+  // ---------------------------------------------------------
+  // SETTINGS
+  // ---------------------------------------------------------
 
   const isSettingsActive =
     pathname === "/settings" ||
@@ -88,7 +115,9 @@ export default function Sidebar() {
   return (
     <aside className="hidden w-[235px] shrink-0 border-r border-[#eee5e6] bg-white px-5 py-7 lg:flex lg:flex-col">
 
-      {/* LOGO */}
+      {/* =====================================================
+          LOGO
+      ===================================================== */}
 
       <Link
         href="/assessment-type"
@@ -112,9 +141,15 @@ export default function Sidebar() {
         </div>
       </Link>
 
-      {/* MENU */}
+      {/* =====================================================
+          MENU
+      ===================================================== */}
 
       <nav className="mt-12 space-y-2">
+
+        {/* ---------------------------------------------------
+            PROFILE
+        --------------------------------------------------- */}
 
         <SidebarItem
           href="/profile"
@@ -125,6 +160,10 @@ export default function Sidebar() {
           active={isProfileActive}
         />
 
+        {/* ---------------------------------------------------
+            ASSESSMENT
+        --------------------------------------------------- */}
+
         <SidebarItem
           href="/assessment-type"
           icon={
@@ -134,14 +173,22 @@ export default function Sidebar() {
           active={isAssessmentActive}
         />
 
+        {/* ---------------------------------------------------
+            DASHBOARD
+        --------------------------------------------------- */}
+
         <SidebarItem
-          href="/result"
+          href="/dashboard"
           icon={
             <BarChart3 size={21} />
           }
           label="Dashboard"
           active={isResultActive}
         />
+
+        {/* ---------------------------------------------------
+            HISTORY
+        --------------------------------------------------- */}
 
         <SidebarItem
           href="/history"
@@ -152,6 +199,10 @@ export default function Sidebar() {
           active={isHistoryActive}
         />
 
+        {/* ---------------------------------------------------
+            RECOMMENDATION
+        --------------------------------------------------- */}
+
         <SidebarItem
           href="/recommendation"
           icon={
@@ -160,6 +211,10 @@ export default function Sidebar() {
           label="คำแนะนำสุขภาพ"
           active={isRecommendationActive}
         />
+
+        {/* ---------------------------------------------------
+            SETTINGS
+        --------------------------------------------------- */}
 
         <SidebarItem
           href="/settings"
@@ -172,7 +227,9 @@ export default function Sidebar() {
 
       </nav>
 
-      {/* LOGOUT */}
+      {/* =====================================================
+          LOGOUT
+      ===================================================== */}
 
       <button
         type="button"
