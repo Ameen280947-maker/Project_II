@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Sidebar from "@/app/components/Sidebar";
@@ -34,22 +34,16 @@ type AssessmentData = {
 };
 
 /* =========================================================
-   PAGE
+   CONTENT
 ========================================================= */
 
-export default function StressRecommendationPage() {
-    const searchParams =
-        useSearchParams();
+function StressRecommendationContent() {
+    const searchParams = useSearchParams();
 
-    const assessmentId =
-        searchParams.get(
-            "assessmentId",
-        );
+    const assessmentId = searchParams.get("assessmentId");
 
     const [data, setData] =
-        useState<AssessmentData | null>(
-            null,
-        );
+        useState<AssessmentData | null>(null);
 
     const [loading, setLoading] =
         useState(true);
@@ -62,103 +56,88 @@ export default function StressRecommendationPage() {
     ======================================================= */
 
     useEffect(() => {
-        const loadResult =
-            async () => {
-                if (!assessmentId) {
-                    setError(
-                        "ไม่พบ assessmentId",
-                    );
+        const loadResult = async () => {
+            if (!assessmentId) {
+                setError("ไม่พบ assessmentId");
+                setLoading(false);
+                return;
+            }
 
-                    setLoading(false);
+            try {
+                setLoading(true);
 
-                    return;
-                }
+                const response = await fetch(
+                    `/api/assessments/stress?assessmentId=${assessmentId}`,
+                    {
+                        method: "GET",
+                        cache: "no-store",
+                    },
+                );
 
-                try {
-                    const response =
-                        await fetch(
-                            `/api/assessments/stress?assessmentId=${assessmentId}`,
-                            {
-                                method: "GET",
-                                cache: "no-store",
-                            },
-                        );
+                const result = await response.json();
 
-                    const result =
-                        await response.json();
-
-                    if (
-                        !response.ok ||
-                        !result.success
-                    ) {
-                        throw new Error(
-                            result.message ||
+                if (
+                    !response.ok ||
+                    !result.success
+                ) {
+                    throw new Error(
+                        result.message ||
                             "ไม่สามารถโหลดผลการประเมินได้",
-                        );
-                    }
-
-                    setData(result.data);
-                } catch (err) {
-                    console.error(err);
-
-                    setError(
-                        err instanceof Error
-                            ? err.message
-                            : "เกิดข้อผิดพลาด",
                     );
-                } finally {
-                    setLoading(false);
                 }
-            };
+
+                setData(result.data);
+            } catch (err) {
+                console.error(err);
+
+                setError(
+                    err instanceof Error
+                        ? err.message
+                        : "เกิดข้อผิดพลาด",
+                );
+            } finally {
+                setLoading(false);
+            }
+        };
 
         loadResult();
     }, [assessmentId]);
 
     /* =======================================================
-       COLOR
+       COLOR / LEVEL STYLE
     ======================================================= */
 
     const getLevelStyle = (
         level: string,
     ) => {
-        if (
-            level === "เครียดน้อย"
-        ) {
+        if (level === "เครียดน้อย") {
             return {
                 bg: "bg-[#eef8e9]",
                 text: "text-[#57965c]",
-                border:
-                    "border-[#dcefd5]",
+                border: "border-[#dcefd5]",
             };
         }
 
-        if (
-            level === "เครียดปานกลาง"
-        ) {
+        if (level === "เครียดปานกลาง") {
             return {
                 bg: "bg-[#fffbe5]",
                 text: "text-[#b29c00]",
-                border:
-                    "border-[#f0e6a9]",
+                border: "border-[#f0e6a9]",
             };
         }
 
-        if (
-            level === "เครียดมาก"
-        ) {
+        if (level === "เครียดมาก") {
             return {
                 bg: "bg-[#fff2eb]",
                 text: "text-[#e66a32]",
-                border:
-                    "border-[#f4d2c2]",
+                border: "border-[#f4d2c2]",
             };
         }
 
         return {
             bg: "bg-[#fff0ed]",
             text: "text-[#e83a24]",
-            border:
-                "border-[#f4c9c2]",
+            border: "border-[#f4c9c2]",
         };
     };
 
@@ -198,7 +177,6 @@ export default function StressRecommendationPage() {
 
                     <section className="flex flex-1 items-center justify-center px-6">
                         <div className="max-w-md text-center">
-
                             <h1 className="text-2xl font-bold text-[#2f3037]">
                                 ไม่สามารถแสดงผลการประเมินได้
                             </h1>
@@ -218,7 +196,6 @@ export default function StressRecommendationPage() {
 
                                 กลับไปหน้าประเมิน
                             </Link>
-
                         </div>
                     </section>
                 </div>
@@ -255,11 +232,17 @@ export default function StressRecommendationPage() {
         <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
             <div className="flex min-h-screen">
 
+                {/* SIDEBAR */}
+
                 <Sidebar />
+
+                {/* MAIN CONTENT */}
 
                 <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
-                    {/* HEADER */}
+                    {/* =================================================
+                       HEADER
+                    ================================================= */}
 
                     <header>
                         <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
@@ -278,11 +261,15 @@ export default function StressRecommendationPage() {
                         </p>
                     </header>
 
-                    {/* RESULT */}
+                    {/* =================================================
+                       RESULT
+                    ================================================= */}
 
                     <div className="mt-8 grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
 
-                        {/* SCORE CARD */}
+                        {/* =================================================
+                           SCORE CARD
+                        ================================================= */}
 
                         <article className="rounded-[28px] border border-[#eee8e9] bg-white p-7 text-center shadow-[0_15px_40px_rgba(35,25,30,0.045)]">
 
@@ -320,10 +307,11 @@ export default function StressRecommendationPage() {
 
                                 {formattedDate}
                             </div>
-
                         </article>
 
-                        {/* RECOMMENDATION */}
+                        {/* =================================================
+                           RECOMMENDATION
+                        ================================================= */}
 
                         <article className="rounded-[28px] border border-[#eee8e9] bg-white p-7 shadow-[0_15px_40px_rgba(35,25,30,0.045)]">
 
@@ -338,29 +326,39 @@ export default function StressRecommendationPage() {
 
                             <div className="mt-6 space-y-3">
 
-                                {data.recommendation
+                                {data
+                                    .recommendation
                                     .recommendations
                                     .length > 0 ? (
-                                    data.recommendation.recommendations.map(
-                                        (
-                                            recommendation,
-                                            index,
-                                        ) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-start gap-3 rounded-2xl bg-[#f8faf7] p-4"
-                                            >
-                                                <CheckCircle2
-                                                    size={20}
-                                                    className="mt-0.5 shrink-0 text-[#65a05b]"
-                                                />
+                                    data
+                                        .recommendation
+                                        .recommendations
+                                        .map(
+                                            (
+                                                recommendation,
+                                                index,
+                                            ) => (
+                                                <div
+                                                    key={
+                                                        index
+                                                    }
+                                                    className="flex items-start gap-3 rounded-2xl bg-[#f8faf7] p-4"
+                                                >
+                                                    <CheckCircle2
+                                                        size={
+                                                            20
+                                                        }
+                                                        className="mt-0.5 shrink-0 text-[#65a05b]"
+                                                    />
 
-                                                <p className="text-sm leading-6 text-[#5e6268]">
-                                                    {recommendation}
-                                                </p>
-                                            </div>
-                                        ),
-                                    )
+                                                    <p className="text-sm leading-6 text-[#5e6268]">
+                                                        {
+                                                            recommendation
+                                                        }
+                                                    </p>
+                                                </div>
+                                            ),
+                                        )
                                 ) : (
                                     <div className="rounded-2xl bg-[#f8faf7] p-5 text-sm text-[#858991]">
                                         ไม่พบคำแนะนำสำหรับระดับความเครียดนี้
@@ -369,12 +367,12 @@ export default function StressRecommendationPage() {
                                 )}
 
                             </div>
-
                         </article>
-
                     </div>
 
-                    {/* DISCLAIMER */}
+                    {/* =================================================
+                       DISCLAIMER
+                    ================================================= */}
 
                     <div className="mt-6 rounded-[24px] border border-[#e8edf5] bg-[#f5f8fc] px-6 py-5">
 
@@ -401,10 +399,11 @@ export default function StressRecommendationPage() {
                             </div>
 
                         </div>
-
                     </div>
 
-                    {/* BUTTONS */}
+                    {/* =================================================
+                       BUTTONS
+                    ================================================= */}
 
                     <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:justify-end">
 
@@ -431,5 +430,36 @@ export default function StressRecommendationPage() {
                 </section>
             </div>
         </main>
+    );
+}
+
+/* =========================================================
+   PAGE
+   Suspense Boundary สำหรับ useSearchParams()
+========================================================= */
+
+export default function StressRecommendationPage() {
+    return (
+        <Suspense
+            fallback={
+                <main className="min-h-screen bg-[#fbf9f9]">
+                    <div className="flex min-h-screen">
+                        <Sidebar />
+
+                        <section className="flex flex-1 items-center justify-center">
+                            <div className="text-center">
+                                <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#e5e5e5] border-t-[#6b9f63]" />
+
+                                <p className="mt-4 text-[#858991]">
+                                    กำลังโหลดผลการประเมิน...
+                                </p>
+                            </div>
+                        </section>
+                    </div>
+                </main>
+            }
+        >
+            <StressRecommendationContent />
+        </Suspense>
     );
 }
