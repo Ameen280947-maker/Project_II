@@ -28,13 +28,13 @@ type HistoryItem = {
   user_id: number;
 
   total_score:
-    | string
-    | number
-    | null;
+  | string
+  | number
+  | null;
 
   risk_level:
-    | string
-    | null;
+  | string
+  | null;
 
   assessed_at: string;
 
@@ -42,12 +42,12 @@ type HistoryItem = {
   assessment_name: string;
 
   recommendation_id:
-    | number
-    | null;
+  | number
+  | null;
 
   recommendation_text:
-    | string
-    | null;
+  | string
+  | null;
 };
 
 type HistoryResponse = {
@@ -124,7 +124,7 @@ export default function HistoryPage() {
         ) {
           throw new Error(
             data.message ??
-              "ไม่สามารถโหลดประวัติการประเมินได้",
+            "ไม่สามารถโหลดประวัติการประเมินได้",
           );
         }
 
@@ -262,9 +262,9 @@ export default function HistoryPage() {
               value={
                 history.length > 0
                   ? formatDateShort(
-                      history[0]
-                        .assessed_at,
-                    )
+                    history[0]
+                      .assessed_at,
+                  )
                   : "-"
               }
             />
@@ -291,11 +291,10 @@ export default function HistoryPage() {
                     onClick={() =>
                       setFilter(name)
                     }
-                    className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-                      filter === name
+                    className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${filter === name
                         ? "bg-[#b91c2b] text-white shadow-[0_8px_20px_rgba(185,28,43,0.2)]"
                         : "bg-[#faf7f7] text-[#74757d] hover:bg-[#fff0f2] hover:text-[#b91c2b]"
-                    }`}
+                      }`}
                   >
                     {getAssessmentDisplayName(
                       name,
@@ -956,9 +955,9 @@ function getRiskDisplayName(
 
   if (
     assessmentName ===
-      "Diabetes TDS" ||
+    "Diabetes TDS" ||
     assessmentName ===
-      "Diabetes Risk"
+    "Diabetes Risk"
   ) {
     if (
       risk === "very_high" ||
@@ -1180,9 +1179,9 @@ function formatScore(
 
   if (
     item.assessment_name ===
-      "Diabetes TDS" ||
+    "Diabetes TDS" ||
     item.assessment_name ===
-      "Diabetes Risk"
+    "Diabetes Risk"
   ) {
     return `${score.toFixed(2)}%`;
   }
@@ -1314,7 +1313,7 @@ function getDetailHref(
   }
 
   switch (
-    item.assessment_name
+  item.assessment_name
   ) {
 
     /* =================================================
@@ -1405,10 +1404,31 @@ function getDetailHref(
       return `/recommendation_sleep?assessmentId=${item.assessment_id}`;
 
     /* =================================================
+       DEPRESSION 2Q & 9Q
+    ================================================== */
+
+    case "PHQ-2":
+    case "2Q":
+    case "แบบคัดกรองภาวะซึมเศร้า 2Q":
+    case "คัดกรองภาวะซึมเศร้า 2Q":
+      return `/recommendation_depression_2q?assessmentId=${item.assessment_id}`;
+
+    case "9Q":
+    case "แบบประเมินโรคซึมเศร้า 9Q":
+    case "โรคซึมเศร้า 9Q":
+      return `/recommendation_depression_9q?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
        OTHER
     ================================================== */
 
     default:
+      if (item.assessment_type_id === 13) {
+        return `/recommendation_depression_2q?assessmentId=${item.assessment_id}`;
+      }
+      if (item.assessment_type_id === 14) {
+        return `/recommendation_depression_9q?assessmentId=${item.assessment_id}`;
+      }
       return null;
   }
 }
