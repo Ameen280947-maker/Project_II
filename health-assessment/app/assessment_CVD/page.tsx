@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import {
@@ -8,8 +7,10 @@ import {
   ArrowRight,
   Heart,
   Lock,
+  Save,
   Stethoscope,
   UserRound,
+  X,
 } from "lucide-react";
 
 import type { ReactNode } from "react";
@@ -43,6 +44,7 @@ type Question = {
     | "text";
 
   displayOrder: number;
+
   isRequired: boolean;
 
   choices: Choice[];
@@ -85,6 +87,7 @@ type Profile = {
 
 type LoadResponse = {
   success: boolean;
+
   assessmentName?: string;
 
   questions?: Question[];
@@ -110,6 +113,16 @@ type SubmitResponse = {
   message?: string;
 };
 
+type UpdateProfileResponse = {
+  success: boolean;
+
+  message?: string;
+
+  profile?: Profile;
+
+  hasProfile?: boolean;
+};
+
 /* =========================================================
    PAGE
 ========================================================= */
@@ -132,15 +145,15 @@ export default function AssessmentPage() {
 
   /* =========================================================
      PROFILE DATA
-
-     ข้อมูลชุดนี้ดึงมาจาก health_profile
-     และจะไม่อนุญาตให้แก้ในหน้านี้
+     
+     ข้อมูลเหล่านี้ดึงจาก health_profile
   ========================================================= */
 
   const [
     age,
     setAge,
-  ] = useState(18);
+  ] =
+    useState(18);
 
   const [
     gender,
@@ -153,39 +166,95 @@ export default function AssessmentPage() {
   const [
     smoking,
     setSmoking,
-  ] = useState(false);
+  ] =
+    useState(false);
 
   const [
     diabetes,
     setDiabetes,
-  ] = useState(false);
+  ] =
+    useState(false);
+
+  const [
+    familyDiabetes,
+    setFamilyDiabetes,
+  ] =
+    useState(false);
 
   const [
     waist,
     setWaist,
-  ] = useState(60);
+  ] =
+    useState(60);
 
   const [
     height,
     setHeight,
-  ] = useState(160);
+  ] =
+    useState(160);
 
   const [
     weight,
     setWeight,
-  ] = useState(0);
+  ] =
+    useState(0);
+
+  /* =========================================================
+     ORIGINAL PROFILE
+
+     ใช้เก็บค่าก่อนแก้ไข
+     เพื่อให้ปุ่ม "ยกเลิก" กลับไปค่าเดิมได้
+  ========================================================= */
+
+  const [
+    originalProfile,
+    setOriginalProfile,
+  ] =
+    useState<{
+      age: number;
+
+      gender:
+        | "female"
+        | "male";
+
+      smoking: boolean;
+
+      diabetes: boolean;
+
+      familyDiabetes: boolean;
+
+      waist: number;
+
+      height: number;
+
+      weight: number;
+    } | null>(null);
+
+  /* =========================================================
+     EDIT MODE
+
+     false = ล็อกข้อมูล
+     true = กำลังแก้ไข
+  ========================================================= */
+
+  const [
+    isEditingProfile,
+    setIsEditingProfile,
+  ] =
+    useState(false);
 
   /* =========================================================
      ASSESSMENT DATA
 
-     Systolic เป็นข้อมูลที่ผู้ใช้กรอกในแบบประเมิน
-     จึงยังแก้ได้
+     SBP เป็นข้อมูลเฉพาะของการประเมิน
+     จึงแก้ได้ตลอด
   ========================================================= */
 
   const [
     systolic,
     setSystolic,
-  ] = useState(120);
+  ] =
+    useState(120);
 
   /* =========================================================
      STATE
@@ -194,25 +263,40 @@ export default function AssessmentPage() {
   const [
     loading,
     setLoading,
-  ] = useState(true);
+  ] =
+    useState(true);
 
   const [
     submitting,
     setSubmitting,
-  ] = useState(false);
+  ] =
+    useState(false);
+
+  const [
+    savingProfile,
+    setSavingProfile,
+  ] =
+    useState(false);
 
   const [
     error,
     setError,
-  ] = useState("");
+  ] =
+    useState("");
+
+  const [
+    successMessage,
+    setSuccessMessage,
+  ] =
+    useState("");
 
   const [
     userId,
     setUserId,
   ] =
-    useState<
-      number | null
-    >(null);
+    useState<number | null>(
+      null,
+    );
 
   /* =========================================================
      QUESTION BY ORDER
@@ -239,11 +323,14 @@ export default function AssessmentPage() {
       async () => {
         try {
           setLoading(true);
+
           setError("");
 
-          /* =========================
+          setSuccessMessage("");
+
+          /* =================================================
              USER ID
-          ========================= */
+          ================================================= */
 
           const storedUserId =
             localStorage.getItem(
@@ -286,16 +373,15 @@ export default function AssessmentPage() {
             currentUserId,
           );
 
-          /* =========================
-             LOAD API
-          ========================= */
+          /* =================================================
+             LOAD THAI CVD API
+          ================================================= */
 
           const response =
             await fetch(
               `/api/assessments/thai-cvd?userId=${currentUserId}`,
               {
-                method:
-                  "GET",
+                method: "GET",
 
                 cache:
                   "no-store",
@@ -315,28 +401,28 @@ export default function AssessmentPage() {
             );
           }
 
-          /* =========================
+          /* =================================================
              QUESTIONS
-          ========================= */
+          ================================================= */
 
           setQuestions(
             data.questions ??
               [],
           );
 
-          /* =========================
+          /* =================================================
              PROFILE
-          ========================= */
+          ================================================= */
 
           const profile =
             data.profile;
 
-          if (!profile) {
-            /*
-              ไม่มีข้อมูลทั่วไป
-              ต้องกลับไปกรอก Profile ก่อน
-            */
+          /*
+            ถ้ายังไม่มี Profile
+            ให้ไปกรอกข้อมูลครั้งแรก
+          */
 
+          if (!profile) {
             router.replace(
               "/profile",
             );
@@ -344,24 +430,29 @@ export default function AssessmentPage() {
             return;
           }
 
-          /* =========================
+          /* =================================================
              AGE
-          ========================= */
+          ================================================= */
 
-          if (
-            profile.age !==
-            null
-          ) {
-            setAge(
-              Number(
-                profile.age,
-              ),
-            );
-          }
+          const profileAge =
+            profile.age !== null
+              ? Number(
+                  profile.age,
+                )
+              : 18;
 
-          /* =========================
+          setAge(
+            profileAge,
+          );
+
+          /* =================================================
              GENDER
-          ========================= */
+          ================================================= */
+
+          let profileGender:
+            | "female"
+            | "male" =
+            "female";
 
           if (
             profile.gender
@@ -379,78 +470,134 @@ export default function AssessmentPage() {
               normalizedGender ===
                 "ชาย"
             ) {
-              setGender(
-                "male",
-              );
+              profileGender =
+                "male";
             } else {
-              setGender(
-                "female",
-              );
+              profileGender =
+                "female";
             }
           }
 
-          /* =========================
-             HEIGHT
-          ========================= */
+          setGender(
+            profileGender,
+          );
 
-          if (
+          /* =================================================
+             HEIGHT
+          ================================================= */
+
+          const profileHeight =
             profile.height_cm !==
             null
-          ) {
-            setHeight(
-              Number(
-                profile.height_cm,
-              ),
-            );
-          }
+              ? Number(
+                  profile.height_cm,
+                )
+              : 160;
 
-          /* =========================
+          setHeight(
+            profileHeight,
+          );
+
+          /* =================================================
              WEIGHT
-          ========================= */
+          ================================================= */
 
-          if (
+          const profileWeight =
             profile.weight_kg !==
             null
-          ) {
-            setWeight(
-              Number(
-                profile.weight_kg,
-              ),
-            );
-          }
+              ? Number(
+                  profile.weight_kg,
+                )
+              : 0;
 
-          /* =========================
+          setWeight(
+            profileWeight,
+          );
+
+          /* =================================================
              WAIST
-          ========================= */
+          ================================================= */
 
-          if (
+          const profileWaist =
             profile.waist_cm !==
             null
-          ) {
-            setWaist(
-              Number(
-                profile.waist_cm,
-              ),
-            );
-          }
+              ? Number(
+                  profile.waist_cm,
+                )
+              : 60;
 
-          /* =========================
+          setWaist(
+            profileWaist,
+          );
+
+          /* =================================================
              SMOKING
-          ========================= */
+          ================================================= */
+
+          const profileSmoking =
+            profile.smoking ===
+            true;
 
           setSmoking(
-            profile.smoking ===
-              true,
+            profileSmoking,
           );
 
-          /* =========================
+          /* =================================================
              DIABETES
-          ========================= */
+          ================================================= */
+
+          const profileDiabetes =
+            profile.has_diabetes ===
+            true;
 
           setDiabetes(
-            profile.has_diabetes ===
-              true,
+            profileDiabetes,
           );
+
+          /* =================================================
+             FAMILY DIABETES
+             
+             เก็บค่าเดิมไว้ด้วย
+             ไม่ hard-code false
+          ================================================= */
+
+          const profileFamilyDiabetes =
+            profile.family_diabetes ===
+            true;
+
+          setFamilyDiabetes(
+            profileFamilyDiabetes,
+          );
+
+          /* =================================================
+             SAVE ORIGINAL PROFILE
+          ================================================= */
+
+          setOriginalProfile({
+            age:
+              profileAge,
+
+            gender:
+              profileGender,
+
+            smoking:
+              profileSmoking,
+
+            diabetes:
+              profileDiabetes,
+
+            familyDiabetes:
+              profileFamilyDiabetes,
+
+            waist:
+              profileWaist,
+
+            height:
+              profileHeight,
+
+            weight:
+              profileWeight,
+          });
         } catch (
           loadError
         ) {
@@ -474,6 +621,283 @@ export default function AssessmentPage() {
   }, [router]);
 
   /* =========================================================
+     START EDITING
+  ========================================================= */
+
+  const startEditingProfile =
+    () => {
+      setError("");
+
+      setSuccessMessage("");
+
+      setIsEditingProfile(
+        true,
+      );
+    };
+
+  /* =========================================================
+     CANCEL EDITING
+  ========================================================= */
+
+  const cancelEditingProfile =
+    () => {
+      if (
+        originalProfile
+      ) {
+        setAge(
+          originalProfile.age,
+        );
+
+        setGender(
+          originalProfile.gender,
+        );
+
+        setSmoking(
+          originalProfile.smoking,
+        );
+
+        setDiabetes(
+          originalProfile.diabetes,
+        );
+
+        setFamilyDiabetes(
+          originalProfile.familyDiabetes,
+        );
+
+        setWaist(
+          originalProfile.waist,
+        );
+
+        setHeight(
+          originalProfile.height,
+        );
+
+        setWeight(
+          originalProfile.weight,
+        );
+      }
+
+      setIsEditingProfile(
+        false,
+      );
+
+      setError("");
+
+      setSuccessMessage("");
+    };
+
+  /* =========================================================
+     SAVE PROFILE
+     
+     ใช้ API ที่มีอยู่แล้ว
+     
+     PUT /api/profile
+  ========================================================= */
+
+  const saveProfile =
+    async () => {
+      try {
+        setSavingProfile(
+          true,
+        );
+
+        setError("");
+
+        setSuccessMessage("");
+
+        /* =================================================
+           VALIDATE USER
+        ================================================= */
+
+        if (!userId) {
+          throw new Error(
+            "ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่",
+          );
+        }
+
+        /* =================================================
+           VALIDATE AGE
+        ================================================= */
+
+        if (
+          !Number.isInteger(
+            age,
+          ) ||
+          age < 18 ||
+          age > 100
+        ) {
+          throw new Error(
+            "อายุต้องอยู่ระหว่าง 18-100 ปี",
+          );
+        }
+
+        /* =================================================
+           VALIDATE HEIGHT
+        ================================================= */
+
+        if (
+          !Number.isFinite(
+            height,
+          ) ||
+          height < 120 ||
+          height > 230
+        ) {
+          throw new Error(
+            "ส่วนสูงต้องอยู่ระหว่าง 120-230 ซม.",
+          );
+        }
+
+        /* =================================================
+           VALIDATE WEIGHT
+        ================================================= */
+
+        if (
+          !Number.isFinite(
+            weight,
+          ) ||
+          weight < 30 ||
+          weight > 250
+        ) {
+          throw new Error(
+            "น้ำหนักต้องอยู่ระหว่าง 30-250 กก.",
+          );
+        }
+
+        /* =================================================
+           VALIDATE WAIST
+        ================================================= */
+
+        if (
+          !Number.isFinite(
+            waist,
+          ) ||
+          waist < 40 ||
+          waist > 200
+        ) {
+          throw new Error(
+            "รอบเอวต้องอยู่ระหว่าง 40-200 ซม.",
+          );
+        }
+
+        /* =================================================
+           UPDATE PROFILE
+           
+           สำคัญ:
+           API ของคุณใช้ user_id
+           ไม่ใช่ userId
+           
+           และใช้ PUT
+           ไม่ใช่ PATCH
+        ================================================= */
+
+        const response =
+          await fetch(
+            "/api/profile",
+            {
+              method: "PUT",
+
+              headers: {
+                "Content-Type":
+                  "application/json",
+              },
+
+              body:
+                JSON.stringify({
+                  user_id:
+                    userId,
+
+                  age,
+
+                  gender,
+
+                  height_cm:
+                    height,
+
+                  weight_kg:
+                    weight,
+
+                  waist_cm:
+                    waist,
+
+                  smoking,
+
+                  has_diabetes:
+                    diabetes,
+
+                  family_diabetes:
+                    familyDiabetes,
+                }),
+            },
+          );
+
+        const data =
+          (await response.json()) as UpdateProfileResponse;
+
+        if (
+          !response.ok ||
+          !data.success
+        ) {
+          throw new Error(
+            data.message ??
+              "ไม่สามารถบันทึกข้อมูลสุขภาพได้",
+          );
+        }
+
+        /* =================================================
+           UPDATE ORIGINAL PROFILE
+        ================================================= */
+
+        setOriginalProfile({
+          age,
+
+          gender,
+
+          smoking,
+
+          diabetes,
+
+          familyDiabetes,
+
+          waist,
+
+          height,
+
+          weight,
+        });
+
+        /* =================================================
+           EXIT EDIT MODE
+        ================================================= */
+
+        setIsEditingProfile(
+          false,
+        );
+
+        setSuccessMessage(
+          "บันทึกข้อมูลสุขภาพเรียบร้อยแล้ว",
+        );
+      } catch (
+        saveError
+      ) {
+        console.error(
+          "SAVE PROFILE ERROR:",
+          saveError,
+        );
+
+        setError(
+          saveError instanceof
+            Error
+            ? saveError.message
+            : "ไม่สามารถบันทึกข้อมูลสุขภาพได้",
+        );
+      } finally {
+        setSavingProfile(
+          false,
+        );
+      }
+    };
+
+  /* =========================================================
      GET CHOICE ID BY SCORE
   ========================================================= */
 
@@ -490,12 +914,13 @@ export default function AssessmentPage() {
           Number(
             choice.score,
           ) === score,
-      )?.choiceId ?? null
+      )?.choiceId ??
+      null
     );
   };
 
   /* =========================================================
-     SUBMIT CVD
+     START ASSESSMENT
   ========================================================= */
 
   const startAssessment =
@@ -507,9 +932,23 @@ export default function AssessmentPage() {
 
         setError("");
 
-        /* =========================
+        setSuccessMessage("");
+
+        /* =================================================
+           ห้ามเริ่มประเมินถ้ายังอยู่ใน Edit Mode
+        ================================================= */
+
+        if (
+          isEditingProfile
+        ) {
+          throw new Error(
+            "กรุณากด “บันทึก” ข้อมูลสุขภาพก่อนเริ่มประเมิน",
+          );
+        }
+
+        /* =================================================
            USER
-        ========================= */
+        ================================================= */
 
         if (!userId) {
           throw new Error(
@@ -517,9 +956,9 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =========================
+        /* =================================================
            QUESTIONS
-        ========================= */
+        ================================================= */
 
         const ageQuestion =
           questionByOrder.get(
@@ -570,9 +1009,9 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =========================
+        /* =================================================
            CHOICE IDS
-        ========================= */
+        ================================================= */
 
         const genderChoiceId =
           getChoiceIdByScore(
@@ -615,9 +1054,9 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =========================
+        /* =================================================
            VALIDATION
-        ========================= */
+        ================================================= */
 
         if (
           !Number.isFinite(
@@ -639,6 +1078,15 @@ export default function AssessmentPage() {
         }
 
         if (
+          age < 18 ||
+          age > 100
+        ) {
+          throw new Error(
+            "อายุต้องอยู่ระหว่าง 18-100 ปี",
+          );
+        }
+
+        if (
           systolic < 80 ||
           systolic > 220
         ) {
@@ -648,23 +1096,32 @@ export default function AssessmentPage() {
         }
 
         if (
-          height <= 0
+          waist < 40 ||
+          waist > 200
         ) {
           throw new Error(
-            "ส่วนสูงต้องมากกว่า 0",
+            "รอบเอวต้องอยู่ระหว่าง 40-200 ซม.",
           );
         }
 
-        /* =========================
-           POST
-        ========================= */
+        if (
+          height < 120 ||
+          height > 230
+        ) {
+          throw new Error(
+            "ส่วนสูงต้องอยู่ระหว่าง 120-230 ซม.",
+          );
+        }
+
+        /* =================================================
+           POST THAI CVD
+        ================================================= */
 
         const response =
           await fetch(
             "/api/assessments/thai-cvd",
             {
-              method:
-                "POST",
+              method: "POST",
 
               headers: {
                 "Content-Type":
@@ -757,9 +1214,9 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =========================
+        /* =================================================
            RESULT PAGE
-        ========================= */
+        ================================================= */
 
         router.push(
           `/recommendation-health?assessmentId=${data.assessmentId}`,
@@ -851,8 +1308,36 @@ export default function AssessmentPage() {
           ================================================= */}
 
           {error && (
-            <div className="mt-6 rounded-2xl bg-[#fff0f2] p-4 text-sm font-medium text-[#b91c2b]">
-              {error}
+            <div className="mt-6 flex items-start gap-3 rounded-2xl bg-[#fff0f2] p-4 text-sm font-medium text-[#b91c2b]">
+
+              <X
+                size={18}
+                className="mt-0.5 shrink-0"
+              />
+
+              <span>
+                {error}
+              </span>
+
+            </div>
+          )}
+
+          {/* =================================================
+              SUCCESS
+          ================================================= */}
+
+          {successMessage && (
+            <div className="mt-6 flex items-start gap-3 rounded-2xl bg-[#f0faf3] p-4 text-sm font-medium text-[#27743a]">
+
+              <Save
+                size={18}
+                className="mt-0.5 shrink-0"
+              />
+
+              <span>
+                {successMessage}
+              </span>
+
             </div>
           )}
 
@@ -870,9 +1355,9 @@ export default function AssessmentPage() {
 
               <section className="rounded-[26px] border border-[#eee5e6] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.045)]">
 
-                {/* =========================
+                {/* =================================================
                     TITLE
-                ========================= */}
+                ================================================= */}
 
                 <div className="flex items-center justify-between gap-4">
 
@@ -889,34 +1374,101 @@ export default function AssessmentPage() {
 
                   </div>
 
-                  {/* =========================
-                      EDIT PROFILE BUTTON
+                  {/* =================================================
+                      NOT EDITING
+                  ================================================= */}
 
-                      ปุ่มยังอยู่เหมือนเดิม
-                      แต่พาไปหน้า Profile
-                  ========================= */}
+                  {!isEditingProfile ? (
+                    <button
+                      type="button"
+                      onClick={
+                        startEditingProfile
+                      }
+                      className="rounded-full bg-[#fff0f2] px-5 py-2.5 text-sm font-bold text-[#b91c2b] transition hover:bg-[#ffe4e8]"
+                    >
+                      แก้ไขข้อมูล
+                    </button>
+                  ) : (
 
-                  <Link
-                    href="/profile"
-                    className="rounded-full bg-[#fff0f2] px-5 py-2.5 text-sm font-bold text-[#b91c2b] transition hover:bg-[#ffe4e8]"
-                  >
-                    แก้ไขข้อมูล
-                  </Link>
+                    /* =================================================
+                       EDITING
+                    ================================================= */
+
+                    <div className="flex gap-2">
+
+                      {/* CANCEL */}
+
+                      <button
+                        type="button"
+                        onClick={
+                          cancelEditingProfile
+                        }
+                        disabled={
+                          savingProfile
+                        }
+                        className="flex items-center gap-2 rounded-full border border-[#ead9db] px-4 py-2.5 text-sm font-bold text-[#777780] transition hover:bg-[#faf8f8] disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+
+                        <X
+                          size={16}
+                        />
+
+                        ยกเลิก
+
+                      </button>
+
+                      {/* SAVE */}
+
+                      <button
+                        type="button"
+                        onClick={
+                          saveProfile
+                        }
+                        disabled={
+                          savingProfile
+                        }
+                        className="flex items-center gap-2 rounded-full bg-[#b91c2b] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#9f1624] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+
+                        <Save
+                          size={16}
+                        />
+
+                        {savingProfile
+                          ? "กำลังบันทึก..."
+                          : "บันทึก"}
+
+                      </button>
+
+                    </div>
+                  )}
 
                 </div>
 
-                {/* =========================
+                {/* =================================================
                     LOCK NOTICE
-                ========================= */}
+                ================================================= */}
 
-                <div className="mt-5 flex items-center gap-2 rounded-2xl bg-[#faf8f8] px-4 py-3 text-xs text-[#85858d]">
+                <div
+                  className={`mt-5 flex items-center gap-2 rounded-2xl px-4 py-3 text-xs ${
+                    isEditingProfile
+                      ? "bg-[#fff7e8] text-[#856404]"
+                      : "bg-[#faf8f8] text-[#85858d]"
+                  }`}
+                >
 
                   <Lock
                     size={15}
-                    className="shrink-0 text-[#b91c2b]"
+                    className={
+                      isEditingProfile
+                        ? "shrink-0 text-[#c98b00]"
+                        : "shrink-0 text-[#b91c2b]"
+                    }
                   />
 
-                  ข้อมูลส่วนนี้ดึงมาจากข้อมูลสุขภาพของคุณ หากต้องการแก้ไขให้กดปุ่ม “แก้ไขข้อมูล”
+                  {isEditingProfile
+                    ? "คุณกำลังแก้ไขข้อมูลสุขภาพ สามารถปรับข้อมูลที่ต้องการได้"
+                    : "ข้อมูลส่วนนี้ดึงมาจากข้อมูลสุขภาพของคุณ กด “แก้ไขข้อมูล” หากต้องการปรับข้อมูล"}
 
                 </div>
 
@@ -926,9 +1478,9 @@ export default function AssessmentPage() {
 
                 <div className="mt-8 grid gap-8 md:grid-cols-2">
 
-                  {/* =========================
-                      AGE - READ ONLY
-                  ========================= */}
+                  {/* =================================================
+                      AGE
+                  ================================================= */}
 
                   <RangeField
                     label={
@@ -944,12 +1496,17 @@ export default function AssessmentPage() {
                     unit="ปี"
                     min={18}
                     max={80}
-                    readOnly
+                    onChange={
+                      setAge
+                    }
+                    readOnly={
+                      !isEditingProfile
+                    }
                   />
 
-                  {/* =========================
-                      GENDER - READ ONLY
-                  ========================= */}
+                  {/* =================================================
+                      GENDER
+                  ================================================= */}
 
                   <div>
 
@@ -963,33 +1520,71 @@ export default function AssessmentPage() {
 
                     <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#e5e0e1]">
 
+                      {/* FEMALE */}
+
                       <button
                         type="button"
-                        disabled
-                        className={`h-14 cursor-not-allowed font-semibold ${
+                        disabled={
+                          !isEditingProfile
+                        }
+                        onClick={() =>
+                          setGender(
+                            "female",
+                          )
+                        }
+                        className={`h-14 font-semibold transition ${
                           gender ===
                           "female"
                             ? "bg-[#f8e8ea] text-[#b91c2b]"
                             : "bg-[#fafafa] text-[#aaaab0]"
+                        } ${
+                          !isEditingProfile
+                            ? "cursor-not-allowed"
+                            : "cursor-pointer hover:bg-[#fceff1]"
                         }`}
                       >
                         หญิง
                       </button>
 
+                      {/* MALE */}
+
                       <button
                         type="button"
-                        disabled
-                        className={`h-14 cursor-not-allowed font-semibold ${
+                        disabled={
+                          !isEditingProfile
+                        }
+                        onClick={() =>
+                          setGender(
+                            "male",
+                          )
+                        }
+                        className={`h-14 font-semibold transition ${
                           gender ===
                           "male"
                             ? "bg-[#f8e8ea] text-[#b91c2b]"
                             : "bg-[#fafafa] text-[#aaaab0]"
+                        } ${
+                          !isEditingProfile
+                            ? "cursor-not-allowed"
+                            : "cursor-pointer hover:bg-[#fceff1]"
                         }`}
                       >
                         ชาย
                       </button>
 
                     </div>
+
+                    {!isEditingProfile && (
+                      <div className="mt-1 flex items-center gap-1 text-[11px] text-[#9a9aa1]">
+
+                        <Lock
+                          size={11}
+                        />
+
+                        จากข้อมูลสุขภาพ
+
+                      </div>
+                    )}
 
                   </div>
 
@@ -1001,17 +1596,53 @@ export default function AssessmentPage() {
 
                 <div className="mt-6 rounded-2xl bg-[#faf8f8] p-4">
 
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-4">
 
                     <span className="text-sm font-semibold text-[#777780]">
                       น้ำหนักจากข้อมูลทั่วไป
                     </span>
 
-                    <strong className="text-lg">
-                      {weight > 0
-                        ? `${weight} kg`
-                        : "-"}
-                    </strong>
+                    {isEditingProfile ? (
+
+                      <div className="flex items-center gap-2">
+
+                        <input
+                          type="number"
+                          min={30}
+                          max={250}
+                          value={
+                            weight
+                          }
+                          onChange={(
+                            event,
+                          ) =>
+                            setWeight(
+                              Number(
+                                event
+                                  .target
+                                  .value,
+                              ),
+                            )
+                          }
+                          className="w-24 rounded-xl border border-[#e5dfe0] bg-white px-3 py-2 text-right font-bold outline-none focus:border-[#b91c2b]"
+                        />
+
+                        <span className="text-sm text-[#777780]">
+                          kg
+                        </span>
+
+                      </div>
+
+                    ) : (
+
+                      <strong className="text-lg">
+                        {weight >
+                        0
+                          ? `${weight} kg`
+                          : "-"}
+                      </strong>
+
+                    )}
 
                   </div>
 
@@ -1023,9 +1654,7 @@ export default function AssessmentPage() {
 
                 <div className="mt-8 grid gap-5 md:grid-cols-2">
 
-                  {/* =========================
-                      SMOKING - READ ONLY
-                  ========================= */}
+                  {/* SMOKING */}
 
                   <ToggleCard
                     icon={
@@ -1040,16 +1669,25 @@ export default function AssessmentPage() {
                         ?.questionText ??
                       "สูบบุหรี่หรือไม่"
                     }
-                    description="ข้อมูลจากโปรไฟล์สุขภาพ"
+                    description={
+                      isEditingProfile
+                        ? "สามารถแก้ไขข้อมูลได้"
+                        : "ข้อมูลจากโปรไฟล์สุขภาพ"
+                    }
                     checked={
                       smoking
                     }
-                    readOnly
+                    onChange={() =>
+                      setSmoking(
+                        !smoking,
+                      )
+                    }
+                    readOnly={
+                      !isEditingProfile
+                    }
                   />
 
-                  {/* =========================
-                      DIABETES - READ ONLY
-                  ========================= */}
+                  {/* DIABETES */}
 
                   <ToggleCard
                     icon={
@@ -1064,11 +1702,22 @@ export default function AssessmentPage() {
                         ?.questionText ??
                       "ป่วยเป็นเบาหวานหรือไม่"
                     }
-                    description="ข้อมูลจากโปรไฟล์สุขภาพ"
+                    description={
+                      isEditingProfile
+                        ? "สามารถแก้ไขข้อมูลได้"
+                        : "ข้อมูลจากโปรไฟล์สุขภาพ"
+                    }
                     checked={
                       diabetes
                     }
-                    readOnly
+                    onChange={() =>
+                      setDiabetes(
+                        !diabetes,
+                      )
+                    }
+                    readOnly={
+                      !isEditingProfile
+                    }
                   />
 
                 </div>
@@ -1089,8 +1738,6 @@ export default function AssessmentPage() {
 
                   {/* =================================================
                       SBP
-
-                      แก้ได้ เพราะเป็นข้อมูลของการประเมินครั้งนี้
                   ================================================= */}
 
                   <RangeField
@@ -1114,8 +1761,6 @@ export default function AssessmentPage() {
 
                   {/* =================================================
                       WAIST
-
-                      ดึง Profile → ห้ามแก้
                   ================================================= */}
 
                   <RangeField
@@ -1132,13 +1777,16 @@ export default function AssessmentPage() {
                     unit="cm"
                     min={40}
                     max={200}
-                    readOnly
+                    onChange={
+                      setWaist
+                    }
+                    readOnly={
+                      !isEditingProfile
+                    }
                   />
 
                   {/* =================================================
                       HEIGHT
-
-                      ดึง Profile → ห้ามแก้
                   ================================================= */}
 
                   <RangeField
@@ -1155,7 +1803,12 @@ export default function AssessmentPage() {
                     unit="cm"
                     min={120}
                     max={230}
-                    readOnly
+                    onChange={
+                      setHeight
+                    }
+                    readOnly={
+                      !isEditingProfile
+                    }
                   />
 
                 </div>
@@ -1169,6 +1822,10 @@ export default function AssessmentPage() {
             ================================================= */}
 
             <aside className="flex flex-col justify-end gap-5">
+
+              {/* =================================================
+                  SUMMARY
+              ================================================= */}
 
               <div className="rounded-[25px] border border-[#f0dfe1] bg-gradient-to-br from-white to-[#fff1f2] p-6">
 
@@ -1185,6 +1842,10 @@ export default function AssessmentPage() {
                   ข้อมูลทั่วไปถูกดึงมาจากโปรไฟล์สุขภาพ
                   และเมื่อกดเริ่มประเมินระบบจะคำนวณและบันทึกผลภายใต้บัญชีผู้ใช้งานของคุณ
                 </p>
+
+                {/* =================================================
+                    SUMMARY BOX
+                ================================================= */}
 
                 <div className="mt-5 rounded-2xl bg-white/80 p-4 text-sm">
 
@@ -1206,7 +1867,8 @@ export default function AssessmentPage() {
                   <SummaryRow
                     label="น้ำหนัก"
                     value={
-                      weight > 0
+                      weight >
+                      0
                         ? `${weight} kg`
                         : "-"
                     }
@@ -1250,7 +1912,7 @@ export default function AssessmentPage() {
               </div>
 
               {/* =================================================
-                  START
+                  START ASSESSMENT
               ================================================= */}
 
               <button
@@ -1260,20 +1922,25 @@ export default function AssessmentPage() {
                 }
                 disabled={
                   loading ||
-                  submitting
+                  submitting ||
+                  savingProfile ||
+                  isEditingProfile
                 }
                 className="flex h-[68px] w-full items-center justify-center gap-3 rounded-[22px] bg-gradient-to-r from-[#b91c2b] to-[#8a1420] text-lg font-bold text-white shadow-[0_16px_35px_rgba(138,20,32,0.3)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
               >
 
                 {submitting
                   ? "กำลังประมวลผล..."
-                  : "เริ่มประเมิน"}
+                  : isEditingProfile
+                    ? "กรุณาบันทึกข้อมูลก่อน"
+                    : "เริ่มประเมิน"}
 
-                {!submitting && (
-                  <ArrowRight
-                    size={23}
-                  />
-                )}
+                {!submitting &&
+                  !isEditingProfile && (
+                    <ArrowRight
+                      size={23}
+                    />
+                  )}
 
               </button>
 
@@ -1298,6 +1965,7 @@ function SummaryRow({
   value,
 }: {
   label: string;
+
   value: string;
 }) {
   return (
@@ -1317,10 +1985,6 @@ function SummaryRow({
 
 /* =========================================================
    RANGE FIELD
-
-   readOnly = true
-   → แสดงค่าอย่างเดียว
-   → Slider ขยับไม่ได้
 ========================================================= */
 
 type RangeFieldProps = {
@@ -1367,6 +2031,10 @@ function RangeField({
   return (
     <div>
 
+      {/* =================================================
+          LABEL + VALUE
+      ================================================= */}
+
       <div className="flex items-end justify-between gap-4">
 
         <div>
@@ -1375,7 +2043,7 @@ function RangeField({
             {label}
           </p>
 
-          {readOnly && (
+          {readOnly ? (
             <div className="mt-1 flex items-center gap-1 text-[11px] text-[#9a9aa1]">
 
               <Lock
@@ -1384,6 +2052,10 @@ function RangeField({
 
               จากข้อมูลสุขภาพ
 
+            </div>
+          ) : (
+            <div className="mt-1 text-[11px] text-[#b91c2b]">
+              สามารถแก้ไขได้
             </div>
           )}
 
@@ -1402,6 +2074,10 @@ function RangeField({
         </div>
 
       </div>
+
+      {/* =================================================
+          RANGE
+      ================================================= */}
 
       <input
         type="range"
@@ -1445,6 +2121,10 @@ function RangeField({
         }}
       />
 
+      {/* =================================================
+          MIN MAX
+      ================================================= */}
+
       <div className="mt-3 flex justify-between text-xs text-[#898991]">
 
         <span>
@@ -1463,10 +2143,6 @@ function RangeField({
 
 /* =========================================================
    TOGGLE CARD
-
-   readOnly = true
-   → ดูสถานะได้
-   → กดเปลี่ยนไม่ได้
 ========================================================= */
 
 type ToggleCardProps = {
@@ -1500,6 +2176,10 @@ function ToggleCard({
       }`}
     >
 
+      {/* =================================================
+          LEFT
+      ================================================= */}
+
       <div className="flex min-w-0 items-center gap-4">
 
         <span className="shrink-0 text-[#b91c2b]">
@@ -1519,6 +2199,10 @@ function ToggleCard({
         </div>
 
       </div>
+
+      {/* =================================================
+          TOGGLE
+      ================================================= */}
 
       <Toggle
         checked={
