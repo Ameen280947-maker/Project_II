@@ -28,13 +28,13 @@ type HistoryItem = {
   user_id: number;
 
   total_score:
-    | string
-    | number
-    | null;
+  | string
+  | number
+  | null;
 
   risk_level:
-    | string
-    | null;
+  | string
+  | null;
 
   assessed_at: string;
 
@@ -42,12 +42,12 @@ type HistoryItem = {
   assessment_name: string;
 
   recommendation_id:
-    | number
-    | null;
+  | number
+  | null;
 
   recommendation_text:
-    | string
-    | null;
+  | string
+  | null;
 };
 
 type HistoryResponse = {
@@ -124,7 +124,7 @@ export default function HistoryPage() {
         ) {
           throw new Error(
             data.message ??
-              "ไม่สามารถโหลดประวัติการประเมินได้",
+            "ไม่สามารถโหลดประวัติการประเมินได้",
           );
         }
 
@@ -196,6 +196,10 @@ export default function HistoryPage() {
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
 
+        {/* =================================================
+            SIDEBAR
+        ================================================== */}
+
         <Sidebar />
 
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-12">
@@ -258,9 +262,9 @@ export default function HistoryPage() {
               value={
                 history.length > 0
                   ? formatDateShort(
-                      history[0]
-                        .assessed_at,
-                    )
+                    history[0]
+                      .assessed_at,
+                  )
                   : "-"
               }
             />
@@ -287,11 +291,10 @@ export default function HistoryPage() {
                     onClick={() =>
                       setFilter(name)
                     }
-                    className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${
-                      filter === name
+                    className={`rounded-full px-5 py-2.5 text-sm font-semibold transition ${filter === name
                         ? "bg-[#b91c2b] text-white shadow-[0_8px_20px_rgba(185,28,43,0.2)]"
                         : "bg-[#faf7f7] text-[#74757d] hover:bg-[#fff0f2] hover:text-[#b91c2b]"
-                    }`}
+                      }`}
                   >
                     {getAssessmentDisplayName(
                       name,
@@ -461,8 +464,6 @@ function HistoryCard({
                 )}
               </h3>
 
-              {/* Risk Badge */}
-
               <span
                 className={`rounded-full px-3 py-1 text-xs font-bold ${resultStyle.badge}`}
               >
@@ -589,16 +590,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         badge:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         box:
           "bg-[#fff0f2]",
-
         text:
           "text-[#b91c2b]",
-
         button:
           "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
       };
@@ -613,16 +610,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff8e8] text-[#a77723]",
-
         badge:
           "bg-[#fff8e8] text-[#a77723]",
-
         box:
           "bg-[#fff8e8]",
-
         text:
           "text-[#a77723]",
-
         button:
           "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
       };
@@ -631,16 +624,12 @@ function getResultStyle(
     return {
       icon:
         "bg-[#eef8e9] text-[#57965c]",
-
       badge:
         "bg-[#eef8e9] text-[#57965c]",
-
       box:
         "bg-[#eef8e9]",
-
       text:
         "text-[#57965c]",
-
       button:
         "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
     };
@@ -663,16 +652,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         badge:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         box:
           "bg-[#fff0f2]",
-
         text:
           "text-[#b91c2b]",
-
         button:
           "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
       };
@@ -685,16 +670,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff0f2] text-[#d64b37]",
-
         badge:
           "bg-[#fff0f2] text-[#d64b37]",
-
         box:
           "bg-[#fff0f2]",
-
         text:
           "text-[#d64b37]",
-
         button:
           "bg-[#fff0f2] text-[#d64b37] hover:bg-[#ffe4e8]",
       };
@@ -707,16 +688,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff8e8] text-[#a77723]",
-
         badge:
           "bg-[#fff8e8] text-[#a77723]",
-
         box:
           "bg-[#fff8e8]",
-
         text:
           "text-[#a77723]",
-
         button:
           "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
       };
@@ -725,16 +702,12 @@ function getResultStyle(
     return {
       icon:
         "bg-[#eef8e9] text-[#57965c]",
-
       badge:
         "bg-[#eef8e9] text-[#57965c]",
-
       box:
         "bg-[#eef8e9]",
-
       text:
         "text-[#57965c]",
-
       button:
         "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
     };
@@ -755,16 +728,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         badge:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         box:
           "bg-[#fff0f2]",
-
         text:
           "text-[#b91c2b]",
-
         button:
           "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
       };
@@ -777,16 +746,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff8e8] text-[#a77723]",
-
         badge:
           "bg-[#fff8e8] text-[#a77723]",
-
         box:
           "bg-[#fff8e8]",
-
         text:
           "text-[#a77723]",
-
         button:
           "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
       };
@@ -795,16 +760,12 @@ function getResultStyle(
     return {
       icon:
         "bg-[#eef8e9] text-[#57965c]",
-
       badge:
         "bg-[#eef8e9] text-[#57965c]",
-
       box:
         "bg-[#eef8e9]",
-
       text:
         "text-[#57965c]",
-
       button:
         "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
     };
@@ -827,16 +788,12 @@ function getResultStyle(
       return {
         icon:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         badge:
           "bg-[#fff0f2] text-[#b91c2b]",
-
         box:
           "bg-[#fff0f2]",
-
         text:
           "text-[#b91c2b]",
-
         button:
           "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
       };
@@ -845,16 +802,71 @@ function getResultStyle(
     return {
       icon:
         "bg-[#eef8e9] text-[#57965c]",
-
       badge:
         "bg-[#eef8e9] text-[#57965c]",
-
       box:
         "bg-[#eef8e9]",
-
       text:
         "text-[#57965c]",
+      button:
+        "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
+    };
+  }
 
+  /* =====================================================
+     SMOKING
+  ===================================================== */
+
+  if (
+    name === "Smoking"
+  ) {
+    if (
+      risk.includes("สูง") ||
+      risk.includes("high") ||
+      risk.includes("มาก") ||
+      risk.includes("รุนแรง")
+    ) {
+      return {
+        icon:
+          "bg-[#fff0f2] text-[#b91c2b]",
+        badge:
+          "bg-[#fff0f2] text-[#b91c2b]",
+        box:
+          "bg-[#fff0f2]",
+        text:
+          "text-[#b91c2b]",
+        button:
+          "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
+      };
+    }
+
+    if (
+      risk.includes("ปานกลาง") ||
+      risk.includes("moderate")
+    ) {
+      return {
+        icon:
+          "bg-[#fff8e8] text-[#a77723]",
+        badge:
+          "bg-[#fff8e8] text-[#a77723]",
+        box:
+          "bg-[#fff8e8]",
+        text:
+          "text-[#a77723]",
+        button:
+          "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
+      };
+    }
+
+    return {
+      icon:
+        "bg-[#eef8e9] text-[#57965c]",
+      badge:
+        "bg-[#eef8e9] text-[#57965c]",
+      box:
+        "bg-[#eef8e9]",
+      text:
+        "text-[#57965c]",
       button:
         "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
     };
@@ -880,16 +892,12 @@ function getResultStyle(
     return {
       icon:
         "bg-[#fff0f2] text-[#b91c2b]",
-
       badge:
         "bg-[#fff0f2] text-[#b91c2b]",
-
       box:
         "bg-[#fff0f2]",
-
       text:
         "text-[#b91c2b]",
-
       button:
         "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
     };
@@ -899,16 +907,12 @@ function getResultStyle(
     return {
       icon:
         "bg-[#fff8e8] text-[#a77723]",
-
       badge:
         "bg-[#fff8e8] text-[#a77723]",
-
       box:
         "bg-[#fff8e8]",
-
       text:
         "text-[#a77723]",
-
       button:
         "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
     };
@@ -917,16 +921,12 @@ function getResultStyle(
   return {
     icon:
       "bg-[#eef8e9] text-[#57965c]",
-
     badge:
       "bg-[#eef8e9] text-[#57965c]",
-
     box:
       "bg-[#eef8e9]",
-
     text:
       "text-[#57965c]",
-
     button:
       "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
   };
@@ -949,40 +949,76 @@ function getRiskDisplayName(
   const risk =
     riskLevel.toLowerCase();
 
-  /* Diabetes */
+  /* =====================================================
+     DIABETES
+  ===================================================== */
 
   if (
     assessmentName ===
-      "Diabetes TDS" ||
+    "Diabetes TDS" ||
     assessmentName ===
-      "Diabetes Risk"
+    "Diabetes Risk"
   ) {
     if (
       risk === "very_high" ||
-      risk.includes("very high")
+      risk.includes("very high") ||
+      risk.includes("สูงมาก")
     ) {
       return "ความเสี่ยงสูงมาก";
     }
 
     if (
       risk === "high" ||
-      risk.includes("high")
+      risk.includes("high") ||
+      risk.includes("สูง")
     ) {
       return "ความเสี่ยงสูง";
     }
 
     if (
       risk === "moderate" ||
-      risk.includes("moderate")
+      risk.includes("moderate") ||
+      risk.includes("ปานกลาง")
     ) {
       return "ความเสี่ยงปานกลาง";
     }
 
     if (
       risk === "low" ||
-      risk.includes("low")
+      risk.includes("low") ||
+      risk.includes("ต่ำ")
     ) {
       return "ความเสี่ยงต่ำ";
+    }
+  }
+
+  /* =====================================================
+     SMOKING
+  ===================================================== */
+
+  if (
+    assessmentName ===
+    "Smoking"
+  ) {
+    if (
+      risk.includes("high") ||
+      risk.includes("สูง")
+    ) {
+      return "ติดนิโคตินระดับสูง";
+    }
+
+    if (
+      risk.includes("moderate") ||
+      risk.includes("ปานกลาง")
+    ) {
+      return "ติดนิโคตินระดับปานกลาง";
+    }
+
+    if (
+      risk.includes("low") ||
+      risk.includes("ต่ำ")
+    ) {
+      return "ติดนิโคตินระดับต่ำ";
     }
   }
 
@@ -1126,7 +1162,9 @@ function formatScore(
     );
   }
 
-  /* CVD */
+  /* =====================================================
+     CVD
+  ===================================================== */
 
   if (
     item.assessment_name ===
@@ -1135,18 +1173,22 @@ function formatScore(
     return `${score.toFixed(2)}%`;
   }
 
-  /* Diabetes */
+  /* =====================================================
+     DIABETES
+  ===================================================== */
 
   if (
     item.assessment_name ===
-      "Diabetes TDS" ||
+    "Diabetes TDS" ||
     item.assessment_name ===
-      "Diabetes Risk"
+    "Diabetes Risk"
   ) {
     return `${score.toFixed(2)}%`;
   }
 
-  /* BMI */
+  /* =====================================================
+     BMI
+  ===================================================== */
 
   if (
     item.assessment_name ===
@@ -1155,7 +1197,9 @@ function formatScore(
     return `BMI ${score.toFixed(2)}`;
   }
 
-  /* Blood Pressure */
+  /* =====================================================
+     BLOOD PRESSURE
+  ===================================================== */
 
   if (
     item.assessment_name ===
@@ -1164,6 +1208,17 @@ function formatScore(
     return getBloodPressureScoreText(
       item,
     );
+  }
+
+  /* =====================================================
+     SMOKING
+  ===================================================== */
+
+  if (
+    item.assessment_name ===
+    "Smoking"
+  ) {
+    return `${score}`;
   }
 
   return `${score}`;
@@ -1245,9 +1300,22 @@ function formatDateShort(
 function getDetailHref(
   item: HistoryItem,
 ) {
+  if (item.assessment_type_id === 7) {
+    return `/recommendation_alcohol?assessmentId=${item.assessment_id}`;
+  }
+
+  if (item.assessment_type_id === 8) {
+    return `/recommendation_physical_activity?assessmentId=${item.assessment_id}`;
+  }
+
+  if (item.assessment_type_id === 10) {
+    return `/recommendation_diet?assessmentId=${item.assessment_id}`;
+  }
+
   switch (
-    item.assessment_name
+  item.assessment_name
   ) {
+
     /* =================================================
        CVD
     ================================================== */
@@ -1265,16 +1333,15 @@ function getDetailHref(
     /* =================================================
        DIABETES
        
-       สำคัญมาก:
-       เพิ่มตรงนี้เพื่อให้ Diabetes
-       กด "ดูรายละเอียด" ได้
+       ใช้ recommendation_diabetes
+       ไม่ใช้ assessment_diabetes/result
     ================================================== */
 
     case "Diabetes TDS":
-      return `/assessment_diabetes/result?assessmentId=${item.assessment_id}`;
+      return `/recommendation_diabetes?assessmentId=${item.assessment_id}`;
 
     case "Diabetes Risk":
-      return `/assessment_diabetes/result?assessmentId=${item.assessment_id}`;
+      return `/recommendation_diabetes?assessmentId=${item.assessment_id}`;
 
     /* =================================================
        BMI
@@ -1284,10 +1351,84 @@ function getDetailHref(
       return `/recommendation-bmi?assessmentId=${item.assessment_id}`;
 
     /* =================================================
+       SMOKING
+    ================================================== */
+
+    case "Smoking":
+      return `/recommendation_smoking?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
+       ALCOHOL
+    ================================================== */
+
+    case "Alcohol":
+    case "การดื่มเครื่องดื่มแอลกอฮอล์":
+    case "การดื่มแอลกอฮอล์":
+      return `/recommendation_alcohol?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
+       PHYSICAL ACTIVITY
+    ================================================== */
+
+    case "Physical Activity":
+    case "กิจกรรมทางกาย":
+    case "แบบประเมินกิจกรรมทางกาย":
+    case "แบบประเมินกิจกรรมทางกายและการนอนหลับ":
+      return `/recommendation_physical_activity?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
+       DIET
+    ================================================== */
+
+    case "Diet":
+    case "พฤติกรรมการรับประทานอาหาร":
+    case "แบบประเมินพฤติกรรมการรับประทานอาหาร":
+      return `/recommendation_diet?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
+       STRESS
+    ================================================== */
+
+    case "Stress":
+    case "ความเครียด":
+    case "แบบประเมินความเครียด":
+      return `/recommendation_stress?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
+       SLEEP
+    ================================================== */
+
+    case "Sleep":
+    case "การนอนหลับ":
+    case "แบบประเมินการนอนหลับ":
+      return `/recommendation_sleep?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
+       DEPRESSION 2Q & 9Q
+    ================================================== */
+
+    case "PHQ-2":
+    case "2Q":
+    case "แบบคัดกรองภาวะซึมเศร้า 2Q":
+    case "คัดกรองภาวะซึมเศร้า 2Q":
+      return `/recommendation_depression_2q?assessmentId=${item.assessment_id}`;
+
+    case "9Q":
+    case "แบบประเมินโรคซึมเศร้า 9Q":
+    case "โรคซึมเศร้า 9Q":
+      return `/recommendation_depression_9q?assessmentId=${item.assessment_id}`;
+
+    /* =================================================
        OTHER
     ================================================== */
 
     default:
+      if (item.assessment_type_id === 13) {
+        return `/recommendation_depression_2q?assessmentId=${item.assessment_id}`;
+      }
+      if (item.assessment_type_id === 14) {
+        return `/recommendation_depression_9q?assessmentId=${item.assessment_id}`;
+      }
       return null;
   }
 }
