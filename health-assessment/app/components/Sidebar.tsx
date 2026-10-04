@@ -67,6 +67,8 @@ export default function Sidebar() {
     pathname.startsWith("/assessment_DB") ||
     pathname.startsWith("/assessment_diabetes") ||
     pathname.startsWith("/assessment_smoking") ||
+    pathname.startsWith("/assessment_depression_2q") ||
+    pathname.startsWith("/assessment_depression_9q") ||
     pathname.startsWith("/assessment/");
 
   // ---------------------------------------------------------
@@ -178,7 +180,7 @@ export default function Sidebar() {
         --------------------------------------------------- */}
 
         <SidebarItem
-          href="/result"
+          href="/dashboard"
           icon={
             <BarChart3 size={21} />
           }

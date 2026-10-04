@@ -458,23 +458,33 @@ export default function LoginPage() {
             เพื่ออนาคตที่ดีกว่า
           </p>
 
-          <div className="relative mt-14 hidden w-full items-center justify-center gap-24 lg:flex">
+          {/* FEATURES */}
 
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_10px_25px_rgba(139,20,32,0.10)]">
-              <HeartPulse
-                size={30}
-                className="text-[#B91C2B]"
-                strokeWidth={1.8}
-              />
-            </div>
+          <div className="mt-10 grid w-full grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-4">
 
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white shadow-[0_10px_25px_rgba(139,20,32,0.10)]">
-              <BarChart3
-                size={30}
-                className="text-[#B91C2B]"
-                strokeWidth={1.8}
-              />
-            </div>
+            <Feature
+              icon={
+                <ShieldCheck size={24} />
+              }
+              title="ปลอดภัย"
+              desc="ข้อมูลของคุณปลอดภัยและเป็นความลับ"
+            />
+
+            <Feature
+              icon={
+                <LockKeyhole size={24} />
+              }
+              title="เชื่อถือได้"
+              desc="ประเมินด้วยมาตรฐานทางการแพทย์"
+            />
+
+            <Feature
+              icon={
+                <BarChart3 size={24} />
+              }
+              title="เข้าใจง่าย"
+              desc="ผลลัพธ์ชัดเจนพร้อมคำแนะนำ"
+            />
 
           </div>
 
@@ -681,36 +691,6 @@ export default function LoginPage() {
 
       </div>
 
-      {/* FEATURES */}
-
-      <div className="relative mx-auto grid max-w-4xl grid-cols-1 gap-8 px-8 pb-14 sm:grid-cols-3 sm:gap-6">
-
-        <Feature
-          icon={
-            <ShieldCheck size={27} />
-          }
-          title="ปลอดภัย"
-          desc="ข้อมูลของคุณปลอดภัยและเป็นความลับ"
-        />
-
-        <Feature
-          icon={
-            <LockKeyhole size={27} />
-          }
-          title="เชื่อถือได้"
-          desc="ประเมินด้วยมาตรฐานทางการแพทย์"
-        />
-
-        <Feature
-          icon={
-            <BarChart3 size={27} />
-          }
-          title="เข้าใจง่าย"
-          desc="ผลลัพธ์ชัดเจนพร้อมคำแนะนำ"
-        />
-
-      </div>
-
     </main>
   );
 }
@@ -729,7 +709,7 @@ function Feature({
   desc: string;
 }) {
   return (
-    <div className="flex items-center justify-center gap-3 text-center sm:items-start sm:text-left">
+    <div className="flex flex-col items-center gap-3 text-center">
 
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-[#B91C2B] shadow-[0_8px_20px_rgba(139,20,32,0.08)]">
         {icon}

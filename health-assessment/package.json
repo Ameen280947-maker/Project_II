@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "lightningcss-darwin-arm64": "^1.33.0",
     "lucide-react": "^1.25.0",
     "mysql2": "^3.24.1",
     "next": "16.2.11",

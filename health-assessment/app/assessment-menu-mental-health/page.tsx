@@ -55,7 +55,7 @@ const mentalHealthAssessments: MentalHealthAssessment[] = [
         description:
             "ประเมินอาการและความรู้สึกที่เกี่ยวข้องกับภาวะซึมเศร้า เพื่อช่วยคัดกรองความเสี่ยงและส่งเสริมการดูแลสุขภาพจิต",
 
-        href: "/depression-assessment",
+        href: "/assessment_depression_2q",
 
         icon: HeartPulse,
 
