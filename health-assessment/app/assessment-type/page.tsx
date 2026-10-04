@@ -44,7 +44,7 @@ const assessmentTypes = [
       "ความเครียดสะสม",
       "ภาวะซึมเศร้า",
     ],
-    href: "/mental-health-assessment",
+    href: "/assessment-menu-mental-health",
     theme: "blue" as const,
   },
 ];
@@ -69,7 +69,7 @@ export default function AssessmentTypePage() {
           {/* Header */}
 
           <header>
-            
+
 
             <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
               Assessment-
@@ -129,9 +129,9 @@ type AssessmentTypeCardProps = {
   href: string;
 
   theme:
-    | "red"
-    | "green"
-    | "blue";
+  | "red"
+  | "green"
+  | "blue";
 };
 
 function AssessmentTypeCard({
@@ -273,9 +273,9 @@ function AssessmentIllustration({
   theme,
 }: {
   theme:
-    | "red"
-    | "green"
-    | "blue";
+  | "red"
+  | "green"
+  | "blue";
 }) {
   /* ================= NCD ================= */
 

@@ -23,11 +23,11 @@ type BehaviorAssessment = {
   href: string;
 
   icon:
-    | typeof Cigarette
-    | typeof Wine
-    | typeof Dumbbell
-    | typeof Moon
-    | typeof Utensils;
+  | typeof Cigarette
+  | typeof Wine
+  | typeof Dumbbell
+  | typeof Moon
+  | typeof Utensils;
 
   iconClass: string;
   buttonClass: string;
@@ -61,7 +61,7 @@ const behaviorAssessments: BehaviorAssessment[] = [
     description:
       "ประเมินพฤติกรรมการดื่มแอลกอฮอล์และปัจจัยเสี่ยงที่อาจส่งผลต่อสุขภาพ",
 
-    href: "/assessment-menu-behavior/alcohol",
+    href: "/assessment_alcohol",
 
     icon: Wine,
 
@@ -78,7 +78,7 @@ const behaviorAssessments: BehaviorAssessment[] = [
     description:
       "ประเมินระดับกิจกรรมทางกายและความเพียงพอของการออกกำลังกายในชีวิตประจำวัน",
 
-    href: "/assessment-menu-behavior/exercise",
+    href: "/assessment_physical_activity",
 
     icon: Dumbbell,
 
@@ -95,7 +95,7 @@ const behaviorAssessments: BehaviorAssessment[] = [
     description:
       "ประเมินระยะเวลา คุณภาพ และความสม่ำเสมอของการนอนหลับ เพื่อเฝ้าระวังปัญหาการนอน",
 
-    href: "/assessment-menu-behavior/sleep",
+    href: "/sleep-assessment",
 
     icon: Moon,
 
@@ -112,7 +112,7 @@ const behaviorAssessments: BehaviorAssessment[] = [
     description:
       "ประเมินพฤติกรรมการรับประทานอาหารและคุณภาพของอาหารที่บริโภคในชีวิตประจำวัน",
 
-    href: "/assessment-menu-behavior/diet",
+    href: "/assessment_diet",
 
     icon: Utensils,
 
@@ -243,7 +243,7 @@ export default function BehaviorAssessmentPage() {
               INFORMATION BANNER
           ================================================= */}
 
-       
+
           {/* =================================================
               BACK BUTTON
           ================================================= */}

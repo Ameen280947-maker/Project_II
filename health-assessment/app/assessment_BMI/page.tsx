@@ -10,7 +10,6 @@ interface NumberStepperProps {
     unit: string;
     value: number;
     step?: number;
-    icon: React.ReactNode;
     onChange: (next: number) => void;
 }
 
@@ -20,13 +19,11 @@ function NumberStepper({
     unit,
     value,
     step = 1,
-    icon,
     onChange,
 }: NumberStepperProps) {
     return (
         <div className="field">
             <label htmlFor={id}>
-                <span className="fieldIcon">{icon}</span>
                 {label}
             </label>
             <div className="stepper">
@@ -251,12 +248,6 @@ export default function WeightAssessmentPage() {
                                     unit="KG"
                                     value={weight}
                                     onChange={setWeight}
-                                    icon={
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                            <rect x="4" y="7" width="16" height="13" rx="3" />
-                                            <path d="M9 7V5.5A2.5 2.5 0 0 1 11.5 3h1A2.5 2.5 0 0 1 15 5.5V7" />
-                                        </svg>
-                                    }
                                 />
                                 <NumberStepper
                                     id="height"
@@ -264,12 +255,6 @@ export default function WeightAssessmentPage() {
                                     unit="CM"
                                     value={height}
                                     onChange={setHeight}
-                                    icon={
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                            <circle cx="12" cy="5" r="2" />
-                                            <path d="M12 7v6M9 10h6M9 13l-2 8M15 13l2 8" />
-                                        </svg>
-                                    }
                                 />
                             </div>
 
@@ -294,22 +279,8 @@ export default function WeightAssessmentPage() {
                         </div>
                     </div>
 
-                    {/* ===================== ขวา: ภาพประกอบ + Tips ===================== */}
+                    {/* ===================== ขวา: Tips ===================== */}
                     <div className="sideColumn">
-                        <div className="illustrationWrap">
-                            <div className="illustrationCircle">
-                                <svg viewBox="0 0 24 24" fill="currentColor" className="heartGlyph">
-                                    <path d="M12 21s-7.2-4.6-9.8-9C.6 8.7 1.7 5 5.3 4.1 7.7 3.5 9.9 4.6 12 6.9c2.1-2.3 4.3-3.4 6.7-2.8 3.6.9 4.7 4.6 3.1 7.9C19.2 16.4 12 21 12 21z" />
-                                </svg>
-                            </div>
-                            {/*
-                หมายเหตุ: ตรงนี้คือจุดใส่ภาพประกอบตัวละคร
-                วางไฟล์ภาพไว้ที่ /public/images/bmi-illustration.png
-                แล้วแทนที่ illustrationCircle ด้วย
-                <img src="/images/bmi-illustration.png" alt="" className="illustrationImg" />
-              */}
-                        </div>
-
                         <div className="tipsCard">
                             <div className="tipsHead">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -400,6 +371,32 @@ export default function WeightAssessmentPage() {
           .layout {
             grid-template-columns: minmax(0, 620px) 1fr;
             align-items: start;
+          }
+
+          /* ให้กล่อง Tips อยู่แถวเดียวกับการ์ดฟอร์ม ขอบบนตรงกัน */
+          .layout {
+            row-gap: 0;
+          }
+
+          .formColumn {
+            display: contents;
+          }
+
+          .eyebrow,
+          .heading,
+          .lede,
+          .card {
+            grid-column: 1;
+          }
+
+          .eyebrow {
+            justify-self: start;
+          }
+
+          .sideColumn {
+            grid-column: 2;
+            grid-row: 4;
+            margin-top: 32px;
           }
         }
 
@@ -514,16 +511,6 @@ export default function WeightAssessmentPage() {
           font-size: 14.5px;
           margin-bottom: 12px;
           color: var(--ink);
-        }
-
-        .fieldIcon {
-          display: inline-flex;
-          color: var(--maroon);
-        }
-
-        .fieldIcon :global(svg) {
-          width: 16px;
-          height: 16px;
         }
 
         .stepper {
@@ -645,7 +632,7 @@ export default function WeightAssessmentPage() {
           height: 19px;
         }
 
-        /* ===================== ขวา: illustration + tips ===================== */
+        /* ===================== ขวา: tips ===================== */
 
         .sideColumn {
           position: relative;
@@ -653,33 +640,6 @@ export default function WeightAssessmentPage() {
           flex-direction: column;
           align-items: center;
           gap: 28px;
-        }
-
-        .illustrationWrap {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 100%;
-          max-width: 360px;
-          aspect-ratio: 1 / 1;
-        }
-
-        .illustrationCircle {
-          width: 100%;
-          height: 100%;
-          border-radius: 50%;
-          background: radial-gradient(circle at 35% 30%, #ffd7de 0%, #f7a9bb 55%, #ef7f99 100%);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          box-shadow: 0 30px 60px rgba(156, 16, 41, 0.18);
-        }
-
-        .heartGlyph {
-          width: 40%;
-          height: 40%;
-          color: #ffffff;
-          opacity: 0.9;
         }
 
         .tipsCard {
