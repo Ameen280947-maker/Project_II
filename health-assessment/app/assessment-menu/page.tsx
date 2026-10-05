@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import Sidebar from "@/app/components/Sidebar";
+import NotificationBell from "@/app/components/NotificationBell";
 
 const assessmentCards = [
   {
@@ -84,27 +85,32 @@ export default function AssessmentMenuPage() {
         <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
           {/* Header */}
+          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
+                Health Assessment
+              </p>
 
-          <header>
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
-              Health Assessment
-            </p>
+              <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-[44px]">
+                Assessment-
+                <span className="text-[#ef4962]">
+                  โรคไม่ติดต่อเรื้อรัง
+                </span>
+              </h1>
 
-            <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-[44px]">
-              Assessment-
-              <span className="text-[#ef4962]">
-                โรคไม่ติดต่อเรื้อรัง
-              </span>
-            </h1>
+              <p className="mt-3 text-lg font-semibold text-[#4f535b]">
+                แบบประเมินสุขภาพเบื้องต้น
+              </p>
 
-            <p className="mt-3 text-lg font-semibold text-[#4f535b]">
-              แบบประเมินสุขภาพเบื้องต้น
-            </p>
+              <p className="mt-2 max-w-[720px] leading-7 text-[#8b8f98]">
+                เริ่มต้นการดูแลสุขภาพของคุณด้วยการประเมินที่มีความแม่นยำสูง
+                เพื่อวางแผนการใช้ชีวิตที่ดีในอนาคต
+              </p>
+            </div>
 
-            <p className="mt-2 max-w-[720px] leading-7 text-[#8b8f98]">
-              เริ่มต้นการดูแลสุขภาพของคุณด้วยการประเมินที่มีความแม่นยำสูง
-              เพื่อวางแผนการใช้ชีวิตที่ดีในอนาคต
-            </p>
+            <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+              <NotificationBell />
+            </div>
           </header>
 
           {/* =================================================

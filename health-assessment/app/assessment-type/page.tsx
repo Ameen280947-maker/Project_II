@@ -14,6 +14,7 @@ import {
 import type { ReactNode } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
+import NotificationBell from "@/app/components/NotificationBell";
 
 const assessmentTypes = [
   {
@@ -67,25 +68,28 @@ export default function AssessmentTypePage() {
         <section className="min-w-0 flex-1 px-5 py-5 sm:px-6 lg:px-8">
 
           {/* Header */}
+          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
+                Assessment-
+                <span className="text-[#ef4962]">
+                  Type
+                </span>
+              </h1>
 
-          <header>
+              <h2 className="mt-3 text-2xl font-bold">
+                เข้าสู่แบบประเมิน
+              </h2>
 
+              <p className="mt-3 max-w-[760px] text-sm leading-7 text-[#7c7d85]">
+                กรุณาเลือกประเภทแบบประเมินที่คุณต้องการ
+                เพื่อให้ระบบวิเคราะห์ข้อมูลสุขภาพเบื้องต้นของคุณอย่างเหมาะสม
+              </p>
+            </div>
 
-            <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
-              Assessment-
-              <span className="text-[#ef4962]">
-                Type
-              </span>
-            </h1>
-
-            <h2 className="mt-3 text-2xl font-bold">
-              เข้าสู่แบบประเมิน
-            </h2>
-
-            <p className="mt-3 max-w-[760px] text-sm leading-7 text-[#7c7d85]">
-              กรุณาเลือกประเภทแบบประเมินที่คุณต้องการ
-              เพื่อให้ระบบวิเคราะห์ข้อมูลสุขภาพเบื้องต้นของคุณอย่างเหมาะสม
-            </p>
+            <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+              <NotificationBell />
+            </div>
           </header>
 
           {/* =================================================

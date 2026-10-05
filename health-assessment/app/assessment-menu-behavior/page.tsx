@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Sidebar from "@/app/components/Sidebar";
+import NotificationBell from "@/app/components/NotificationBell";
 
 import {
   ArrowLeft,
@@ -149,27 +150,33 @@ export default function BehaviorAssessmentPage() {
               HEADER
           ================================================= */}
 
-          <header>
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
-              Health Assessment
-            </p>
+          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
+                Health Assessment
+              </p>
 
-            <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-[44px]">
-              Assessment-
-              <span className="text-[#57965c]">
-                ความเสี่ยงด้านพฤติกรรม
-              </span>
-            </h1>
+              <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-[44px]">
+                Assessment-
+                <span className="text-[#57965c]">
+                  ความเสี่ยงด้านพฤติกรรม
+                </span>
+              </h1>
 
-            <p className="mt-3 text-lg font-semibold text-[#4f535b]">
-              แบบประเมินสุขภาพเบื้องต้น
-            </p>
+              <p className="mt-3 text-lg font-semibold text-[#4f535b]">
+                แบบประเมินสุขภาพเบื้องต้น
+              </p>
 
-            <p className="mt-2 max-w-[850px] leading-7 text-[#8b8f98]">
-              ประเมินพฤติกรรมในชีวิตประจำวัน
-              เพื่อค้นหาปัจจัยเสี่ยงด้านพฤติกรรม
-              ที่อาจส่งผลกระทบต่อสุขภาพของคุณ
-            </p>
+              <p className="mt-2 max-w-[850px] leading-7 text-[#8b8f98]">
+                ประเมินพฤติกรรมในชีวิตประจำวัน
+                เพื่อค้นหาปัจจัยเสี่ยงด้านพฤติกรรม
+                ที่อาจส่งผลกระทบต่อสุขภาพของคุณ
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+              <NotificationBell />
+            </div>
           </header>
 
           {/* =================================================

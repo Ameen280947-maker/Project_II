@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   usePathname,
@@ -8,6 +9,7 @@ import {
 
 import {
   BarChart3,
+  Bell,
   ClipboardList,
   Heart,
   History,
@@ -25,6 +27,29 @@ import type { ReactNode } from "react";
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const userId = localStorage.getItem("userId");
+        if (!userId) return;
+        const res = await fetch(`/api/notifications?userId=${encodeURIComponent(userId)}`, {
+          cache: "no-store",
+        });
+        const data = await res.json();
+        if (data.success) {
+          // แจ้งเตือนรายการที่ครบกำหนดหรือยังไม่ได้อ่าน
+          const totalAlerts = (data.summary?.dueCount || 0) + (data.summary?.unreadCount || 0);
+          setUnreadNotifs(totalAlerts > 0 ? totalAlerts : 0);
+        }
+      } catch (err) {
+        // silent fail in sidebar
+      }
+    };
+
+    fetchUnread();
+  }, [pathname]);
 
   /* =========================================================
      LOGOUT
@@ -76,8 +101,18 @@ export default function Sidebar() {
   // ---------------------------------------------------------
 
   const isResultActive =
+    pathname === "/dashboard" ||
+    pathname.startsWith("/dashboard/") ||
     pathname === "/result" ||
     pathname.startsWith("/result/");
+
+  // ---------------------------------------------------------
+  // NOTIFICATIONS
+  // ---------------------------------------------------------
+
+  const isNotificationsActive =
+    pathname === "/notifications" ||
+    pathname.startsWith("/notifications/");
 
   // ---------------------------------------------------------
   // HISTORY
@@ -89,10 +124,6 @@ export default function Sidebar() {
 
   // ---------------------------------------------------------
   // RECOMMENDATION
-  //
-  // IMPORTANT:
-  // /recommendation_smoking จะไม่ Active
-  // เพราะเป็นหน้าผลการประเมินการสูบบุหรี่
   // ---------------------------------------------------------
 
   const isRecommendationActive =
@@ -189,6 +220,20 @@ export default function Sidebar() {
         />
 
         {/* ---------------------------------------------------
+            NOTIFICATIONS
+        --------------------------------------------------- */}
+
+        <SidebarItem
+          href="/notifications"
+          icon={
+            <Bell size={21} />
+          }
+          label="การแจ้งเตือน"
+          active={isNotificationsActive}
+          badge={unreadNotifs > 0 ? (unreadNotifs > 9 ? "9+" : unreadNotifs) : undefined}
+        />
+
+        {/* ---------------------------------------------------
             HISTORY
         --------------------------------------------------- */}
 
@@ -258,6 +303,7 @@ type SidebarItemProps = {
   icon: ReactNode;
   label: string;
   active?: boolean;
+  badge?: string | number;
 };
 
 function SidebarItem({
@@ -265,6 +311,7 @@ function SidebarItem({
   icon,
   label,
   active = false,
+  badge,
 }: SidebarItemProps) {
   return (
     <Link
@@ -274,19 +321,27 @@ function SidebarItem({
           ? "page"
           : undefined
       }
-      className={`flex min-h-14 w-full items-center gap-4 rounded-2xl px-4 text-left font-medium transition ${
+      className={`flex min-h-14 w-full items-center justify-between rounded-2xl px-4 text-left font-medium transition ${
         active
           ? "bg-[#f8e8ea] text-[#b91c2b]"
           : "text-[#666770] hover:bg-[#f8f5f5] hover:text-[#2f3037]"
       }`}
     >
-      <span className="shrink-0">
-        {icon}
-      </span>
+      <div className="flex items-center gap-4 min-w-0">
+        <span className="shrink-0">
+          {icon}
+        </span>
 
-      <span className="min-w-0">
-        {label}
-      </span>
+        <span className="truncate">
+          {label}
+        </span>
+      </div>
+
+      {badge != null && (
+        <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#b91c2b] px-1 text-[11px] font-bold text-white shadow-sm">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }
