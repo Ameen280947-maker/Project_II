@@ -386,8 +386,8 @@ export default function DashboardPage() {
         setError("");
 
         const userId = localStorage.getItem("userId");
-        // ปรับ key ให้ตรงกับที่ระบบ login เก็บไว้
-        setUserName(localStorage.getItem("userName") || "");
+        // ใช้ key เดียวกับที่หน้า login เก็บไว้ ("username")
+        setUserName(localStorage.getItem("username") || "");
 
         if (!userId) {
           throw new Error("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
@@ -473,6 +473,13 @@ function PageShell({ children }: { children: ReactNode }) {
    CONTENT
 ========================================================= */
 
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return "สวัสดีตอนเช้า";
+  if (hour < 17) return "สวัสดีตอนบ่าย";
+  return "สวัสดีตอนเย็น";
+}
+
 function DashboardContent({
   data,
   userName,
@@ -498,15 +505,31 @@ function DashboardContent({
     <main className="max-w-[1200px] mx-auto px-6 pt-10 pb-16 flex flex-col gap-8">
       {/* ---------- Greeting ---------- */}
       <section className="flex flex-wrap items-end justify-between gap-5">
-        <div>
-          <p className="text-sm font-semibold tracking-[0.18em] text-[#4F7A4C]">HEALTH DASHBOARD</p>
-          <h1 className="mt-1.5 mb-1 font-[family-name:var(--font-anuphan)] text-4xl font-bold leading-tight">
-            สวัสดี{userName ? `, ${userName}` : ""}
-          </h1>
-          <p className="text-[#5E6470] text-base">
-            สรุปผลการประเมินสุขภาพของคุณ
-            {latest && <> · อัปเดตล่าสุด {formatDateTime(latest.assessed_at)}</>}
-          </p>
+        <div className="flex items-center gap-5 min-w-0">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold tracking-[0.18em] text-[#4F7A4C]">HEALTH DASHBOARD</p>
+            <h1 className="mt-1.5 mb-1 font-[family-name:var(--font-anuphan)] text-2xl sm:text-3xl font-bold leading-tight">
+              {getGreeting()}
+              {userName && (
+                <>
+                  ,{" "}
+                  <span
+                    className="inline-block max-w-full truncate align-bottom px-1"
+                    style={{
+                      color: ACCENT,
+                      background: "linear-gradient(transparent 68%, rgba(215,53,79,0.16) 68%)",
+                    }}
+                  >
+                    คุณ{userName}
+                  </span>
+                </>
+              )}
+            </h1>
+            <p className="text-[#5E6470] text-base">
+              สรุปผลการประเมินสุขภาพของคุณ
+              {latest && <> · อัปเดตล่าสุด {formatDateTime(latest.assessed_at)}</>}
+            </p>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

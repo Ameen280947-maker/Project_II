@@ -77,7 +77,8 @@ export async function GET(
         SELECT
           user_id,
           username,
-          email
+          email,
+          created_at
         FROM users
         WHERE user_id = $1
         LIMIT 1
@@ -158,6 +159,9 @@ export async function GET(
 
           email:
             user.email,
+
+          created_at:
+            user.created_at,
         },
 
         hasProfile: false,
@@ -186,6 +190,9 @@ export async function GET(
 
         email:
           user.email,
+
+        created_at:
+          user.created_at,
       },
 
       hasProfile: true,

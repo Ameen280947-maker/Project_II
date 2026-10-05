@@ -24,6 +24,7 @@ const assessmentTypes = [
       "โรคหัวใจและหลอดเลือด",
       "โรคเบาหวาน",
       "ความดันโลหิตสูง",
+      "ภาวะน้ำหนักเกิน",
     ],
     href: "/assessment-menu",
     theme: "red" as const,
@@ -34,6 +35,7 @@ const assessmentTypes = [
       "การสูบบุหรี่",
       "แอลกอฮอล์",
       "การออกกำลังกาย",
+      "การนอนหลับ",
       "การรับประทานอาหาร",
     ],
     href: "/assessment-menu-behavior",
@@ -68,8 +70,8 @@ export default function AssessmentTypePage() {
         <section className="min-w-0 flex-1 px-5 py-5 sm:px-6 lg:px-8">
 
           {/* Header */}
-          <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
               <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
                 Assessment-
                 <span className="text-[#ef4962]">
@@ -87,7 +89,7 @@ export default function AssessmentTypePage() {
               </p>
             </div>
 
-            <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
+            <div className="mt-2 shrink-0">
               <NotificationBell />
             </div>
           </header>

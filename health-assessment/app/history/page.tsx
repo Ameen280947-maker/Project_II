@@ -1321,7 +1321,7 @@ function getDetailHref(
     ================================================== */
 
     case "Thai CVD":
-      return `/recommendation-health?assessmentId=${item.assessment_id}`;
+      return `/recommendation-CVD?assessmentId=${item.assessment_id}`;
 
     /* =================================================
        BLOOD PRESSURE

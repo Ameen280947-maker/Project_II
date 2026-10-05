@@ -287,7 +287,7 @@ function Depression9QRecommendationContent() {
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                       <a
                         href="tel:1323"
-                        className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700"
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50"
                       >
                         <PhoneCall size={16} />
                         สายด่วนสุขภาพจิต 1323 (โทรฟรี 24 ชม.)
@@ -298,7 +298,7 @@ function Depression9QRecommendationContent() {
                         className="inline-flex items-center gap-2 rounded-xl border border-red-300 bg-white px-4 py-2.5 text-sm font-bold text-red-700 shadow-sm transition hover:bg-red-50"
                       >
                         <PhoneCall size={16} />
-                        สะมาริตันส์ 02-113-6789
+                        สมาคมสะมาริตันส์ 02-113-6789
                       </a>
                     </div>
                   </div>
