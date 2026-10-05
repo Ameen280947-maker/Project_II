@@ -101,8 +101,8 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fbf7f7] p-3 sm:p-5">
-      <section className="mx-auto grid min-h-[calc(100vh-24px)] max-w-[1450px] overflow-hidden rounded-[30px] border border-[#efe5e6] bg-white shadow-[0_25px_70px_rgba(35,25,30,0.08)] lg:grid-cols-[42%_58%]">
+    <main className="min-h-screen bg-white">
+      <section className="grid min-h-screen overflow-hidden bg-white lg:grid-cols-[42%_58%]">
         {/* ฝั่งซ้าย */}
         <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#fff5f6] via-[#f3dadd] to-[#b91c2b] p-14 lg:flex lg:flex-col">
         

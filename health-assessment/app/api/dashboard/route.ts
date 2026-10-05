@@ -1,18 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
-
-/* =========================================================
-   DATABASE
-   ใช้ DATABASE_URL เดิมของโปรเจกต์
-========================================================= */
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? { rejectUnauthorized: false }
-      : false,
-});
+import pool from "@/lib/db";
 
 /* =========================================================
    GET DASHBOARD
