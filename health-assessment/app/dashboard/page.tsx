@@ -292,8 +292,6 @@ const FALLBACK_CONFIG: TypeConfig = {
   tip: { title: "ติดตามผลต่อเนื่อง", text: "ทำแบบประเมินซ้ำเพื่อติดตามการเปลี่ยนแปลง" },
 };
 
-const REASSESS_DAYS = 30; // รอบแนะนำให้ประเมินซ้ำ
-
 /* =========================================================
    HELPERS
 ========================================================= */
@@ -996,10 +994,9 @@ function DashboardContent({
             </div>
           </section>
 
-          {/* ---------- Tips + Due ---------- */}
+          {/* ---------- Tips ---------- */}
           <section className="flex flex-wrap gap-4">
             <Recommendations items={latestByType} />
-            <DueList items={latestByType} onStart={() => router.push("/assessment")} />
           </section>
         </>
       )}
@@ -1431,44 +1428,6 @@ function Recommendations({ items }: { items: Assessment[] }) {
           </div>
         ))}
       </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   DUE LIST
-========================================================= */
-
-function DueList({ items, onStart }: { items: Assessment[]; onStart: () => void }) {
-  const due = [...items]
-    .map((a) => ({ a, days: daysSince(a.assessed_at) }))
-    .sort((x, y) => y.days - x.days)
-    .slice(0, 4);
-
-  return (
-    <div className="flex-[1_1_340px] min-w-0 bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-3.5">
-      <SectionHead eyebrow="UP NEXT" title="ถึงเวลาประเมินซ้ำ" />
-      <p className="-mt-2 text-[13px] text-[#5E6470]">รอบแนะนำ: ทุก {REASSESS_DAYS} วัน</p>
-      {due.map(({ a, days }) => {
-        const overdue = days >= REASSESS_DAYS;
-        return (
-          <div
-            key={a.assessment_id}
-            className={`flex items-center gap-3 p-3 rounded-[14px] ${overdue ? "bg-[#FBEFD6]" : "bg-[#F3F1EC]"}`}
-          >
-            <div className="flex-auto">
-              <p className="font-semibold">{a.assessment_name}</p>
-              <p className={`text-[13px] ${overdue ? "text-[#7A4A00]" : "text-[#4A4F59]"}`}>
-                ล่าสุด {relativeDay(a.assessed_at)} ·{" "}
-                {overdue ? "เกินกำหนด" : `อีก ${REASSESS_DAYS - days} วัน`}
-              </p>
-            </div>
-            <button onClick={onStart} className="min-h-11 px-3.5 rounded-[10px] bg-white text-sm font-semibold" style={{ color: ACCENT }}>
-              ประเมิน
-            </button>
-          </div>
-        );
-      })}
     </div>
   );
 }
