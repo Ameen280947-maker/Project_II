@@ -44,9 +44,29 @@ export async function GET(request: NextRequest) {
         a.total_score,
         a.risk_level,
         a.assessed_at,
-        r.recommendation_text
+        r.recommendation_text,
+
+        -- Blood Pressure ไม่ได้เก็บค่าไว้ใน total_score
+        -- ค่าความดันอยู่ใน assessment_answers (ข้อ 1 = ตัวบน, ข้อ 2 = ตัวล่าง)
+        bp.systolic,
+        bp.diastolic
 
       FROM assessment a
+
+      LEFT JOIN LATERAL (
+        SELECT
+          MAX(aa.answer_value) FILTER (WHERE q.display_order = 1)::numeric AS systolic,
+          MAX(aa.answer_value) FILTER (WHERE q.display_order = 2)::numeric AS diastolic
+        FROM assessment_answers aa
+        JOIN questions q
+          ON q.question_id = aa.question_id
+        WHERE aa.assessment_id = a.assessment_id
+          AND aa.answer_value ~ '^[0-9]+(\\.[0-9]+)?$'
+      ) bp ON a.assessment_type_id = (
+        SELECT assessment_type_id
+        FROM assessment_types
+        WHERE assessment_name = 'Blood Pressure'
+      )
 
       INNER JOIN assessment_types t
         ON t.assessment_type_id = a.assessment_type_id

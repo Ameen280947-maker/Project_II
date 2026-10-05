@@ -1,999 +1,262 @@
 "use client";
 
-import {
-  useEffect,
-  useState,
-} from "react";
-
-import {
-  Activity,
-  CalendarDays,
-  ClipboardList,
-  HeartPulse,
-  AlertTriangle,
-  CheckCircle2,
-  Clock3,
-  ArrowRight,
-  Bell,
-  Calendar,
-  ChevronRight,
-  ShieldAlert,
-} from "lucide-react";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import NotificationBell from "@/app/components/NotificationBell";
-import type { CalculatedNotification } from "@/lib/notificationRules";
+import {
+  ArrowLeft,
+  ArrowRight,
+  Eye,
+  EyeOff,
+  HeartPulse,
+  LockKeyhole,
+  Mail,
+  ShieldCheck,
+  UserPlus,
+  UserRound,
+} from "lucide-react";
+import { FormEvent, ReactNode, useState } from "react";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-type Assessment = {
-  assessment_id: number;
-  assessment_type_id: number;
-  assessment_name: string;
-  total_score: number;
-  risk_level: string;
-  assessed_at: string;
-  recommendation_text?: string | null;
-};
-
-type DashboardData = {
-  success: boolean;
-
-  summary: {
-    totalAssessments: number;
-    totalTypes: number;
-    riskAssessments: number;
-    latestAssessment:
-      | Assessment
-      | null;
-  };
-
-  latestByType: Assessment[];
-
-  assessments: Assessment[];
-};
-
-/* =========================================================
-   PAGE
-========================================================= */
-
-export default function DashboardPage() {
+export default function RegisterPage() {
   const router = useRouter();
 
-  const [data, setData] =
-    useState<DashboardData | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState(false);
+  const [error, setError] = useState("");
 
-  const [notifs, setNotifs] =
-    useState<CalculatedNotification[]>([]);
+  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError("");
 
-  const [notifSummary, setNotifSummary] =
-    useState<{
-      total: number;
-      unreadCount: number;
-      dueCount: number;
-      upcomingCount: number;
-    } | null>(null);
+    const formData = new FormData(event.currentTarget);
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  /* =======================================================
-     LOAD DASHBOARD
-  ======================================================= */
-
-  useEffect(() => {
-    const loadDashboard = async () => {
-      try {
-        setLoading(true);
-        setError("");
-
-        const userId =
-          localStorage.getItem("userId");
-
-        if (!userId) {
-          throw new Error(
-            "ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่"
-          );
-        }
-
-        const [dashRes, notifRes] = await Promise.all([
-          fetch(
-            `/api/dashboard?userId=${encodeURIComponent(userId)}`,
-            { method: "GET", cache: "no-store" }
-          ),
-          fetch(
-            `/api/notifications?userId=${encodeURIComponent(userId)}`,
-            { method: "GET", cache: "no-store" }
-          ),
-        ]);
-
-        const result = await dashRes.json();
-        const notifResult = await notifRes.json();
-
-        if (!dashRes.ok) {
-          throw new Error(
-            result.message ||
-              "ไม่สามารถโหลด Dashboard ได้"
-          );
-        }
-
-        setData(result);
-
-        if (notifResult.success) {
-          setNotifs(notifResult.notifications || []);
-          setNotifSummary(notifResult.summary || null);
-        }
-      } catch (err) {
-        console.error(err);
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "ไม่สามารถโหลดข้อมูลได้"
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadDashboard();
-  }, []);
-
-  /* =======================================================
-     LOADING
-  ======================================================= */
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-[#faf9f7] flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-10 h-10 border-4 border-gray-200 border-t-[#b91c2b] rounded-full animate-spin mx-auto mb-4" />
-
-          <p className="text-gray-500">
-            กำลังโหลด Dashboard...
-          </p>
-        </div>
-      </main>
+    const username = String(formData.get("username") || "").trim();
+    const email = String(formData.get("email") || "").trim();
+    const password = String(formData.get("password") || "");
+    const confirmPassword = String(
+      formData.get("confirmPassword") || "",
     );
-  }
 
-  /* =======================================================
-     ERROR
-  ======================================================= */
-
-  if (error) {
-    return (
-      <main className="min-h-screen bg-[#faf9f7] p-8">
-        <div className="max-w-4xl mx-auto bg-white border border-red-100 rounded-3xl p-8 text-center">
-          <AlertTriangle
-            size={48}
-            className="text-red-500 mx-auto mb-4"
-          />
-
-          <h1 className="text-xl font-bold text-gray-800 mb-2">
-            ไม่สามารถโหลดข้อมูลได้
-          </h1>
-
-          <p className="text-gray-500">
-            {error}
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  /* =======================================================
-     DATA
-  ======================================================= */
-
-  const summary = data.summary;
-
-  const latest =
-    summary.latestAssessment;
-
-  /* =======================================================
-     DATE FORMAT
-  ======================================================= */
-
-  const formatDate = (
-    date?: string | null
-  ) => {
-    if (!date) return "-";
-
-    return new Date(date).toLocaleString(
-      "th-TH",
-      {
-        dateStyle: "long",
-        timeStyle: "short",
-      }
-    );
-  };
-
-  /* =======================================================
-     RISK STYLE
-  ======================================================= */
-
-  const getRiskStyle = (
-    risk?: string | null
-  ) => {
-    const value = String(
-      risk || ""
-    ).toLowerCase();
-
-    if (
-      value.includes("เพียงพอ") ||
-      value.includes("ปกติ") ||
-      value.includes("น้อย") ||
-      value.includes("ไม่มีความเสี่ยง")
-    ) {
-      return {
-        bg: "bg-green-50",
-        border: "border-green-100",
-        text: "text-green-700",
-        icon: CheckCircle2,
-      };
-    }
-
-    if (
-      value.includes("ปานกลาง") ||
-      value.includes("ไม่เพียงพอ")
-    ) {
-      return {
-        bg: "bg-yellow-50",
-        border: "border-yellow-100",
-        text: "text-yellow-700",
-        icon: Clock3,
-      };
-    }
-
-    if (
-      value.includes("สูง") ||
-      value.includes("อันตราย") ||
-      value.includes("ไม่มี")
-    ) {
-      return {
-        bg: "bg-red-50",
-        border: "border-red-100",
-        text: "text-red-700",
-        icon: AlertTriangle,
-      };
-    }
-
-    return {
-      bg: "bg-gray-50",
-      border: "border-gray-100",
-      text: "text-gray-700",
-      icon: Activity,
-    };
-  };
-
-  /* =======================================================
-     GET RESULT PAGE
-  ======================================================= */
-
-  const openResult = (
-    assessment: Assessment
-  ) => {
-    const type =
-      assessment.assessment_name
-        ?.toLowerCase()
-        .trim();
-
-    /*
-      กิจกรรมทางกาย
-    */
-
-    if (
-      type === "physical activity" ||
-      type === "กิจกรรมทางกาย"
-    ) {
-      router.push(
-        `/recommendation_physical_activity?assessmentId=${assessment.assessment_id}`
-      );
-
+    if (!username || !email || !password || !confirmPassword) {
+      setError("กรุณากรอกข้อมูลให้ครบทุกช่อง");
       return;
     }
 
-    /*
-      ถ้ายังไม่มีหน้า Result ของประเภทนั้น
-      ให้ไปประวัติการประเมินก่อน
-    */
+    if (!email.includes("@")) {
+      setError("กรุณากรอกอีเมลให้ถูกต้อง");
+      return;
+    }
 
-    router.push(
-      `/history?assessmentId=${assessment.assessment_id}`
-    );
+    if (password.length < 8) {
+      setError("รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError("รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน");
+      return;
+    }
+
+    alert("สมัครสมาชิกสำเร็จ กรุณาเข้าสู่ระบบ");
+    router.push("/login");
   };
 
-  /* =======================================================
-     MAIN
-  ======================================================= */
-
   return (
-    <main className="min-h-screen bg-[#faf9f7] px-6 py-8 lg:px-10">
-      <div className="max-w-7xl mx-auto">
+    <main className="min-h-screen bg-[#fbf7f7] p-3 sm:p-5">
+      <section className="mx-auto grid min-h-[calc(100vh-24px)] max-w-[1450px] overflow-hidden rounded-[30px] border border-[#efe5e6] bg-white shadow-[0_25px_70px_rgba(35,25,30,0.08)] lg:grid-cols-[42%_58%]">
+        {/* ฝั่งซ้าย */}
+        <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#fff5f6] via-[#f3dadd] to-[#b91c2b] p-14 lg:flex lg:flex-col">
+          <Link
+            href="/welcome"
+            className="relative z-10 flex w-fit items-center gap-2 rounded-full bg-white/75 px-4 py-2 text-sm font-semibold text-[#8a1420]"
+          >
+            <ArrowLeft size={18} />
+            กลับหน้าหลัก
+          </Link>
 
-        {/* =================================================
-            HEADER
-        ================================================= */}
+          <div className="relative z-10 mt-20 max-w-[420px]">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-white text-[#b91c2b] shadow-lg">
+              <HeartPulse size={35} />
+            </div>
 
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
-          <div>
-            <p className="text-sm font-semibold tracking-[0.2em] text-[#6c9470] uppercase">
-              HEALTH DASHBOARD
-            </p>
-
-            <h1 className="text-4xl lg:text-5xl font-bold text-gray-800 mt-2">
-              Dashboard
+            <h1 className="mt-8 text-5xl font-bold leading-tight text-[#292a31]">
+              เริ่มต้นดูแล
+              <span className="block text-[#b91c2b]">สุขภาพของคุณ</span>
             </h1>
 
-            <p className="text-gray-500 mt-2 text-base sm:text-lg">
-              สรุปผลการประเมินสุขภาพและกำหนดติดตามรอบถัดไป
+            <p className="mt-7 text-lg leading-9 text-[#686970]">
+              สร้างบัญชีเพื่อประเมินความเสี่ยงสุขภาพ
+              บันทึกผล และติดตามการเปลี่ยนแปลงของคุณ
             </p>
           </div>
 
-          <div className="flex items-center gap-3 self-start sm:self-auto">
+          <div className="relative z-10 mt-auto flex items-center gap-3 text-white">
+            <ShieldCheck size={24} />
+            <p className="text-sm">จัดเก็บข้อมูลอย่างปลอดภัย</p>
+          </div>
+
+          <div className="absolute -bottom-40 -right-28 h-[430px] w-[430px] rounded-full bg-white/15" />
+        </aside>
+
+        {/* ฟอร์ม */}
+        <section className="flex items-center justify-center px-5 py-12 sm:px-10 lg:px-16">
+          <div className="w-full max-w-[510px]">
             <Link
-              href="/assessment-type"
-              className="px-4 py-2.5 rounded-2xl bg-[#2f3037] text-white text-xs sm:text-sm font-bold hover:bg-black transition shadow-sm"
+              href="/welcome"
+              className="mb-8 flex w-fit items-center gap-2 text-sm font-semibold text-[#8a1420] lg:hidden"
             >
-              ทำแบบประเมิน
+              <ArrowLeft size={18} />
+              กลับหน้าหลัก
             </Link>
 
-            <Link
-              href="/notifications"
-              className="px-4 py-2.5 rounded-2xl bg-white border border-gray-200 text-gray-700 text-xs sm:text-sm font-bold hover:bg-gray-50 transition shadow-sm flex items-center gap-1.5"
-            >
-              <span>รอบติดตาม</span>
-              {notifSummary && notifSummary.dueCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-[#b91c2b] text-white text-[10px] font-bold">
-                  {notifSummary.dueCount}
-                </span>
-              )}
-            </Link>
-
-            <NotificationBell />
-          </div>
-        </div>
-
-        {/* =================================================
-            SUMMARY CARDS
-        ================================================= */}
-
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
-
-          {/* Total */}
-
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
-            <div className="flex items-start justify-between">
-
-              <div>
-                <p className="text-gray-500 text-sm">
-                  การประเมินทั้งหมด
-                </p>
-
-                <p className="text-4xl font-bold text-gray-800 mt-3">
-                  {summary.totalAssessments}
-                </p>
-
-                <p className="text-gray-400 text-sm mt-1">
-                  ครั้ง
-                </p>
+            <header className="text-center">
+              <div className="relative mx-auto grid h-24 w-24 place-items-center rounded-full bg-[#f8e8ea] text-[#b91c2b] shadow-[0_15px_40px_rgba(138,20,32,0.1)]">
+                <UserPlus size={43} strokeWidth={1.7} />
               </div>
 
-              <div className="w-12 h-12 rounded-2xl bg-red-50 flex items-center justify-center">
-                <ClipboardList
-                  size={24}
-                  className="text-[#b91c2b]"
-                />
-              </div>
-
-            </div>
-          </div>
-
-          {/* Types */}
-
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
-            <div className="flex items-start justify-between">
-
-              <div>
-                <p className="text-gray-500 text-sm">
-                  ประเภทที่ประเมิน
-                </p>
-
-                <p className="text-4xl font-bold text-gray-800 mt-3">
-                  {summary.totalTypes}
-                </p>
-
-                <p className="text-gray-400 text-sm mt-1">
-                  ประเภท
-                </p>
-              </div>
-
-              <div className="w-12 h-12 rounded-2xl bg-green-50 flex items-center justify-center">
-                <HeartPulse
-                  size={24}
-                  className="text-[#6c9470]"
-                />
-              </div>
-
-            </div>
-          </div>
-
-          {/* Latest */}
-
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
-            <div className="flex items-start justify-between">
-
-              <div>
-                <p className="text-gray-500 text-sm">
-                  ประเมินล่าสุด
-                </p>
-
-                <p className="text-lg font-bold text-gray-800 mt-4">
-                  {latest
-                    ? latest.assessment_name
-                    : "-"}
-                </p>
-
-                <p className="text-gray-400 text-sm mt-1">
-                  {latest
-                    ? formatDate(
-                        latest.assessed_at
-                      )
-                    : "-"}
-                </p>
-              </div>
-
-              <div className="w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center">
-                <CalendarDays
-                  size={24}
-                  className="text-blue-500"
-                />
-              </div>
-
-            </div>
-          </div>
-
-          {/* Risk */}
-
-          <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
-            <div className="flex items-start justify-between">
-
-              <div>
-                <p className="text-gray-500 text-sm">
-                  ผลที่ควรติดตาม
-                </p>
-
-                <p className="text-4xl font-bold text-gray-800 mt-3">
-                  {summary.riskAssessments}
-                </p>
-
-                <p className="text-gray-400 text-sm mt-1">
-                  รายการ
-                </p>
-              </div>
-
-              <div className="w-12 h-12 rounded-2xl bg-yellow-50 flex items-center justify-center">
-                <AlertTriangle
-                  size={24}
-                  className="text-yellow-500"
-                />
-              </div>
-
-            </div>
-          </div>
-
-        </div>
-
-        {/* =================================================
-            HEALTH FOLLOW-UP & NOTIFICATIONS SECTION
-        ================================================= */}
-
-        {notifs.length > 0 && (
-          <div className="mb-10">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-2xl bg-red-50 flex items-center justify-center text-[#b91c2b]">
-                  <Bell size={18} />
-                </div>
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">
-                    การแจ้งเตือนและกำหนดติดตามสุขภาพ
-                  </h2>
-                  <p className="text-xs text-gray-500">
-                    กำหนดรอบประเมินซ้ำตามเกณฑ์ทางการแพทย์ของแต่ละโรค
-                  </p>
-                </div>
-              </div>
-
-              <Link
-                href="/notifications"
-                className="text-xs font-bold text-[#b91c2b] hover:underline flex items-center gap-1"
-              >
-                <span>ดูทั้งหมด ({notifs.length})</span>
-                <ChevronRight size={14} />
-              </Link>
-            </div>
-
-            {/* Overdue/Due Banner */}
-            {notifSummary && notifSummary.dueCount > 0 && (
-              <div className="mb-5 bg-gradient-to-r from-red-500 to-[#b91c2b] text-white rounded-3xl p-5 shadow-[0_10px_30px_rgba(185,28,43,0.20)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <div className="flex items-start sm:items-center gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
-                    <ShieldAlert size={22} className="text-white" />
-                  </div>
-                  <div>
-                    <h3 className="font-extrabold text-base">
-                      มี {notifSummary.dueCount} แบบประเมินที่ครบกำหนดติดตามซ้ำแล้ว!
-                    </h3>
-                    <p className="text-xs text-red-100 mt-0.5">
-                      กรุณาทำแบบประเมินซ้ำเพื่อเปรียบเทียบผลและเฝ้าระวังความเสี่ยงอย่างต่อเนื่อง
-                    </p>
-                  </div>
-                </div>
-
-                <Link
-                  href="/notifications"
-                  className="px-5 py-2.5 rounded-2xl bg-white text-[#b91c2b] font-bold text-xs sm:text-sm hover:bg-red-50 transition shrink-0 self-start sm:self-auto shadow-sm"
-                >
-                  ดูรายการที่ครบกำหนด
-                </Link>
-              </div>
-            )}
-
-            {/* Grid of Follow-up Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {notifs.slice(0, 3).map((item) => {
-                const isDue = item.status === "overdue" || item.status === "due_today";
-                const isUpcoming = item.status === "upcoming";
-
-                return (
-                  <div
-                    key={item.notificationId || `${item.assessmentTypeId}-${item.assessmentId}`}
-                    className={`rounded-3xl p-5 border transition flex flex-col justify-between ${
-                      isDue
-                        ? "bg-white border-red-200 shadow-sm ring-1 ring-red-100"
-                        : isUpcoming
-                        ? "bg-white border-amber-200 shadow-sm"
-                        : "bg-white border-gray-100 shadow-sm"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2.5">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold ${
-                            isDue
-                              ? "bg-red-100 text-[#b91c2b]"
-                              : isUpcoming
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-gray-100 text-gray-600"
-                          }`}
-                        >
-                          {item.statusText}
-                        </span>
-
-                        <span className="text-[11px] font-medium text-gray-400">
-                          {item.intervalLabel}
-                        </span>
-                      </div>
-
-                      <h3 className="font-bold text-gray-900 text-base leading-snug">
-                        {item.assessmentName}
-                      </h3>
-
-                      <div className="mt-2 flex items-center gap-2 text-xs">
-                        <span className="text-gray-400">ผลล่าสุด:</span>
-                        <span className="font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded-md">
-                          {item.riskLevel}
-                        </span>
-                      </div>
-
-                      <p className="mt-2.5 text-xs text-gray-600 line-clamp-2 leading-relaxed">
-                        {item.message}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
-                      <span className="text-[11px] text-gray-400">
-                        {new Date(item.dueDate).toLocaleDateString("th-TH", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </span>
-
-                      <Link
-                        href={item.actionUrl}
-                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-bold text-xs transition ${
-                          isDue
-                            ? "bg-[#b91c2b] text-white hover:bg-[#8a1420]"
-                            : "bg-gray-900 text-white hover:bg-black"
-                        }`}
-                      >
-                        <span>ประเมินซ้ำ</span>
-                        <ArrowRight size={13} />
-                      </Link>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* =================================================
-            LATEST RESULT
-        ================================================= */}
-
-        {latest && (
-          <div className="bg-white border border-gray-100 rounded-3xl p-7 shadow-sm mb-8">
-
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-
-              <div>
-                <p className="text-sm font-semibold text-[#6c9470] uppercase tracking-wider">
-                  LATEST ASSESSMENT
-                </p>
-
-                <h2 className="text-2xl font-bold text-gray-800 mt-2">
-                  {latest.assessment_name}
-                </h2>
-
-                <p className="text-gray-400 mt-1">
-                  {formatDate(
-                    latest.assessed_at
-                  )}
-                </p>
-              </div>
-
-              {(() => {
-                const style =
-                  getRiskStyle(
-                    latest.risk_level
-                  );
-
-                const Icon =
-                  style.icon;
-
-                return (
-                  <div
-                    className={`${style.bg} ${style.border} border rounded-2xl px-5 py-4 flex items-center gap-3`}
-                  >
-                    <Icon
-                      size={22}
-                      className={
-                        style.text
-                      }
-                    />
-
-                    <div>
-                      <p className="text-xs text-gray-500">
-                        ระดับผลการประเมิน
-                      </p>
-
-                      <p
-                        className={`font-bold ${style.text}`}
-                      >
-                        {latest.risk_level ||
-                          "-"}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
-
-            </div>
-
-            <div className="border-t border-gray-100 mt-6 pt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
-              <div>
-                <p className="text-sm text-gray-500">
-                  คะแนนรวม
-                </p>
-
-                <p className="text-3xl font-bold text-[#b91c2b]">
-                  {latest.total_score}
-                </p>
-              </div>
-
-              <button
-                onClick={() =>
-                  openResult(latest)
-                }
-                className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#b91c2b] text-white font-semibold hover:bg-[#991b1b] transition"
-              >
-                ดูผลการประเมิน
-                <ArrowRight size={18} />
-              </button>
-
-            </div>
-
-          </div>
-        )}
-
-        {/* =================================================
-            LATEST BY TYPE
-        ================================================= */}
-
-        <section className="mb-8">
-
-          <div className="flex items-end justify-between mb-5">
-            <div>
-              <p className="text-sm font-semibold text-[#6c9470] uppercase tracking-wider">
-                HEALTH ASSESSMENTS
-              </p>
-
-              <h2 className="text-2xl font-bold text-gray-800 mt-1">
-                สรุปผลการประเมิน
+              <h2 className="mt-7 text-3xl font-bold sm:text-4xl">
+                สร้างบัญชีผู้ใช้
               </h2>
-            </div>
-          </div>
 
-          {data.latestByType.length === 0 ? (
-            <div className="bg-white border border-gray-100 rounded-3xl p-12 text-center">
-              <ClipboardList
-                size={48}
-                className="text-gray-300 mx-auto mb-4"
+              <div className="mx-auto mt-4 h-1 w-10 rounded-full bg-[#b91c2b]" />
+
+              <p className="mt-4 text-[#909199]">
+                กรอกข้อมูลเพื่อสมัครสมาชิก
+              </p>
+            </header>
+
+            <form className="mt-9 space-y-4" onSubmit={handleSubmit}>
+              <InputField
+                name="username"
+                type="text"
+                placeholder="ชื่อผู้ใช้"
+                autoComplete="username"
+                icon={<UserRound size={22} />}
               />
 
-              <h3 className="text-lg font-semibold text-gray-700">
-                ยังไม่มีผลการประเมิน
-              </h3>
+              <InputField
+                name="email"
+                type="email"
+                placeholder="อีเมล"
+                autoComplete="email"
+                icon={<Mail size={22} />}
+              />
 
-              <p className="text-gray-400 mt-2">
-                เมื่อทำแบบประเมินแล้ว
-                ผลจะปรากฏที่นี่
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-
-              {data.latestByType.map(
-                (assessment) => {
-                  const style =
-                    getRiskStyle(
-                      assessment.risk_level
-                    );
-
-                  const Icon =
-                    style.icon;
-
-                  return (
-                    <div
-                      key={
-                        assessment.assessment_id
-                      }
-                      className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm hover:shadow-md transition"
-                    >
-
-                      <div className="flex items-start justify-between">
-
-                        <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center">
-                          <Activity
-                            size={24}
-                            className="text-[#b91c2b]"
-                          />
-                        </div>
-
-                        <div
-                          className={`${style.bg} ${style.border} border rounded-xl px-3 py-2 flex items-center gap-2`}
-                        >
-                          <Icon
-                            size={16}
-                            className={
-                              style.text
-                            }
-                          />
-
-                          <span
-                            className={`text-sm font-semibold ${style.text}`}
-                          >
-                            {
-                              assessment.risk_level
-                            }
-                          </span>
-                        </div>
-
-                      </div>
-
-                      <h3 className="text-xl font-bold text-gray-800 mt-5">
-                        {
-                          assessment.assessment_name
-                        }
-                      </h3>
-
-                      <p className="text-sm text-gray-400 mt-1">
-                        ประเมินเมื่อ{" "}
-                        {formatDate(
-                          assessment.assessed_at
-                        )}
-                      </p>
-
-                      <div className="mt-5 pt-5 border-t border-gray-100">
-
-                        <div className="flex items-end justify-between">
-
-                          <div>
-                            <p className="text-sm text-gray-400">
-                              คะแนน
-                            </p>
-
-                            <p className="text-3xl font-bold text-[#b91c2b]">
-                              {
-                                assessment.total_score
-                              }
-                            </p>
-                          </div>
-
-                          <button
-                            onClick={() =>
-                              openResult(
-                                assessment
-                              )
-                            }
-                            className="text-sm font-semibold text-[#b91c2b] hover:underline flex items-center gap-1"
-                          >
-                            ดูผล
-                            <ArrowRight
-                              size={16}
-                            />
-                          </button>
-
-                        </div>
-
-                      </div>
-
-                    </div>
-                  );
+              <PasswordField
+                name="password"
+                placeholder="รหัสผ่านอย่างน้อย 8 ตัวอักษร"
+                visible={showPassword}
+                onToggle={() =>
+                  setShowPassword((value) => !value)
                 }
+              />
+
+              <PasswordField
+                name="confirmPassword"
+                placeholder="ยืนยันรหัสผ่าน"
+                visible={showConfirmPassword}
+                onToggle={() =>
+                  setShowConfirmPassword((value) => !value)
+                }
+              />
+
+              {error && (
+                <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-medium text-[#b91c2b]">
+                  {error}
+                </p>
               )}
 
-            </div>
-          )}
+              <button
+                type="submit"
+                className="flex h-[66px] w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#b91c2b] to-[#8a1420] text-lg font-bold text-white shadow-[0_14px_30px_rgba(138,20,32,0.28)] transition hover:-translate-y-0.5"
+              >
+                สมัครสมาชิก
+                <ArrowRight size={22} />
+              </button>
+            </form>
 
-        </section>
-
-        {/* =================================================
-            RECENT HISTORY
-        ================================================= */}
-
-        <section>
-
-          <div className="flex items-end justify-between mb-5">
-
-            <div>
-              <p className="text-sm font-semibold text-[#6c9470] uppercase tracking-wider">
-                RECENT HISTORY
-              </p>
-
-              <h2 className="text-2xl font-bold text-gray-800 mt-1">
-                ประวัติการประเมินล่าสุด
-              </h2>
-            </div>
-
-            <button
-              onClick={() =>
-                router.push("/history")
-              }
-              className="text-sm font-semibold text-[#b91c2b] hover:underline"
-            >
-              ดูทั้งหมด
-            </button>
-
+            <p className="mt-7 text-center text-[#909199]">
+              มีบัญชีอยู่แล้ว?
+              <Link
+                href="/login"
+                className="ml-2 font-bold text-[#b91c2b] hover:underline"
+              >
+                เข้าสู่ระบบ
+              </Link>
+            </p>
           </div>
-
-          <div className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
-
-            {data.assessments.length === 0 ? (
-              <div className="p-10 text-center text-gray-400">
-                ยังไม่มีประวัติการประเมิน
-              </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-
-                {data.assessments
-                  .slice(0, 6)
-                  .map(
-                    (assessment) => {
-                      const style =
-                        getRiskStyle(
-                          assessment.risk_level
-                        );
-
-                      return (
-                        <div
-                          key={
-                            assessment.assessment_id
-                          }
-                          className="p-5 flex flex-col md:flex-row md:items-center gap-4 md:justify-between hover:bg-gray-50 transition"
-                        >
-
-                          <div className="flex items-center gap-4">
-
-                            <div className="w-11 h-11 rounded-xl bg-red-50 flex items-center justify-center shrink-0">
-                              <Activity
-                                size={21}
-                                className="text-[#b91c2b]"
-                              />
-                            </div>
-
-                            <div>
-                              <p className="font-semibold text-gray-800">
-                                {
-                                  assessment.assessment_name
-                                }
-                              </p>
-
-                              <p className="text-sm text-gray-400 mt-1">
-                                {formatDate(
-                                  assessment.assessed_at
-                                )}
-                              </p>
-                            </div>
-
-                          </div>
-
-                          <div className="flex items-center gap-5">
-
-                            <div className="text-right">
-                              <p className="text-xs text-gray-400">
-                                คะแนน
-                              </p>
-
-                              <p className="font-bold text-gray-800">
-                                {
-                                  assessment.total_score
-                                }
-                              </p>
-                            </div>
-
-                            <span
-                              className={`${style.bg} ${style.text} px-4 py-2 rounded-full text-sm font-semibold`}
-                            >
-                              {
-                                assessment.risk_level ||
-                                "-"
-                              }
-                            </span>
-
-                            <button
-                              onClick={() =>
-                                openResult(
-                                  assessment
-                                )
-                              }
-                              className="w-9 h-9 rounded-xl border border-gray-200 flex items-center justify-center hover:bg-gray-100"
-                            >
-                              <ArrowRight
-                                size={17}
-                                className="text-gray-500"
-                              />
-                            </button>
-
-                          </div>
-
-                        </div>
-                      )
-                    }
-                  )}
-
-              </div>
-            )}
-
-          </div>
-
         </section>
-
-      </div>
+      </section>
     </main>
+  );
+}
+
+type InputFieldProps = {
+  name: string;
+  type: string;
+  placeholder: string;
+  autoComplete?: string;
+  icon: ReactNode;
+};
+
+function InputField({
+  name,
+  type,
+  placeholder,
+  autoComplete,
+  icon,
+}: InputFieldProps) {
+  return (
+    <label className="flex h-[66px] items-center rounded-2xl border border-[#e5e0e1] bg-white px-5 focus-within:border-[#b91c2b]/60 focus-within:ring-4 focus-within:ring-[#b91c2b]/10">
+      <span className="mr-4 text-[#8b8c94]">{icon}</span>
+
+      <input
+        name={name}
+        type={type}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className="h-full w-full bg-transparent outline-none placeholder:text-[#a6a7ad]"
+      />
+    </label>
+  );
+}
+
+type PasswordFieldProps = {
+  name: string;
+  placeholder: string;
+  visible: boolean;
+  onToggle: () => void;
+};
+
+function PasswordField({
+  name,
+  placeholder,
+  visible,
+  onToggle,
+}: PasswordFieldProps) {
+  return (
+    <label className="flex h-[66px] items-center rounded-2xl border border-[#e5e0e1] bg-white px-5 focus-within:border-[#b91c2b]/60 focus-within:ring-4 focus-within:ring-[#b91c2b]/10">
+      <LockKeyhole
+        size={22}
+        className="mr-4 shrink-0 text-[#8b8c94]"
+      />
+
+      <input
+        name={name}
+        type={visible ? "text" : "password"}
+        placeholder={placeholder}
+        autoComplete="new-password"
+        className="h-full w-full bg-transparent outline-none placeholder:text-[#a6a7ad]"
+      />
+
+      <button
+        type="button"
+        onClick={onToggle}
+        className="ml-3 grid h-10 w-10 shrink-0 place-items-center rounded-full text-[#8b8c94] hover:bg-[#f8e8ea] hover:text-[#b91c2b]"
+        aria-label={visible ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}
+      >
+        {visible ? <EyeOff size={21} /> : <Eye size={21} />}
+      </button>
+    </label>
   );
 }
