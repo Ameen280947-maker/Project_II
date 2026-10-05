@@ -1219,7 +1219,7 @@ export default function AssessmentPage() {
         ================================================= */
 
         router.push(
-          `/recommendation-health?assessmentId=${data.assessmentId}`,
+          `/recommendation-CVD?assessmentId=${data.assessmentId}`,
         );
       } catch (
         submitError

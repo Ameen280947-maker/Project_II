@@ -17,6 +17,16 @@ import {
 } from "lucide-react";
 import type { CalculatedNotification } from "@/lib/notificationRules";
 
+// แจ้งให้ส่วนอื่น (เช่น Sidebar) โหลดจำนวนแจ้งเตือนใหม่
+export const NOTIFICATIONS_UPDATED_EVENT = "notifications:updated";
+
+// จำนวนรายการที่ต้องให้ผู้ใช้สนใจ = ยังไม่อ่าน หรือ ครบกำหนดแล้ว (ไม่นับซ้ำ)
+export function countAlerts(notifications: CalculatedNotification[]) {
+  return notifications.filter(
+    (n) => !n.isRead || n.status === "overdue" || n.status === "due_today"
+  ).length;
+}
+
 interface NotificationBellProps {
   className?: string;
   onNavigate?: () => void;
@@ -28,7 +38,6 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
   const [notifications, setNotifications] = useState<CalculatedNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [dueCount, setDueCount] = useState(0);
-  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"all" | "due" | "upcoming">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -112,6 +121,16 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
     router.push(notif.actionUrl);
   };
 
+  const alertCount = countAlerts(notifications);
+  const hasAlerts = alertCount > 0;
+
+  // แจ้ง Sidebar ให้ใช้ตัวเลขเดียวกัน
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent<number>(NOTIFICATIONS_UPDATED_EVENT, { detail: alertCount })
+    );
+  }, [alertCount]);
+
   // Filter items based on activeTab
   const filteredNotifications = notifications.filter((n) => {
     if (activeTab === "due") return n.status === "overdue" || n.status === "due_today";
@@ -164,15 +183,31 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
           setIsOpen(!isOpen);
           if (!isOpen) fetchNotifications();
         }}
-        aria-label="การแจ้งเตือน"
-        className="relative flex items-center justify-center w-11 h-11 rounded-2xl bg-white border border-gray-200 text-gray-700 shadow-sm hover:bg-gray-50 hover:border-gray-300 transition active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#b91c2b]/30"
+        aria-label={hasAlerts ? `การแจ้งเตือน ${alertCount} รายการ` : "การแจ้งเตือน"}
+        className={`group relative flex h-14 w-14 items-center justify-center rounded-[20px] transition duration-200 hover:-translate-y-0.5 active:scale-95 cursor-pointer focus:outline-none focus-visible:ring-4 focus-visible:ring-[#ef4962]/25 ${
+          hasAlerts
+            ? "bg-gradient-to-br from-[#ef3153] to-[#b91c2b] text-white shadow-[0_14px_30px_rgba(185,28,43,0.32)] hover:shadow-[0_18px_36px_rgba(185,28,43,0.4)]"
+            : "bg-white text-[#b91c2b] border border-[#f1e3e5] shadow-[0_10px_26px_rgba(35,25,30,0.08)] hover:border-[#f5c9cf]"
+        } ${isOpen ? "ring-4 ring-[#ef4962]/20" : ""}`}
       >
-        <Bell size={20} className={dueCount > 0 ? "text-[#b91c2b] animate-pulse" : "text-gray-600"} />
+        {/* Soft halo while there are alerts */}
+        {hasAlerts && (
+          <span className="pointer-events-none absolute inset-0 rounded-[20px] bg-[#ef4962]/40 animate-ping [animation-duration:2.2s]" />
+        )}
 
-        {/* Unread / Due Badge */}
-        {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#b91c2b] px-1 text-[11px] font-bold text-white shadow-md animate-bounce">
-            {unreadCount > 9 ? "9+" : unreadCount}
+        <Bell
+          size={24}
+          strokeWidth={2.2}
+          fill={hasAlerts ? "currentColor" : "none"}
+          className={`relative transition-transform group-hover:rotate-12 ${
+            dueCount > 0 ? "origin-top animate-[bell-ring_2.4s_ease-in-out_infinite]" : ""
+          }`}
+        />
+
+        {/* Alert count badge */}
+        {hasAlerts && (
+          <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-xs font-extrabold text-[#b91c2b] ring-2 ring-[#b91c2b] shadow-[0_4px_10px_rgba(185,28,43,0.35)] tabular-nums">
+            {alertCount > 9 ? "9+" : alertCount}
           </span>
         )}
       </button>

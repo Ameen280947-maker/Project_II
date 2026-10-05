@@ -10,6 +10,7 @@ import {
 import {
   BarChart3,
   Bell,
+  ChevronLeft,
   ClipboardList,
   Heart,
   History,
@@ -20,6 +21,14 @@ import {
 
 import type { ReactNode } from "react";
 
+import { countAlerts, NOTIFICATIONS_UPDATED_EVENT } from "@/app/components/NotificationBell";
+
+/* =========================================================
+   CONSTANTS
+========================================================= */
+
+const COLLAPSE_KEY = "sidebarCollapsed";
+
 /* =========================================================
    SIDEBAR
 ========================================================= */
@@ -28,6 +37,50 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [unreadNotifs, setUnreadNotifs] = useState(0);
+
+  // สถานะย่อ/ขยาย (จำค่าไว้ใน localStorage)
+  const [collapsed, setCollapsed] = useState(false);
+  // เปิด animation หลังอ่านค่าที่จำไว้แล้ว กันไม่ให้แถบ "กระตุก" ตอนเปิดหน้า
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+    } catch {
+      /* ignore */
+    }
+    const t = requestAnimationFrame(() => setReady(true));
+    return () => cancelAnimationFrame(t);
+  }, []);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  // คีย์ลัด Ctrl + B (Windows) / ⌘ + B (Mac) เพื่อย่อ/ขยาย
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const typing =
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable;
+      if (!typing && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleCollapsed();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   useEffect(() => {
     const fetchUnread = async () => {
@@ -39,9 +92,8 @@ export default function Sidebar() {
         });
         const data = await res.json();
         if (data.success) {
-          // แจ้งเตือนรายการที่ครบกำหนดหรือยังไม่ได้อ่าน
-          const totalAlerts = (data.summary?.dueCount || 0) + (data.summary?.unreadCount || 0);
-          setUnreadNotifs(totalAlerts > 0 ? totalAlerts : 0);
+          // แจ้งเตือนรายการที่ครบกำหนดหรือยังไม่ได้อ่าน (นับเหมือนกระดิ่ง)
+          setUnreadNotifs(countAlerts(data.notifications || []));
         }
       } catch (err) {
         // silent fail in sidebar
@@ -49,6 +101,13 @@ export default function Sidebar() {
     };
 
     fetchUnread();
+
+    // อัปเดตทันทีเมื่อกระดิ่งโหลดใหม่หรือมีการกดอ่าน
+    const handleUpdate = (e: Event) => {
+      setUnreadNotifs((e as CustomEvent<number>).detail);
+    };
+    window.addEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate);
+    return () => window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate);
   }, [pathname]);
 
   /* =========================================================
@@ -72,17 +131,9 @@ export default function Sidebar() {
      ACTIVE ROUTES
   ========================================================= */
 
-  // ---------------------------------------------------------
-  // PROFILE
-  // ---------------------------------------------------------
-
   const isProfileActive =
     pathname === "/profile" ||
     pathname.startsWith("/profile/");
-
-  // ---------------------------------------------------------
-  // ASSESSMENT
-  // ---------------------------------------------------------
 
   const isAssessmentActive =
     pathname === "/assessment-type" ||
@@ -96,57 +147,64 @@ export default function Sidebar() {
     pathname.startsWith("/assessment_depression_9q") ||
     pathname.startsWith("/assessment/");
 
-  // ---------------------------------------------------------
-  // DASHBOARD / RESULT
-  // ---------------------------------------------------------
-
   const isResultActive =
     pathname === "/dashboard" ||
     pathname.startsWith("/dashboard/") ||
     pathname === "/result" ||
     pathname.startsWith("/result/");
 
-  // ---------------------------------------------------------
-  // NOTIFICATIONS
-  // ---------------------------------------------------------
-
   const isNotificationsActive =
     pathname === "/notifications" ||
     pathname.startsWith("/notifications/");
-
-  // ---------------------------------------------------------
-  // HISTORY
-  // ---------------------------------------------------------
 
   const isHistoryActive =
     pathname === "/history" ||
     pathname.startsWith("/history/");
 
-  // ---------------------------------------------------------
-  // RECOMMENDATION
-  // ---------------------------------------------------------
-
   const isRecommendationActive =
+    pathname === "/recommendation-health" ||
     pathname === "/recommendation" ||
     pathname.startsWith("/recommendation/") ||
-    pathname.startsWith("/recommendation-health") ||
+    pathname.startsWith("/recommendation-CVD") ||
     pathname.startsWith("/recommendation_DB") ||
     pathname.startsWith("/recommendation_diabetes");
-
-  // ---------------------------------------------------------
-  // SETTINGS
-  // ---------------------------------------------------------
 
   const isSettingsActive =
     pathname === "/settings" ||
     pathname.startsWith("/settings/");
+
+  const badge = unreadNotifs > 0 ? (unreadNotifs > 9 ? "9+" : unreadNotifs) : undefined;
 
   /* =========================================================
      UI
   ========================================================= */
 
   return (
-    <aside className="hidden w-[235px] shrink-0 border-r border-[#eee5e6] bg-white px-5 py-7 lg:flex lg:flex-col">
+    <aside
+      data-collapsed={collapsed}
+      className={`group/sidebar sticky top-0 hidden h-screen shrink-0 border-r border-[#eee5e6] bg-white py-7 lg:flex lg:flex-col ${
+        ready ? "transition-[width,padding] duration-300 ease-[cubic-bezier(.4,0,.2,1)]" : ""
+      } ${collapsed ? "w-[88px] px-3" : "w-[235px] px-5"}`}
+    >
+
+      {/* =====================================================
+          COLLAPSE TOGGLE (ปุ่มกลมที่ขอบแถบ)
+      ===================================================== */}
+
+      <button
+        type="button"
+        onClick={toggleCollapsed}
+        aria-label={collapsed ? "ขยายแถบเมนู" : "ย่อแถบเมนู"}
+        aria-expanded={!collapsed}
+        title={collapsed ? "ขยายแถบเมนู (⌘/Ctrl + B)" : "ย่อแถบเมนู (⌘/Ctrl + B)"}
+        className="absolute -right-3.5 top-[42px] z-20 grid h-7 w-7 place-items-center rounded-full border border-[#eee5e6] bg-white text-[#96969e] shadow-[0_2px_8px_rgba(47,48,55,0.10)] transition hover:scale-110 hover:border-[#f2c9cf] hover:text-[#b91c2b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#b91c2b]/40"
+      >
+        <ChevronLeft
+          size={16}
+          strokeWidth={2.5}
+          className={`transition-transform duration-300 ${collapsed ? "rotate-180" : ""}`}
+        />
+      </button>
 
       {/* =====================================================
           LOGO
@@ -154,16 +212,20 @@ export default function Sidebar() {
 
       <Link
         href="/assessment-type"
-        className="flex items-center gap-3 px-3"
+        className={`flex items-center gap-3 ${collapsed ? "justify-center px-0" : "px-3"}`}
       >
-        <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-[#b91c2b] to-[#8a1420] text-white shadow-[0_12px_28px_rgba(138,20,32,0.20)]">
+        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#b91c2b] to-[#8a1420] text-white shadow-[0_12px_28px_rgba(138,20,32,0.20)]">
           <Heart
             size={26}
             fill="currentColor"
           />
         </div>
 
-        <div className="min-w-0">
+        <div
+          className={`min-w-0 overflow-hidden whitespace-nowrap transition-all duration-300 ${
+            collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+          }`}
+        >
           <p className="truncate font-bold text-[#2f3037]">
             Health Risk
           </p>
@@ -178,98 +240,63 @@ export default function Sidebar() {
           MENU
       ===================================================== */}
 
-      <nav className="mt-12 space-y-2">
-
-        {/* ---------------------------------------------------
-            PROFILE
-        --------------------------------------------------- */}
+      <nav className="mt-12 space-y-2" aria-label="เมนูหลัก">
 
         <SidebarItem
           href="/profile"
-          icon={
-            <UserRound size={21} />
-          }
+          icon={<UserRound size={21} />}
           label="ข้อมูลสุขภาพของคุณ"
           active={isProfileActive}
+          collapsed={collapsed}
         />
-
-        {/* ---------------------------------------------------
-            ASSESSMENT
-        --------------------------------------------------- */}
 
         <SidebarItem
           href="/assessment-type"
-          icon={
-            <ClipboardList size={21} />
-          }
+          icon={<ClipboardList size={21} />}
           label="แบบประเมินสุขภาพ"
           active={isAssessmentActive}
+          collapsed={collapsed}
         />
-
-        {/* ---------------------------------------------------
-            DASHBOARD
-        --------------------------------------------------- */}
 
         <SidebarItem
           href="/dashboard"
-          icon={
-            <BarChart3 size={21} />
-          }
+          icon={<BarChart3 size={21} />}
           label="Dashboard"
           active={isResultActive}
+          collapsed={collapsed}
         />
-
-        {/* ---------------------------------------------------
-            NOTIFICATIONS
-        --------------------------------------------------- */}
 
         <SidebarItem
           href="/notifications"
-          icon={
-            <Bell size={21} />
-          }
+          icon={<Bell size={21} />}
           label="การแจ้งเตือน"
           active={isNotificationsActive}
-          badge={unreadNotifs > 0 ? (unreadNotifs > 9 ? "9+" : unreadNotifs) : undefined}
+          badge={badge}
+          collapsed={collapsed}
         />
-
-        {/* ---------------------------------------------------
-            HISTORY
-        --------------------------------------------------- */}
 
         <SidebarItem
           href="/history"
-          icon={
-            <History size={21} />
-          }
+          icon={<History size={21} />}
           label="ประวัติการประเมิน"
           active={isHistoryActive}
+          collapsed={collapsed}
         />
-
-        {/* ---------------------------------------------------
-            RECOMMENDATION
-        --------------------------------------------------- */}
 
         <SidebarItem
-          href="/recommendation"
-          icon={
-            <Heart size={21} />
-          }
+          href="/recommendation-health"
+          icon={<Heart size={21} />}
           label="คำแนะนำสุขภาพ"
           active={isRecommendationActive}
+          collapsed={collapsed}
         />
-
-        {/* ---------------------------------------------------
-            SETTINGS
-        --------------------------------------------------- */}
 
         <SidebarItem
           href="/settings"
-          icon={
-            <Settings size={21} />
-          }
+          icon={<Settings size={21} />}
           label="ตั้งค่า"
           active={isSettingsActive}
+          collapsed={collapsed}
         />
 
       </nav>
@@ -281,13 +308,22 @@ export default function Sidebar() {
       <button
         type="button"
         onClick={logout}
-        className="mt-auto flex h-12 w-full items-center gap-3 rounded-2xl bg-[#fff0f2] px-4 font-semibold text-[#b91c2b] transition hover:bg-[#ffe4e8] active:scale-[0.99]"
+        aria-label="ออกจากระบบ"
+        className={`group relative mt-auto flex h-12 w-full items-center gap-3 rounded-2xl bg-[#fff0f2] font-semibold text-[#b91c2b] transition hover:bg-[#ffe4e8] active:scale-[0.99] ${
+          collapsed ? "justify-center px-0" : "px-4"
+        }`}
       >
-        <LogOut size={20} />
+        <LogOut size={20} className="shrink-0" />
 
-        <span>
+        <span
+          className={`overflow-hidden whitespace-nowrap transition-all duration-300 ${
+            collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+          }`}
+        >
           ออกจากระบบ
         </span>
+
+        {collapsed && <Tooltip label="ออกจากระบบ" />}
       </button>
 
     </aside>
@@ -304,6 +340,7 @@ type SidebarItemProps = {
   label: string;
   active?: boolean;
   badge?: string | number;
+  collapsed?: boolean;
 };
 
 function SidebarItem({
@@ -312,36 +349,71 @@ function SidebarItem({
   label,
   active = false,
   badge,
+  collapsed = false,
 }: SidebarItemProps) {
   return (
     <Link
       href={href}
-      aria-current={
-        active
-          ? "page"
-          : undefined
-      }
-      className={`flex min-h-14 w-full items-center justify-between rounded-2xl px-4 text-left font-medium transition ${
+      aria-current={active ? "page" : undefined}
+      aria-label={collapsed ? (badge != null ? `${label} (${badge} รายการ)` : label) : undefined}
+      className={`group relative flex min-h-14 w-full items-center rounded-2xl text-left font-medium transition ${
+        collapsed ? "justify-center px-0" : "justify-between px-4"
+      } ${
         active
           ? "bg-[#f8e8ea] text-[#b91c2b]"
           : "text-[#666770] hover:bg-[#f8f5f5] hover:text-[#2f3037]"
       }`}
     >
-      <div className="flex items-center gap-4 min-w-0">
-        <span className="shrink-0">
+      {/* แถบสีด้านซ้ายเมื่ออยู่หน้านี้ (ช่วยให้เห็นชัดตอนย่อ) */}
+      {active && collapsed && (
+        <span className="absolute -left-3 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-[#b91c2b]" />
+      )}
+
+      <div className={`flex min-w-0 items-center ${collapsed ? "gap-0" : "gap-4"}`}>
+        <span className="relative shrink-0">
           {icon}
+
+          {/* ตอนย่อ: badge เล็กติดมุมไอคอน */}
+          {collapsed && badge != null && (
+            <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#b91c2b] px-1 text-[10px] font-bold text-white ring-2 ring-white">
+              {badge}
+            </span>
+          )}
         </span>
 
-        <span className="truncate">
+        <span
+          className={`truncate whitespace-nowrap transition-all duration-300 ${
+            collapsed ? "w-0 opacity-0" : "w-auto opacity-100"
+          }`}
+        >
           {label}
         </span>
       </div>
 
-      {badge != null && (
+      {/* ตอนขยาย: badge ด้านขวาเหมือนเดิม */}
+      {!collapsed && badge != null && (
         <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#b91c2b] px-1 text-[11px] font-bold text-white shadow-sm">
           {badge}
         </span>
       )}
+
+      {collapsed && <Tooltip label={label} />}
     </Link>
+  );
+}
+
+/* =========================================================
+   TOOLTIP (แสดงชื่อเมนูเมื่อชี้ตอนย่อแถบ)
+========================================================= */
+
+function Tooltip({ label }: { label: string }) {
+  return (
+    <span
+      role="tooltip"
+      className="pointer-events-none absolute left-full top-1/2 z-30 ml-3 -translate-y-1/2 translate-x-[-4px] whitespace-nowrap rounded-xl bg-[#2f3037] px-3 py-2 text-sm font-medium text-white opacity-0 shadow-lg transition-all duration-150 group-hover:translate-x-0 group-hover:opacity-100 group-focus-visible:translate-x-0 group-focus-visible:opacity-100"
+    >
+      {label}
+      <span className="absolute -left-1 top-1/2 h-2 w-2 -translate-y-1/2 rotate-45 bg-[#2f3037]" />
+    </span>
   );
 }
