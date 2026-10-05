@@ -49,7 +49,8 @@ export default function NotificationsPage() {
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.message || "ไม่สามารถโหลดข้อมูลการแจ้งเตือนได้");
+        const detail = data.error ? ` (${data.error})` : "";
+        throw new Error((data.message || "ไม่สามารถโหลดข้อมูลการแจ้งเตือนได้") + detail);
       }
 
       setNotifications(data.notifications || []);

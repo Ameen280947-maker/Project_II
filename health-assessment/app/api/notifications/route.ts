@@ -52,12 +52,15 @@ export async function GET(request: NextRequest) {
       upcomingNotifications,
     });
   } catch (error) {
-    console.error("Notifications GET Error:", error);
+    const errMsg = error instanceof Error ? error.message : "Unknown error";
+    const errStack = error instanceof Error ? error.stack : undefined;
+    console.error("Notifications GET Error:", errMsg);
+    if (errStack) console.error("Stack:", errStack);
     return NextResponse.json(
       {
         success: false,
         message: "เกิดข้อผิดพลาดในการดึงข้อมูลการแจ้งเตือน",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errMsg,
       },
       { status: 500 }
     );

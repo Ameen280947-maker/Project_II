@@ -889,84 +889,53 @@ export async function syncUserNotifications(
       rule.intervalDays
     );
 
-    // ตรวจสอบว่ามีบันทึกใน user_notifications หรือยัง
-    const existingRes = await pool.query(
+    // Upsert: INSERT ถ้ายังไม่มี, UPDATE ถ้ามีแล้ว (atomic - ป้องกัน race condition)
+    const upsertRes = await pool.query(
       `
-      SELECT notification_id, is_read, read_at
-      FROM user_notifications
-      WHERE user_id = $1 AND assessment_id = $2
-      LIMIT 1
+      INSERT INTO user_notifications (
+        user_id,
+        assessment_id,
+        assessment_type_id,
+        title,
+        message,
+        risk_level,
+        interval_days,
+        due_date,
+        status,
+        is_read,
+        action_url
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, FALSE, $10)
+      ON CONFLICT (user_id, assessment_id) DO UPDATE SET
+        assessment_type_id = EXCLUDED.assessment_type_id,
+        title              = EXCLUDED.title,
+        message            = EXCLUDED.message,
+        risk_level         = EXCLUDED.risk_level,
+        interval_days      = EXCLUDED.interval_days,
+        due_date           = EXCLUDED.due_date,
+        status             = EXCLUDED.status,
+        action_url         = EXCLUDED.action_url
+        -- is_read และ read_at ไม่เปลี่ยนแปลง เพื่อรักษาสถานะการอ่านของผู้ใช้
+      RETURNING notification_id, is_read, read_at
       `,
-      [userId, item.assessment_id]
+      [
+        userId,
+        item.assessment_id,
+        item.assessment_type_id,
+        rule.title,
+        rule.message,
+        item.risk_level || "ทั่วไป",
+        rule.intervalDays,
+        dueDate,
+        status,
+        rule.actionUrl,
+      ]
     );
 
-    let notificationId: number;
-    let isRead = false;
-    let readAt: string | null = null;
-
-    if (existingRes.rows.length === 0) {
-      // สร้างใหม่
-      const insertRes = await pool.query(
-        `
-        INSERT INTO user_notifications (
-          user_id,
-          assessment_id,
-          assessment_type_id,
-          title,
-          message,
-          risk_level,
-          interval_days,
-          due_date,
-          status,
-          is_read,
-          action_url
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        RETURNING notification_id, is_read, read_at
-        `,
-        [
-          userId,
-          item.assessment_id,
-          item.assessment_type_id,
-          rule.title,
-          rule.message,
-          item.risk_level || "ทั่วไป",
-          rule.intervalDays,
-          dueDate,
-          status,
-          false,
-          rule.actionUrl,
-        ]
-      );
-      notificationId = insertRes.rows[0].notification_id;
-    } else {
-      notificationId = existingRes.rows[0].notification_id;
-      isRead = existingRes.rows[0].is_read;
-      readAt = existingRes.rows[0].read_at ? new Date(existingRes.rows[0].read_at).toISOString() : null;
-
-      // อัปเดตข้อมูลและสถานะล่าสุด
-      await pool.query(
-        `
-        UPDATE user_notifications
-        SET
-          status = $1,
-          due_date = $2,
-          interval_days = $3,
-          title = $4,
-          message = $5,
-          action_url = $6
-        WHERE notification_id = $7
-        `,
-        [
-          status,
-          dueDate,
-          rule.intervalDays,
-          rule.title,
-          rule.message,
-          rule.actionUrl,
-          notificationId,
-        ]
-      );
-    }
+    const notificationId: number = upsertRes.rows[0].notification_id;
+    const isRead: boolean = upsertRes.rows[0].is_read ?? false;
+    const readAt: string | null = upsertRes.rows[0].read_at
+      ? new Date(upsertRes.rows[0].read_at).toISOString()
+      : null;
 
     results.push({
       notificationId,
