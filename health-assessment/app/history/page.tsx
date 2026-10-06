@@ -1429,6 +1429,7 @@ function getDetailHref(
       if (item.assessment_type_id === 14) {
         return `/recommendation_depression_9q?assessmentId=${item.assessment_id}`;
       }
-      return null;
+      // แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม ใช้หน้ากลาง
+      return `/assessment/${item.assessment_type_id}?result=${item.assessment_id}`;
   }
 }

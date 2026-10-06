@@ -775,7 +775,8 @@ export function getNotificationRule(
         intervalDays: 90,
         intervalLabel: "ทุก 3 เดือน",
         urgency: "medium",
-        actionUrl: "/assessment-type",
+        // แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม → หน้ากลางของแบบนั้น
+        actionUrl: `/assessment/${assessmentTypeId}`,
         assessmentName: "แบบประเมินสุขภาพ",
         category: "ncd",
         title: "ถึงกำหนดติดตามและประเมินสุขภาพซ้ำ",

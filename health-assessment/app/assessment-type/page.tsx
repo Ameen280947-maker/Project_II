@@ -11,7 +11,7 @@ import {
   Heart,
   Wine,
 } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
@@ -52,7 +52,18 @@ const assessmentTypes = [
   },
 ];
 
+type ExtraAssessment = { id: number; name: string; description: string | null; questions: number };
+
 export default function AssessmentTypePage() {
+  // แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม (ไม่มีจะไม่แสดงหัวข้อนี้)
+  const [extra, setExtra] = useState<ExtraAssessment[]>([]);
+  useEffect(() => {
+    fetch("/api/assessments/custom", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((d) => d.success && setExtra(d.types))
+      .catch(() => {});
+  }, []);
+
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
@@ -114,6 +125,33 @@ export default function AssessmentTypePage() {
             ))}
 
           </div>
+
+          {extra.length > 0 && (
+            <div className="mt-10">
+              <h2 className="text-xl font-bold">แบบประเมินเพิ่มเติม</h2>
+              <p className="mt-1 text-sm text-[#7c7d85]">แบบประเมินที่เจ้าหน้าที่เพิ่มเข้ามาในระบบ</p>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                {extra.map((a) => (
+                  <Link
+                    key={a.id}
+                    href={`/assessment/${a.id}`}
+                    className="group flex items-center gap-4 rounded-[24px] border border-[#eee8e9] bg-white p-5 shadow-[0_12px_35px_rgba(35,25,30,0.04)] transition hover:-translate-y-0.5 hover:border-[#f3b6c0]"
+                  >
+                    <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#fff0f2] text-[#b91c2b]">
+                      <Activity size={22} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-bold">{a.name}</span>
+                      <span className="line-clamp-2 text-sm text-[#7c7d85]">
+                        {a.description || `${a.questions} ข้อ`}
+                      </span>
+                    </span>
+                    <ArrowRight size={18} className="shrink-0 text-[#b91c2b] transition group-hover:translate-x-1" />
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
 
         </section>
 

@@ -25,6 +25,8 @@ const DEFAULTS = {
   consent_health_at: null as string | null,
   consent_research: false,
   consent_research_at: null as string | null,
+  consent_staff: false,
+  consent_staff_at: null as string | null,
 };
 
 type SettingKey = keyof typeof DEFAULTS;
@@ -47,6 +49,7 @@ const EDITABLE: SettingKey[] = [
   "emergency_phone",
   "consent_health",
   "consent_research",
+  "consent_staff",
 ];
 
 const ALLOWED_VALUES: Partial<Record<SettingKey, string[]>> = {
@@ -101,6 +104,7 @@ export async function PUT(request: NextRequest) {
     // บันทึกเวลาที่ให้/เปลี่ยนความยินยอม
     if ("consent_health" in updates) updates.consent_health_at = new Date().toISOString();
     if ("consent_research" in updates) updates.consent_research_at = new Date().toISOString();
+    if ("consent_staff" in updates) updates.consent_staff_at = new Date().toISOString();
 
     const keys = Object.keys(updates);
     if (keys.length === 0) {
