@@ -1,24 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getGenericLevels, levelForScore, listGenericTypes } from "@/lib/customAssessments";
+import { requireUser } from "@/lib/session";
+import {
+  badRequest,
+  loadActiveChoices,
+  readJsonObject,
+  resolveChoiceAnswers,
+  toId,
+  userExists,
+} from "../_lib/validate";
 
 /* =========================================================
    /api/assessments/custom  (แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม)
    GET                                  → รายการแบบประเมินที่เปิดใช้งาน
-   GET ?type=<id>                       → คำถาม + ตัวเลือก
-   GET ?assessmentId=<id>&userId=<id>   → ผลการประเมินที่ทำไปแล้ว
+   GET ?type=<id>                       → คำถาม + ตัวเลือก (id ไม่ใช่ตัวเลข/ไม่มีจริง = 404)
+   GET ?assessmentId=<id>&userId=<id>   → ผลการประเมินของผู้ใช้ใน session เท่านั้น
    POST { userId, typeId, answers: [{ questionId, choiceId }] }
    - คะแนนคิดจากฐานข้อมูลเสมอ ไม่เชื่อคะแนนที่ส่งมาจากเบราว์เซอร์
+   - ต้องตอบครบทุกข้อ ข้อละ 1 คำตอบ
 ========================================================= */
 
 export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
   try {
-    const assessmentId = Number(p.get("assessmentId"));
-    if (assessmentId) return result(assessmentId, Number(p.get("userId")));
+    if (p.has("assessmentId")) {
+      const auth = requireUser(request, p.get("userId"));
+      if (!auth.ok) return auth.response;
 
-    const typeId = Number(p.get("type"));
-    if (!typeId) return NextResponse.json({ success: true, types: await listGenericTypes() });
+      const assessmentId = toId(p.get("assessmentId"));
+      if (assessmentId === null) return badRequest("assessmentId ไม่ถูกต้อง");
+      return result(assessmentId, auth.userId);
+    }
+
+    if (!p.has("type")) return NextResponse.json({ success: true, types: await listGenericTypes() });
+
+    const typeId = toId(p.get("type"));
+    if (typeId === null) {
+      return NextResponse.json({ success: false, message: "ไม่พบแบบประเมินนี้" }, { status: 404 });
+    }
 
     const levels = await getGenericLevels(typeId);
     const t = await pool.query("SELECT assessment_name, description, is_active FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
@@ -52,9 +72,6 @@ export async function GET(request: NextRequest) {
 }
 
 async function result(assessmentId: number, userId: number) {
-  if (!Number.isInteger(userId) || userId <= 0) {
-    return NextResponse.json({ success: false, message: "ไม่พบข้อมูลผู้ใช้งาน" }, { status: 400 });
-  }
   const { rows } = await pool.query(
     `SELECT a.assessment_id, a.assessment_type_id, a.total_score, a.risk_level, a.assessed_at,
             t.assessment_name, r.recommendation_text, r.reassess_days, r.hotline, r.source
@@ -89,42 +106,40 @@ async function result(assessmentId: number, userId: number) {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => ({}));
-  const userId = Number(body.userId);
-  const typeId = Number(body.typeId);
-  const answers: { questionId: number; choiceId: number }[] = Array.isArray(body.answers) ? body.answers : [];
+  const body = await readJsonObject(request);
+  if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  if (!Number.isInteger(userId) || userId <= 0) {
-    return NextResponse.json({ success: false, message: "ไม่พบข้อมูลผู้ใช้งานที่ถูกต้อง" }, { status: 400 });
+  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = requireUser(request, body.userId ?? body.user_id);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  const typeId = toId(body.typeId);
+  if (typeId === null) {
+    return NextResponse.json({ success: false, message: "แบบประเมินนี้ยังไม่เปิดให้ใช้งาน" }, { status: 404 });
   }
+  if (!Array.isArray(body.answers)) return badRequest("ไม่พบคำตอบแบบประเมิน");
+  const answers = body.answers as { questionId?: unknown; choiceId?: unknown }[];
 
   const client = await pool.connect();
   try {
+    if (!(await userExists(client, userId))) return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
+
     const levels = await getGenericLevels(typeId, client);
     const t = await client.query("SELECT is_active FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
     if (!levels || !t.rows[0]?.is_active) {
       return NextResponse.json({ success: false, message: "แบบประเมินนี้ยังไม่เปิดให้ใช้งาน" }, { status: 404 });
     }
 
-    // คำถามที่ใช้งานอยู่ และคะแนนของแต่ละตัวเลือก
-    const { rows } = await client.query(
-      `SELECT q.question_id, c.choice_id, c.choice_text, c.score
-         FROM questions q
-         JOIN question_choices c ON c.question_id = q.question_id AND c.is_active
-        WHERE q.assessment_type_id = $1 AND q.is_active`,
-      [typeId]
+    // คำถามที่ใช้งานอยู่ และคะแนนของแต่ละตัวเลือก (ตอบซ้ำ/ตัวเลือกไม่มีจริง/ไม่ครบ = 400)
+    const resolved = resolveChoiceAnswers(
+      await loadActiveChoices(client, typeId),
+      answers.map((a) => ({ questionId: a?.questionId, choiceId: a?.choiceId ?? null }))
     );
-    const questionIds = new Set(rows.map((r) => r.question_id as number));
-    const picked = new Map<number, (typeof rows)[number]>();
-    for (const a of answers) {
-      const choice = rows.find((r) => r.question_id === Number(a.questionId) && r.choice_id === Number(a.choiceId));
-      if (choice) picked.set(choice.question_id, choice);
-    }
-    if (picked.size !== questionIds.size) {
-      return NextResponse.json({ success: false, message: `กรุณาตอบให้ครบทั้ง ${questionIds.size} ข้อ` }, { status: 400 });
-    }
+    if (!resolved.ok) return badRequest(resolved.message);
+    const picked = resolved.picked;
 
-    const total = Array.from(picked.values()).reduce((s, c) => s + Number(c.score), 0);
+    const total = resolved.total;
     const level = levelForScore(levels, total);
     if (!level) {
       console.error(`custom assessment ${typeId}: score ${total} อยู่นอกเกณฑ์แปลผล`);
@@ -141,7 +156,7 @@ export async function POST(request: NextRequest) {
       [userId, typeId, level.recId, total, level.riskLevel]
     );
     const assessmentId = ins.rows[0].assessment_id as number;
-    for (const c of picked.values()) {
+    for (const c of picked) {
       await client.query(
         `INSERT INTO assessment_answers (assessment_id, question_id, choice_id, answer_value, score, answered_at)
          VALUES ($1, $2, $3, $4, $5, NOW())`,

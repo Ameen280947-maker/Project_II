@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
 import {
   AlertTriangle,
-  Bell,
   CheckCircle2,
   ChevronRight,
   Download,
@@ -14,10 +13,12 @@ import {
   HelpCircle,
   KeyRound,
   LogOut,
+  Pencil,
   Phone,
   Shield,
   Trash2,
   User,
+  X,
   type LucideIcon,
 } from "lucide-react";
 
@@ -49,6 +50,7 @@ type Settings = {
 };
 
 type Profile = {
+  username: string;
   name: string;
   email: string;
   phone: string;
@@ -71,7 +73,6 @@ type Assessment = {
 const SECTIONS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "account", label: "บัญชีผู้ใช้", icon: User },
   { id: "security", label: "ความปลอดภัย", icon: Shield },
-  { id: "notifications", label: "การแจ้งเตือน", icon: Bell },
   { id: "display", label: "การแสดงผล", icon: Eye },
   { id: "emergency", label: "ผู้ติดต่อฉุกเฉิน", icon: Phone },
   { id: "privacy", label: "ความเป็นส่วนตัว", icon: KeyRound },
@@ -85,12 +86,11 @@ const FONT_SIZE_PX: Record<Settings["font_size"], string> = {
   xl: "20px",
 };
 
-const NOTIFY_ITEMS: { key: keyof Settings; label: string; desc: string }[] = [
-  { key: "notify_reassess", label: "เตือนเมื่อถึงรอบประเมินซ้ำ", desc: "แจ้งเมื่อแบบประเมินครบกำหนดตามเกณฑ์ของแต่ละโรค" },
-  { key: "notify_weekly", label: "สรุปสุขภาพรายสัปดาห์", desc: "ส่งสรุปผลและความคืบหน้าทุกวันจันทร์" },
-  { key: "notify_goals", label: "เตือนเป้าหมายสัปดาห์นี้", desc: "เตือนเป้าหมายที่ยังไม่ได้ทำในช่วงกลางสัปดาห์" },
-  { key: "notify_tips", label: "คำแนะนำสุขภาพใหม่", desc: "แจ้งเมื่อมีคำแนะนำที่เกี่ยวข้องกับผลของคุณ" },
-];
+/*
+  หมายเหตุ: ซ่อนตัวเลือกที่บันทึกได้แต่ยังไม่มีผลกับระบบจริง
+  (การแจ้งเตือน/ช่องทาง/เวลา/รอบประเมินซ้ำ, OTP ตอนเข้าสู่ระบบ, ภาษา, รูปแบบปี)
+  ฟิลด์ยังอยู่ใน DB และ API ถ้าเชื่อมใช้งานจริงแล้วค่อยเปิดกลับมา
+*/
 
 /* =========================================================
    HELPERS
@@ -105,17 +105,22 @@ const formatDate = (d?: string | null, yearFormat: Settings["year_format"] = "be
   });
 };
 
-// อ่านข้อมูลโปรไฟล์แบบยืดหยุ่น เพราะ /api/profile อาจตั้งชื่อฟิลด์ต่างกัน
+// อ่านข้อมูลบัญชีจาก /api/profile
+// ข้อมูลบัญชี (username, email, วันที่สมัคร) อยู่ใน raw.user
+// ส่วน raw.profile เป็นข้อมูลสุขภาพ จึงต้องอ่าน user ก่อน
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const readProfile = (raw: any): Profile => {
-  const p = raw?.profile ?? raw?.user ?? raw?.data ?? raw ?? {};
-  const first = p.first_name ?? p.firstName ?? "";
-  const last = p.last_name ?? p.lastName ?? "";
+  const u = raw?.user ?? {};
+  const p = raw?.profile ?? raw?.data ?? {};
+  const first = u.first_name ?? p.first_name ?? "";
+  const last = u.last_name ?? p.last_name ?? "";
+  const username = u.username ?? p.username ?? "";
   return {
-    name: [first, last].filter(Boolean).join(" ") || p.name || p.username || "",
-    email: p.email ?? "",
-    phone: p.phone ?? p.phone_number ?? p.tel ?? "",
-    createdAt: p.created_at ?? p.createdAt ?? null,
+    username,
+    name: [first, last].filter(Boolean).join(" ") || username,
+    email: u.email ?? p.email ?? "",
+    phone: u.phone ?? p.phone ?? p.phone_number ?? p.tel ?? "",
+    createdAt: u.created_at ?? u.createdAt ?? p.created_at ?? null,
   };
 };
 
@@ -135,7 +140,6 @@ export default function SettingsPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [assessmentNames, setAssessmentNames] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [toast, setToast] = useState<{ type: "ok" | "error"; text: string } | null>(null);
@@ -143,6 +147,23 @@ export default function SettingsPage() {
   const [dialog, setDialog] = useState<null | "clear" | "delete">(null);
 
   const [emergency, setEmergency] = useState({ name: "", relation: "", phone: "" });
+
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [savingUsername, setSavingUsername] = useState(false);
+
+  // เปลี่ยนอีเมลต้องยืนยันรหัสผ่าน เพราะอีเมลใช้รับ OTP ตอนลืมรหัสผ่าน
+  const [editingEmail, setEditingEmail] = useState(false);
+  const [emailDraft, setEmailDraft] = useState("");
+  const [emailPassword, setEmailPassword] = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  // ประกาศก่อน useEffect ที่เรียกใช้
+  const applyFontSize = (size: Settings["font_size"]) => {
+    // Tailwind ใช้หน่วย rem จึงขยายได้ทั้งหน้า
+    document.documentElement.style.fontSize = FONT_SIZE_PX[size];
+    localStorage.setItem("fontSize", size);
+  };
 
   /* ---------- load ---------- */
   useEffect(() => {
@@ -153,10 +174,9 @@ export default function SettingsPage() {
         setUserId(uid);
 
         const q = `userId=${encodeURIComponent(uid)}`;
-        const [settingsRes, profileRes, dashRes] = await Promise.all([
+        const [settingsRes, profileRes] = await Promise.all([
           fetch(`/api/settings?${q}`, { cache: "no-store" }),
           fetch(`/api/profile?${q}`, { cache: "no-store" }).catch(() => null),
-          fetch(`/api/dashboard?${q}`, { cache: "no-store" }).catch(() => null),
         ]);
 
         const settingsJson = await settingsRes.json();
@@ -171,11 +191,6 @@ export default function SettingsPage() {
         applyFontSize(s.font_size);
 
         if (profileRes?.ok) setProfile(readProfile(await profileRes.json()));
-        if (dashRes?.ok) {
-          const dash = await dashRes.json();
-          const names = (dash.latestByType ?? []).map((a: Assessment) => a.assessment_name);
-          setAssessmentNames(Array.from(new Set<string>(names)));
-        }
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : "ไม่สามารถโหลดข้อมูลได้");
@@ -193,12 +208,6 @@ export default function SettingsPage() {
   }, [toast]);
 
   /* ---------- actions ---------- */
-  const applyFontSize = (size: Settings["font_size"]) => {
-    // Tailwind ใช้หน่วย rem จึงขยายได้ทั้งหน้า
-    document.documentElement.style.fontSize = FONT_SIZE_PX[size];
-    localStorage.setItem("fontSize", size);
-  };
-
   const save = async (patch: Partial<Settings>, okText = "บันทึกแล้ว") => {
     if (!userId || !settings) return;
     const previous = settings;
@@ -220,10 +229,104 @@ export default function SettingsPage() {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem("userId");
-    localStorage.removeItem("userName");
-    router.push("/login");
+  const saveUsername = async () => {
+    if (!userId || !profile) return;
+    const username = usernameDraft.trim();
+    if (username === profile.username) {
+      setEditingUsername(false);
+      return;
+    }
+    setSavingUsername(true);
+    try {
+      const res = await fetch("/api/settings/account", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, username }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message);
+
+      const newName = json.user.username as string;
+      setProfile({
+        ...profile,
+        username: newName,
+        // ชื่อที่แสดงใช้ username เมื่อไม่มีชื่อจริง
+        name: profile.name === profile.username ? newName : profile.name,
+      });
+
+      // หน้าอื่น (Dashboard, Sidebar) อ่านชื่อจาก localStorage
+      localStorage.setItem("username", newName);
+      try {
+        const stored = JSON.parse(localStorage.getItem("user") ?? "null");
+        if (stored) localStorage.setItem("user", JSON.stringify({ ...stored, username: newName }));
+      } catch {
+        // ข้อมูลเดิมเสีย ไม่ต้องอัปเดต
+      }
+
+      setEditingUsername(false);
+      setToast({ type: "ok", text: "เปลี่ยนชื่อผู้ใช้แล้ว ใช้ชื่อใหม่ในการเข้าสู่ระบบครั้งถัดไป" });
+    } catch (err) {
+      console.error(err);
+      setToast({ type: "error", text: err instanceof Error && err.message ? err.message : "เปลี่ยนชื่อผู้ใช้ไม่สำเร็จ" });
+    } finally {
+      setSavingUsername(false);
+    }
+  };
+
+  const cancelEditEmail = () => {
+    setEditingEmail(false);
+    setEmailPassword("");
+  };
+
+  const saveEmail = async () => {
+    if (!userId || !profile) return;
+    const email = emailDraft.trim().toLowerCase();
+    if (email === profile.email.toLowerCase()) {
+      cancelEditEmail();
+      return;
+    }
+    setSavingEmail(true);
+    try {
+      const res = await fetch("/api/settings/email", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, email, password: emailPassword }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.success) throw new Error(json.message);
+
+      const newEmail = json.user.email as string;
+      setProfile({ ...profile, email: newEmail });
+
+      localStorage.setItem("email", newEmail);
+      try {
+        const stored = JSON.parse(localStorage.getItem("user") ?? "null");
+        if (stored) localStorage.setItem("user", JSON.stringify({ ...stored, email: newEmail }));
+      } catch {
+        // ข้อมูลเดิมเสีย ไม่ต้องอัปเดต
+      }
+
+      cancelEditEmail();
+      setToast({ type: "ok", text: "เปลี่ยนอีเมลแล้ว รหัส OTP ลืมรหัสผ่านจะส่งไปที่อีเมลใหม่" });
+    } catch (err) {
+      console.error(err);
+      setToast({ type: "error", text: err instanceof Error && err.message ? err.message : "เปลี่ยนอีเมลไม่สำเร็จ" });
+    } finally {
+      setSavingEmail(false);
+    }
+  };
+
+  const logout = async () => {
+    // ลบ session cookie ฝั่ง server ก่อน (ถ้าเรียกไม่สำเร็จก็ยังออกจากระบบในเครื่องต่อ)
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* ignore */
+    }
+    for (const key of ["userId", "username", "userName", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"]) {
+      localStorage.removeItem(key);
+    }
+    router.replace("/login");
   };
 
   const downloadData = async () => {
@@ -281,7 +384,7 @@ export default function SettingsPage() {
             <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-3">
               ตั้ง<span className="text-[#b91c2b]">ค่า</span>
             </h1>
-            <p className="text-gray-500 mt-3 text-lg">จัดการบัญชี การแจ้งเตือน การแสดงผล และความเป็นส่วนตัวของข้อมูลสุขภาพ</p>
+            <p className="text-gray-500 mt-3 text-lg">จัดการบัญชี การแสดงผล และความเป็นส่วนตัวของข้อมูลสุขภาพ</p>
           </div>
 
           {loading ? (
@@ -299,7 +402,7 @@ export default function SettingsPage() {
               {/* SUB NAV */}
               <nav
                 aria-label="หมวดการตั้งค่า"
-                className="w-full lg:w-60 shrink-0 bg-white border border-gray-100 rounded-3xl p-2 shadow-sm lg:sticky lg:top-6 flex lg:flex-col gap-1 overflow-x-auto"
+                className="w-full lg:w-60 shrink-0 bg-white border border-gray-100 rounded-3xl p-2 shadow-sm flex lg:flex-col gap-1 overflow-x-auto"
               >
                 {SECTIONS.map((s) => (
                   <a
@@ -326,13 +429,124 @@ export default function SettingsPage() {
                 <Card id="account" title="บัญชีผู้ใช้" desc="ข้อมูลที่ใช้เข้าสู่ระบบและติดต่อคุณ">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-red-50 text-[#b91c2b] text-2xl font-bold flex items-center justify-center shrink-0">
-                      {(profile?.name || "U").trim().charAt(0)}
+                      {(profile?.username || "U").trim().charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-lg font-bold text-gray-800">{profile?.name || "-"}</p>
-                      <p className="text-sm text-gray-500">{profile?.email || "-"}</p>
+                      {editingUsername ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <input
+                            autoFocus
+                            value={usernameDraft}
+                            maxLength={30}
+                            onChange={(e) => setUsernameDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveUsername();
+                              if (e.key === "Escape") setEditingUsername(false);
+                            }}
+                            aria-label="ชื่อผู้ใช้"
+                            className="h-10 w-full max-w-xs rounded-xl border border-gray-200 px-3 font-semibold text-gray-800 outline-none focus:border-[#b91c2b]"
+                          />
+                          <button
+                            type="button"
+                            onClick={saveUsername}
+                            disabled={savingUsername || !usernameDraft.trim()}
+                            className="h-10 px-4 rounded-xl bg-[#b91c2b] text-white text-sm font-semibold hover:bg-[#9f1624] transition disabled:opacity-50"
+                          >
+                            {savingUsername ? "กำลังบันทึก..." : "บันทึก"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditingUsername(false)}
+                            disabled={savingUsername}
+                            aria-label="ยกเลิก"
+                            className="h-10 w-10 grid place-items-center rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 transition"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-bold text-gray-800 truncate">{profile?.username || "-"}</p>
+                          {profile && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setUsernameDraft(profile.username);
+                                setEditingUsername(true);
+                              }}
+                              aria-label="แก้ไขชื่อผู้ใช้"
+                              className="p-1.5 rounded-lg text-gray-400 hover:text-[#b91c2b] hover:bg-red-50 transition"
+                            >
+                              <Pencil size={15} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                      {editingEmail ? (
+                        <div className="mt-2 flex flex-col gap-2 max-w-md">
+                          <input
+                            autoFocus
+                            type="email"
+                            value={emailDraft}
+                            maxLength={254}
+                            onChange={(e) => setEmailDraft(e.target.value)}
+                            aria-label="อีเมลใหม่"
+                            placeholder="อีเมลใหม่"
+                            className="h-10 w-full rounded-xl border border-gray-200 px-3 text-sm text-gray-800 outline-none focus:border-[#b91c2b]"
+                          />
+                          <input
+                            type="password"
+                            value={emailPassword}
+                            onChange={(e) => setEmailPassword(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") saveEmail();
+                              if (e.key === "Escape") cancelEditEmail();
+                            }}
+                            aria-label="รหัสผ่านปัจจุบัน"
+                            placeholder="รหัสผ่านปัจจุบัน (เพื่อยืนยัน)"
+                            autoComplete="current-password"
+                            className="h-10 w-full rounded-xl border border-gray-200 px-3 text-sm text-gray-800 outline-none focus:border-[#b91c2b]"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={saveEmail}
+                              disabled={savingEmail || !emailDraft.trim() || !emailPassword}
+                              className="h-10 px-4 rounded-xl bg-[#b91c2b] text-white text-sm font-semibold hover:bg-[#9f1624] transition disabled:opacity-50"
+                            >
+                              {savingEmail ? "กำลังบันทึก..." : "บันทึกอีเมล"}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={cancelEditEmail}
+                              disabled={savingEmail}
+                              className="h-10 px-4 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition"
+                            >
+                              ยกเลิก
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-gray-500 truncate">{profile?.email || "-"}</p>
+                          {profile && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEmailDraft(profile.email);
+                                setEmailPassword("");
+                                setEditingEmail(true);
+                              }}
+                              aria-label="แก้ไขอีเมล"
+                              className="p-1 rounded-lg text-gray-400 hover:text-[#b91c2b] hover:bg-red-50 transition"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                        </div>
+                      )}
                       <p className="text-sm text-gray-400">
-                        {profile?.phone ? `${profile.phone} · ` : ""}สมาชิกตั้งแต่ {formatDate(profile?.createdAt, settings.year_format)}
+                        {profile?.phone ? `${profile.phone} · ` : ""}สมาชิกตั้งแต่ {formatDate(profile?.createdAt)}
                       </p>
                     </div>
                     <Link
@@ -358,13 +572,6 @@ export default function SettingsPage() {
                       เปลี่ยนรหัสผ่าน
                     </Link>
                   </Row>
-                  <Row title="ยืนยันตัวตนด้วยรหัส OTP ทางอีเมล" desc="ขอรหัส OTP ทุกครั้งที่เข้าสู่ระบบจากอุปกรณ์ใหม่">
-                    <Toggle
-                      label="ยืนยันตัวตนด้วย OTP"
-                      checked={settings.require_otp}
-                      onChange={(v) => save({ require_otp: v })}
-                    />
-                  </Row>
                   <Row title="อุปกรณ์นี้" desc="ออกจากระบบบนอุปกรณ์ที่ใช้อยู่ตอนนี้" last>
                     <button
                       onClick={logout}
@@ -376,75 +583,9 @@ export default function SettingsPage() {
                   </Row>
                 </Card>
 
-                {/* 3. NOTIFICATIONS */}
-                <Card id="notifications" title="การแจ้งเตือน" desc="เลือกว่าจะให้ระบบเตือนเรื่องอะไร ผ่านช่องทางไหน">
-                  {NOTIFY_ITEMS.map((n) => (
-                    <Row key={n.key} title={n.label} desc={n.desc}>
-                      <Toggle
-                        label={n.label}
-                        checked={Boolean(settings[n.key])}
-                        onChange={(v) => save({ [n.key]: v } as Partial<Settings>)}
-                      />
-                    </Row>
-                  ))}
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-5">
-                    <Field label="ช่องทางการแจ้งเตือน">
-                      <select
-                        value={settings.notify_channel}
-                        onChange={(e) => save({ notify_channel: e.target.value as Settings["notify_channel"] })}
-                        className="h-12 px-3 rounded-xl border border-gray-200 bg-[#faf9f7] text-gray-800"
-                      >
-                        <option value="app_email">ในแอปและอีเมล</option>
-                        <option value="app">ในแอปเท่านั้น</option>
-                        <option value="email">อีเมลเท่านั้น</option>
-                      </select>
-                    </Field>
-                    <Field label="เวลาที่สะดวกรับการแจ้งเตือน">
-                      <input
-                        type="time"
-                        value={settings.notify_time}
-                        onChange={(e) => save({ notify_time: e.target.value })}
-                        className="h-12 px-3 rounded-xl border border-gray-200 bg-[#faf9f7] text-gray-800"
-                      />
-                    </Field>
-                  </div>
-
-                  {assessmentNames.length > 0 && (
-                    <div className="pt-6">
-                      <p className="font-semibold text-gray-800">รอบประเมินซ้ำของแต่ละแบบประเมิน</p>
-                      <p className="text-sm text-gray-500 mb-3">
-                        ค่าเริ่มต้นเป็นไปตามเกณฑ์แนะนำของแต่ละโรค ปรับให้ถี่ขึ้นได้ แต่ห่างกว่าเกณฑ์ไม่ได้
-                      </p>
-                      <div className="border border-gray-100 rounded-2xl divide-y divide-gray-100">
-                        {assessmentNames.map((name) => {
-                          const key = name.toLowerCase().trim();
-                          return (
-                            <div key={name} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 px-4 py-3">
-                              <span className="flex-1 text-sm font-semibold text-gray-700">{name}</span>
-                              <select
-                                aria-label={`รอบประเมินซ้ำ ${name}`}
-                                value={settings.reassess_overrides?.[key] ?? "default"}
-                                onChange={(e) =>
-                                  save({ reassess_overrides: { ...settings.reassess_overrides, [key]: e.target.value } })
-                                }
-                                className="h-10 px-3 rounded-xl border border-gray-200 bg-white text-sm"
-                              >
-                                <option value="default">ตามเกณฑ์แนะนำ</option>
-                                <option value="14">ทุก 2 สัปดาห์</option>
-                                <option value="30">ทุก 1 เดือน</option>
-                              </select>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </Card>
-
                 {/* 4. DISPLAY */}
                 <Card id="display" title="การแสดงผลและการเข้าถึง" desc="ปรับให้อ่านง่ายและเหมาะกับการใช้งานของคุณ">
-                  <Row title="ขนาดตัวอักษร" desc="มีผลกับทุกหน้า">
+                  <Row title="ขนาดตัวอักษร" desc="มีผลกับทุกหน้าที่มีแถบเมนู" last>
                     <Segmented
                       label="ขนาดตัวอักษร"
                       value={settings.font_size}
@@ -459,32 +600,10 @@ export default function SettingsPage() {
                       }}
                     />
                   </Row>
-                  <div className="my-3 rounded-2xl bg-[#faf9f7] border border-dashed border-gray-200 px-4 py-3">
+                  <div className="mt-1 rounded-2xl bg-[#faf9f7] border border-dashed border-gray-200 px-4 py-3">
                     <p className="text-xs font-bold text-gray-400 mb-1">ตัวอย่าง</p>
                     <p className="font-semibold text-gray-800">ผลการประเมินความดันโลหิตของคุณอยู่ในระดับปกติ</p>
                   </div>
-                  <Row title="ภาษา" desc="ตอนนี้รองรับภาษาไทยเป็นหลัก">
-                    <Segmented
-                      label="ภาษา"
-                      value={settings.language}
-                      options={[
-                        ["th", "ไทย"],
-                        ["en", "English"],
-                      ]}
-                      onChange={(v) => save({ language: v as Settings["language"] })}
-                    />
-                  </Row>
-                  <Row title="รูปแบบปี" desc={`ตัวอย่าง: ${formatDate(new Date().toISOString(), settings.year_format)}`} last>
-                    <Segmented
-                      label="รูปแบบปี"
-                      value={settings.year_format}
-                      options={[
-                        ["be", "พ.ศ."],
-                        ["ce", "ค.ศ."],
-                      ]}
-                      onChange={(v) => save({ year_format: v as Settings["year_format"] })}
-                    />
-                  </Row>
                 </Card>
 
                 {/* 5. EMERGENCY CONTACT */}
@@ -549,7 +668,7 @@ export default function SettingsPage() {
                 >
                   <Row
                     title="ยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ"
-                    desc={`จำเป็นสำหรับการประเมินและให้คำแนะนำ · อัปเดตเมื่อ ${formatDate(settings.consent_health_at, settings.year_format)}`}
+                    desc={`จำเป็นสำหรับการประเมินและให้คำแนะนำ · อัปเดตเมื่อ ${formatDate(settings.consent_health_at)}`}
                   >
                     <Toggle
                       label="ยินยอมให้เก็บข้อมูลสุขภาพ"
@@ -564,7 +683,7 @@ export default function SettingsPage() {
                     title="ยินยอมให้เจ้าหน้าที่เข้าถึงผลประเมินเพื่อติดตามดูแล"
                     desc={
                       settings.consent_staff
-                        ? `เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะติดต่อเพื่อให้คำแนะนำ · ยินยอมเมื่อ ${formatDate(settings.consent_staff_at, settings.year_format)}`
+                        ? `เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะติดต่อเพื่อให้คำแนะนำ · ยินยอมเมื่อ ${formatDate(settings.consent_staff_at)}`
                         : "เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะเห็นผลประเมินและติดต่อคุณเพื่อให้คำแนะนำ"
                     }
                   >

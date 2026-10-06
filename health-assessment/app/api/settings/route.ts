@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
 
 /* =========================================================
    GET  /api/settings?userId=...   → อ่านการตั้งค่า (ถ้ายังไม่มีจะคืนค่าเริ่มต้น)
@@ -61,10 +62,10 @@ const ALLOWED_VALUES: Partial<Record<SettingKey, string[]>> = {
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = new URL(request.url).searchParams.get("userId");
-    if (!userId) {
-      return NextResponse.json({ success: false, message: "ไม่พบข้อมูลผู้ใช้" }, { status: 400 });
-    }
+    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(request, new URL(request.url).searchParams.get("userId"));
+    if (!auth.ok) return auth.response;
+    const userId = auth.userId;
 
     const { rows } = await pool.query("SELECT * FROM user_settings WHERE user_id = $1", [String(userId)]);
 
@@ -81,10 +82,9 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const userId = body?.userId;
-    if (!userId) {
-      return NextResponse.json({ success: false, message: "ไม่พบข้อมูลผู้ใช้" }, { status: 400 });
-    }
+    const auth = requireUser(request, body?.userId);
+    if (!auth.ok) return auth.response;
+    const userId = auth.userId;
 
     // เลือกเฉพาะฟิลด์ที่แก้ไขได้ และตรวจค่าที่อนุญาต
     const updates: Record<string, unknown> = {};

@@ -6,6 +6,7 @@ import {
 import crypto from "crypto";
 
 import pool from "@/lib/db";
+import { otpRateLimits } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -14,6 +15,75 @@ type VerifyOtpBody = {
   email?: string;
   otp?: string;
 };
+
+const INVALID_OTP_MESSAGE =
+  "OTP ไม่ถูกต้องหรือหมดอายุแล้ว";
+
+const TOO_MANY_ATTEMPTS_MESSAGE =
+  "กรอก OTP ผิดเกินจำนวนครั้งที่กำหนด รหัสนี้ถูกยกเลิกแล้ว กรุณาขอรหัส OTP ใหม่";
+
+/*
+  ยกเลิก OTP ที่ยังไม่ถูกใช้ของอีเมลนี้
+  (forgot-password เก็บไว้แค่ตัวล่าสุดตัวเดียวอยู่แล้ว)
+*/
+async function invalidateLatestOtp(
+  email: string,
+) {
+  await pool.query(
+    `
+    UPDATE password_reset_tokens t
+    SET used = TRUE
+    FROM users u
+    WHERE u.user_id = t.user_id
+      AND LOWER(u.email) = LOWER($1)
+      AND t.used = FALSE
+    `,
+    [email],
+  );
+}
+
+function tooManyAttemptsResponse() {
+  return NextResponse.json(
+    {
+      success: false,
+      message:
+        TOO_MANY_ATTEMPTS_MESSAGE,
+    },
+    {
+      status: 429,
+    },
+  );
+}
+
+/*
+  นับการกรอกผิด (5 ครั้ง / อีเมล / 10 นาที)
+  ครบแล้ว → ยกเลิก OTP และตอบ 429
+*/
+async function failedAttemptResponse(
+  email: string,
+) {
+  const failures =
+    otpRateLimits.verifyOtpFailures.hit(
+      email,
+    );
+
+  if (failures >= 5) {
+    await invalidateLatestOtp(email);
+
+    return tooManyAttemptsResponse();
+  }
+
+  return NextResponse.json(
+    {
+      success: false,
+      message:
+        INVALID_OTP_MESSAGE,
+    },
+    {
+      status: 400,
+    },
+  );
+}
 
 /* =========================================================
    POST /api/auth/verify-otp
@@ -86,6 +156,23 @@ export async function POST(
     }
 
     /* =====================================================
+       RATE LIMIT
+
+       กรอกผิดครบ 5 ครั้งแล้ว → ต้องขอ OTP ใหม่
+       (ตัวนับอยู่ใน memory ดู lib/rateLimit.ts)
+    ===================================================== */
+
+    if (
+      otpRateLimits.verifyOtpFailures.isLimited(
+        email,
+      )
+    ) {
+      await invalidateLatestOtp(email);
+
+      return tooManyAttemptsResponse();
+    }
+
+    /* =====================================================
        START TRANSACTION
     ===================================================== */
 
@@ -127,15 +214,12 @@ export async function POST(
       transactionStarted =
         false;
 
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "ไม่พบข้อมูลผู้ใช้งาน",
-        },
-        {
-          status: 404,
-        },
+      /*
+        ไม่บอกว่าไม่มีอีเมลนี้ในระบบ
+        ตอบเหมือน OTP ผิด กันการเดาว่าใครมีบัญชี
+      */
+      return failedAttemptResponse(
+        email,
       );
     }
 
@@ -208,15 +292,8 @@ export async function POST(
       transactionStarted =
         false;
 
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "OTP ไม่ถูกต้องหรือหมดอายุแล้ว",
-        },
-        {
-          status: 400,
-        },
+      return failedAttemptResponse(
+        email,
       );
     }
 
@@ -294,6 +371,11 @@ export async function POST(
 
     transactionStarted =
       false;
+
+    // ยืนยันสำเร็จ → ล้างตัวนับการกรอกผิด
+    otpRateLimits.verifyOtpFailures.reset(
+      email,
+    );
 
     /* =====================================================
        RETURN RESET TOKEN

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { requireStaff, USER_ROLE_ID } from "@/lib/staff/auth";
-import { EXCLUDED_TYPES, severityOf, typeLabel } from "@/lib/staff/riskLevels";
+import { EXCLUDED_TYPES, severityOf, riskLabel, typeLabel } from "@/lib/staff/riskLevels";
 import { syncFollowUpCases } from "@/lib/staff/syncFollowUps";
 
 /* =========================================================
@@ -166,7 +166,7 @@ export async function GET(request: NextRequest) {
     const activity = [
       ...recentRes.rows.map((r) => ({
         type: severityOf(r.assessment_name, r.risk_level) >= 2 ? "high" : "assessment",
-        text: `${r.username} ทำแบบประเมิน${typeLabel(r.assessment_name)} ผล: ${r.risk_level ?? "-"}`,
+        text: `${r.username} ทำแบบประเมิน${typeLabel(r.assessment_name)} ผล: ${riskLabel(r.assessment_name, r.risk_level)}`,
         at: r.assessed_at,
       })),
       ...notesRes.rows.map((r) => ({
@@ -194,7 +194,7 @@ export async function GET(request: NextRequest) {
         caseId: r.case_id,
         username: r.username,
         assessment: typeLabel(r.assessment_name),
-        riskLevel: r.risk_level,
+        riskLevel: riskLabel(r.assessment_name, r.risk_level),
         score: r.total_score,
         severity: r.severity,
         createdAt: r.created_at,

@@ -65,7 +65,7 @@ type Filter = "all" | CaseStatus;
 
 const STATUS_PILL: Record<CaseStatus, string> = {
   waiting: "bg-[#fde6e7] text-[#a61e28]",
-  in_progress: "bg-[#fff3dc] text-[#8a5a00]",
+  progress: "bg-[#fff3dc] text-[#8a5a00]",
   referred: "bg-[#e3f0ff] text-[#1d5fa8]",
   closed: "bg-staff-100 text-staff-800",
 };
@@ -76,7 +76,7 @@ const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTim
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short" });
 
 function waitText(c: CaseRow) {
-  if (c.status === "referred") return `ส่งต่อ ${shortDate(c.updatedAt)}`;
+  if (c.status === "referred") return `แนะนำ ${shortDate(c.updatedAt)}`;
   if (c.status === "closed") return `ปิด ${shortDate(c.updatedAt)}`;
   const d = daysSince(c.createdAt);
   return d === 0 ? "วันนี้" : `รอ ${d} วัน`;
@@ -101,16 +101,18 @@ function FollowUp() {
 
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [notConsented, setNotConsented] = useState(0);
   const [filter, setFilter] = useState<Filter>("all");
   const [q, setQ] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const loadList = useCallback(() => {
-    return staffFetch<{ cases: CaseRow[]; counts: Record<string, number> }>("/api/staff/follow-up")
+    return staffFetch<{ cases: CaseRow[]; counts: Record<string, number>; notConsented: number }>("/api/staff/follow-up")
       .then((d) => {
         setCases(d.cases);
         setCounts(d.counts);
+        setNotConsented(d.notConsented);
       })
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
@@ -160,6 +162,12 @@ function FollowUp() {
       />
 
       <Chips label="สถานะเคส" items={chips} value={filter} onChange={setFilter} />
+      {notConsented > 0 && (
+        <p className="-mt-2 flex items-start gap-2 rounded-2xl border border-staff-line bg-white px-4 py-3 text-sm text-staff-muted">
+          <Lock size={16} className="mt-0.5 shrink-0" />
+          มีผู้ใช้อีก {notConsented} คนที่ผลล่าสุดอยู่ในระดับต้องติดตาม แต่ยังไม่ยินยอมให้เจ้าหน้าที่เข้าถึงข้อมูล จึงไม่แสดงในรายการนี้ (ผู้ใช้เปิดความยินยอมได้ที่หน้าตั้งค่า)
+        </p>
+      )}
       <ErrorBox message={error} />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
@@ -167,7 +175,7 @@ function FollowUp() {
         <Card className={`!p-3 lg:w-[400px] lg:shrink-0 ${selectedId ? "hidden lg:block" : ""}`}>
           {loading && <Empty>กำลังโหลด…</Empty>}
           {!loading && shown.length === 0 && (
-            <Empty>{cases.length === 0 ? "ยังไม่มีเคสติดตาม (หรือยังไม่มีผู้ใช้ที่ยินยอมให้เจ้าหน้าที่ติดตาม)" : "ไม่พบเคสตามเงื่อนไข"}</Empty>
+            <Empty>{cases.length === 0 ? "ยังไม่มีเคสติดตามจากผู้ใช้ที่ยินยอม" : "ไม่พบเคสตามเงื่อนไข"}</Empty>
           )}
           <ul className="flex flex-col gap-1">
             {shown.map((c) => {
@@ -229,7 +237,7 @@ function FollowUp() {
 function CasePanel({ caseId, onBack, onSaved }: { caseId: number; onBack: () => void; onSaved: () => void }) {
   const [data, setData] = useState<CaseDetail | null>(null);
   const [error, setError] = useState("");
-  const [status, setStatus] = useState<CaseStatus>("in_progress");
+  const [status, setStatus] = useState<CaseStatus>("progress");
   const [next, setNext] = useState("");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
@@ -239,7 +247,7 @@ function CasePanel({ caseId, onBack, onSaved }: { caseId: number; onBack: () => 
     staffFetch<{ case: CaseDetail }>(`/api/staff/follow-up?case=${caseId}`)
       .then((d) => {
         setData(d.case);
-        setStatus(d.case.status === "waiting" ? "in_progress" : d.case.status);
+        setStatus(d.case.status === "waiting" ? "progress" : d.case.status);
         setNext(d.case.nextFollowUp ? String(d.case.nextFollowUp).slice(0, 10) : "");
       })
       .catch((e) => setError(e.message));
@@ -264,9 +272,12 @@ function CasePanel({ caseId, onBack, onSaved }: { caseId: number; onBack: () => 
           assignToMe,
         }),
       });
-      setNote("");
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      // "บันทึกแล้ว" แสดงเฉพาะตอนบันทึกฟอร์ม ส่วนการรับเคสเห็นผลจากชื่อผู้รับผิดชอบที่เปลี่ยน
+      if (!assignToMe) {
+        setNote("");
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      }
       load();
       onSaved();
       window.dispatchEvent(new Event(FOLLOW_UP_UPDATED_EVENT));
@@ -375,7 +386,7 @@ function CasePanel({ caseId, onBack, onSaved }: { caseId: number; onBack: () => 
               onChange={(e) => setNote(e.target.value)}
               rows={3}
               maxLength={2000}
-              placeholder="เช่น โทรติดตามแล้ว ผู้ใช้รับทราบ และนัดพบนักจิตวิทยาวันศุกร์"
+              placeholder="เช่น โทรติดตามแล้ว ผู้ใช้รับทราบ และแนะนำให้ไปพบแพทย์ที่สถานพยาบาลใกล้บ้าน"
               className={`${inputCls} resize-y`}
             />
           </label>

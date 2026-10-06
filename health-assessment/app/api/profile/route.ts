@@ -1,4 +1,5 @@
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
 import {
   NextRequest,
   NextResponse,
@@ -41,11 +42,14 @@ export async function GET(
   request: NextRequest,
 ) {
   try {
-    const userId = Number(
-      request.nextUrl.searchParams.get(
-        "userId",
-      ),
+    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(
+      request,
+      request.nextUrl.searchParams.get("userId"),
     );
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.userId;
 
     /* =========================
        Validate userId
@@ -240,9 +244,14 @@ export async function PUT(
        รับค่า
     ========================= */
 
-    const userId = Number(
+    // ใช้ผู้ใช้จาก session (user_id ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(
+      request,
       body.user_id,
     );
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.userId;
 
     const age =
       body.age === null ||

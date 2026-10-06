@@ -90,11 +90,14 @@ export async function GET(request: NextRequest) {
     const trend = Array.from({ length: months }, (_, i) => {
       const d = new Date(start.getFullYear(), start.getMonth() + i, 1);
       const inMonth = cur.filter((r) => r.assessed_at.getFullYear() === d.getFullYear() && r.assessed_at.getMonth() === d.getMonth());
-      const users = new Set(inMonth.map((r) => r.user_id)).size;
+      // % ผู้ใช้ที่มีผลล่าสุดของเดือนนั้นอยู่ระดับสูงอย่างน้อย 1 แบบ (นิยามเดียวกับหน้าภาพรวม)
+      const latestInMonth = latestPerUserType(inMonth);
+      const users = new Set(latestInMonth.map((r) => r.user_id));
+      const highUsers = new Set(latestInMonth.filter(high).map((r) => r.user_id));
       return {
         label: TH_MONTHS[d.getMonth()],
         total: inMonth.length,
-        highPct: users >= MIN_GROUP ? Math.round((inMonth.filter(high).length / Math.max(1, inMonth.length)) * 1000) / 10 : null,
+        highPct: pct(highUsers.size, users.size),
         partial: i === months - 1,
       };
     });
@@ -134,8 +137,9 @@ export async function GET(request: NextRequest) {
         const pv = prev.filter((r) => r.type_id === t.assessment_type_id);
         const users = new Set(c.map((r) => r.user_id)).size;
         const prevUsers = new Set(pv.map((r) => r.user_id)).size;
-        const highPct = pct(c.filter(high).length, users >= MIN_GROUP ? c.length : 0);
-        const prevHigh = pct(pv.filter(high).length, prevUsers >= MIN_GROUP ? pv.length : 0);
+        // % ผู้ใช้ที่ผลล่าสุดในช่วงนั้นอยู่ระดับสูง (นิยามเดียวกับหน้าภาพรวม)
+        const highPct = pct(latestPerUserType(c).filter(high).length, users);
+        const prevHigh = pct(latestPerUserType(pv).filter(high).length, prevUsers);
         return {
           label: typeLabel(t.assessment_name),
           count: c.length,

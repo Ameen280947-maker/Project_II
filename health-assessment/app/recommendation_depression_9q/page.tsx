@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -52,6 +52,7 @@ type Result = {
 
 function Depression9QRecommendationContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const assessmentId = searchParams.get("assessmentId");
 
   const [result, setResult] = useState<Result | null>(null);
@@ -83,6 +84,13 @@ function Depression9QRecommendationContent() {
           }
         );
 
+        // session หมดอายุ → กลับไปหน้า login
+        if (res.status === 401) {
+          localStorage.removeItem("userId");
+          router.replace("/login");
+          return;
+        }
+
         const data = await res.json();
 
         if (!res.ok) {
@@ -100,7 +108,7 @@ function Depression9QRecommendationContent() {
     }
 
     loadResult();
-  }, [assessmentId]);
+  }, [assessmentId, router]);
 
   if (loading) {
     return (
@@ -188,6 +196,20 @@ function Depression9QRecommendationContent() {
 
   const StatusIcon = severityTheme.Icon;
 
+  /* ข้อ 9 (ข้อสุดท้าย) = คิดทำร้ายตนเอง ตอบมากกว่า 0 คะแนน
+     ถ้าไม่มีรายการคำตอบ ใช้ค่าที่ API ตรวจมาให้แทน */
+  const lastAnswer = result.answers?.length
+    ? result.answers.reduce((max, a) =>
+        Number(a.display_order) > Number(max.display_order) ? a : max
+      )
+    : null;
+  const selfHarm = lastAnswer
+    ? Number(lastAnswer.score) > 0
+    : !!result.needs_urgent_attention;
+
+  // ระดับปานกลางขึ้นไป (≥13) หรือคิดทำร้ายตนเอง → แสดงช่องทางช่วยเหลือ
+  const showHelpBox = selfHarm || score >= 13;
+
   const formattedDate = result.assessed_at
     ? new Date(result.assessed_at).toLocaleDateString("th-TH", {
         year: "numeric",
@@ -263,7 +285,7 @@ function Depression9QRecommendationContent() {
             </div>
 
             {/* Urgent Attention Alert Box */}
-            {(result.needs_urgent_attention || score >= 19) && (
+            {showHelpBox && (
               <div className="mt-8 rounded-3xl border-2 border-red-200 bg-red-50/90 p-6 sm:p-7">
                 <div className="flex items-start gap-4">
                   <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-600">
@@ -272,16 +294,27 @@ function Depression9QRecommendationContent() {
 
                   <div className="flex-1">
                     <h3 className="text-lg font-bold text-red-800">
-                      {result.needs_urgent_attention
+                      {selfHarm
                         ? "คำเตือน: ควรได้รับการประเมินและดูแลอย่างใกล้ชิด"
-                        : "มีอาการซึมเศร้าระดับรุนแรง ควรพบแพทย์เพื่อรับการรักษา"}
+                        : score >= 19
+                          ? "มีอาการซึมเศร้าระดับรุนแรง ควรพบแพทย์เพื่อรับการรักษา"
+                          : "มีอาการซึมเศร้าระดับปานกลาง ควรพบแพทย์เพื่อรับการประเมินและรักษา"}
                     </h3>
 
                     <p className="mt-2 text-sm leading-relaxed text-red-700">
-                      {result.needs_urgent_attention
+                      {selfHarm
                         ? "เนื่องจากมีคำตอบที่บ่งชี้ถึงความคิดทำร้ายตนเอง หรือมีความเสี่ยงต่อความปลอดภัย หากท่านหรือคนใกล้ชิดรู้สึกไม่ปลอดภัย ขอให้ปรึกษาผู้เชี่ยวชาญหรือติดต่อสายด่วนทันที"
                         : "คะแนนของท่านอยู่ในระดับที่ควรได้รับการดูแลและวางแผนการรักษาจากแพทย์หรือบุคลากรสาธารณสุขโดยเร็ว"}
                     </p>
+
+                    {/* คิดทำร้ายตนเอง → ส่งต่อประเมินความเสี่ยงการฆ่าตัวตาย 8Q */}
+                    {selfHarm && (
+                      <div className="mt-3 rounded-2xl border border-red-200 bg-white/80 px-4 py-3 text-sm leading-relaxed text-red-800">
+                        <span className="font-bold">ขั้นตอนถัดไป: </span>
+                        ควรไปพบแพทย์หรือเจ้าหน้าที่ที่สถานพยาบาลใกล้บ้าน
+                        เพื่อรับการประเมินความเสี่ยงการฆ่าตัวตายด้วยแบบประเมิน 8Q โดยเร็วที่สุด
+                      </div>
+                    )}
 
                     {/* Hotlines */}
                     <div className="mt-4 flex flex-wrap items-center gap-3">

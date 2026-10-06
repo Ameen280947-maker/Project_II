@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs"; // ⬅️ ถ้าโปรเจคใช้แพ็กเกจ "bcrypt" ให้เปลี่ยนเป็น import bcrypt from "bcrypt"
 import pool from "@/lib/db";
+import { clearSessionCookie, requireUser } from "@/lib/session";
 
 /* =========================================================
    POST /api/settings/danger
@@ -42,12 +43,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: "ข้อมูลไม่ถูกต้อง" }, { status: 400 });
   }
 
-  const userId = Number(body.userId);
+  // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = requireUser(request, body.userId);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
   const { password, action } = body;
-
-  if (!Number.isInteger(userId) || userId <= 0) {
-    return NextResponse.json({ success: false, message: "ไม่พบข้อมูลผู้ใช้" }, { status: 400 });
-  }
   if (!password) {
     return NextResponse.json({ success: false, message: "กรุณากรอกรหัสผ่าน" }, { status: 400 });
   }
@@ -79,10 +79,13 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT");
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
       message: action === "clear" ? "ล้างประวัติการประเมินเรียบร้อยแล้ว" : "ลบบัญชีเรียบร้อยแล้ว",
     });
+    // ลบบัญชีแล้ว → ลบ session ด้วย
+    if (action === "delete") clearSessionCookie(response);
+    return response;
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST /api/settings/danger error:", error);

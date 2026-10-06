@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { logAccess, requireStaff } from "@/lib/staff/auth";
-import { EXCLUDED_TYPES, severityOf, typeLabel } from "@/lib/staff/riskLevels";
+import { EXCLUDED_TYPES, severityOf, riskLabel, typeLabel } from "@/lib/staff/riskLevels";
 import { loadCustomSeverities } from "@/lib/customAssessments";
-import { syncFollowUpCases } from "@/lib/staff/syncFollowUps";
+import { countHighRiskWithoutConsent, syncFollowUpCases } from "@/lib/staff/syncFollowUps";
 import { CASE_STATUSES, CASE_STATUS_LABEL, isCaseStatus } from "@/lib/staff/cases";
 
 /* =========================================================
@@ -24,6 +24,7 @@ export async function GET(request: NextRequest) {
 
   try {
     if (params.get("summary")) {
+      await syncFollowUpCases();
       const { rows } = await pool.query(
         `SELECT COUNT(*)::int AS waiting FROM follow_up_cases c ${CONSENT_JOIN} WHERE c.status = 'waiting'`
       );
@@ -37,15 +38,17 @@ export async function GET(request: NextRequest) {
     }
 
     await syncFollowUpCases();
+    const notConsented = await countHighRiskWithoutConsent();
     const { rows } = await pool.query(
-      `SELECT c.case_id, c.status, c.severity, c.created_at, c.updated_at, c.next_follow_up,
+      `SELECT c.case_id, c.status, c.severity, c.created_at, c.updated_at,
+              to_char(c.next_follow_up, 'YYYY-MM-DD') AS next_follow_up,
               u.username, u.email, t.assessment_name, a.risk_level, a.total_score
          FROM follow_up_cases c
          ${CONSENT_JOIN}
          JOIN users u ON u.user_id = c.user_id
          JOIN assessment a ON a.assessment_id = c.assessment_id
          JOIN assessment_types t ON t.assessment_type_id = c.assessment_type_id
-        ORDER BY CASE c.status WHEN 'waiting' THEN 0 WHEN 'in_progress' THEN 1 WHEN 'referred' THEN 2 ELSE 3 END,
+        ORDER BY CASE c.status WHEN 'waiting' THEN 0 WHEN 'progress' THEN 1 WHEN 'referred' THEN 2 ELSE 3 END,
                  c.severity DESC, c.created_at ASC`
     );
 
@@ -55,6 +58,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       counts: { all: rows.length, ...counts },
+      notConsented,
       cases: rows.map((r) => ({
         caseId: r.case_id,
         status: r.status,
@@ -62,7 +66,7 @@ export async function GET(request: NextRequest) {
         username: r.username,
         email: r.email,
         assessment: typeLabel(r.assessment_name),
-        riskLevel: r.risk_level,
+        riskLevel: riskLabel(r.assessment_name, r.risk_level),
         score: r.total_score === null ? null : Number(r.total_score),
         createdAt: r.created_at,
         updatedAt: r.updated_at,
@@ -76,8 +80,9 @@ export async function GET(request: NextRequest) {
 }
 
 async function caseDetail(caseId: number, staffId: number) {
+  // next_follow_up เป็นชนิด date: ส่งเป็นข้อความ YYYY-MM-DD กันวันเลื่อนจากการแปลงเขตเวลา
   const { rows } = await pool.query(
-    `SELECT c.*, u.username, u.email, u.created_at AS joined_at,
+    `SELECT c.*, to_char(c.next_follow_up, 'YYYY-MM-DD') AS next_follow_up, u.username, u.email, u.created_at AS joined_at,
             hp.gender, hp.age, st.emergency_name, st.emergency_relation, st.emergency_phone,
             o.username AS owner_name, t.assessment_name, a.risk_level, a.total_score,
             (SELECT MIN(assessed_at) FROM assessment WHERE user_id = c.user_id) AS first_assessed
@@ -115,7 +120,7 @@ async function caseDetail(caseId: number, staffId: number) {
   const latest = latestRes.rows
     .map((r) => ({
       assessment: typeLabel(r.assessment_name),
-      riskLevel: r.risk_level,
+      riskLevel: riskLabel(r.assessment_name, r.risk_level),
       score: r.total_score === null ? null : Number(r.total_score),
       severity: severityOf(r.assessment_name, r.risk_level),
       assessedAt: r.assessed_at,
@@ -129,7 +134,7 @@ async function caseDetail(caseId: number, staffId: number) {
       status: c.status,
       severity: c.severity,
       assessment: typeLabel(c.assessment_name),
-      riskLevel: c.risk_level,
+      riskLevel: riskLabel(c.assessment_name, c.risk_level),
       score: c.total_score === null ? null : Number(c.total_score),
       createdAt: c.created_at,
       nextFollowUp: c.next_follow_up,

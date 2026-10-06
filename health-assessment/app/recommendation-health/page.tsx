@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
+import { riskLevelOf, type Level } from "@/lib/riskLevel";
 import type { CalculatedNotification } from "@/lib/notificationRules";
 import {
   Activity,
@@ -46,6 +47,7 @@ type Assessment = {
   diastolic?: number | string | null;
   assessed_at: string;
   recommendation_text?: string | null;
+  self_harm_flag?: boolean; // 9Q: ตอบข้อคิดทำร้ายตนเอง > 0
 };
 
 type DashboardData = {
@@ -54,7 +56,6 @@ type DashboardData = {
   assessments: Assessment[];
 };
 
-type Level = "ok" | "mid" | "high" | "unknown";
 type Category = "mind" | "body" | "behavior";
 
 type TypeConfig = {
@@ -389,25 +390,6 @@ const getConfig = (name?: string | null): TypeConfig => {
   return TYPE_CONFIGS.find((c) => c.match.includes(key)) ?? FALLBACK_CONFIG;
 };
 
-// เช็คคำเชิงลบก่อนเสมอ ("ไม่เพียงพอ" มีคำว่า "เพียงพอ" อยู่ข้างใน)
-const levelFromText = (risk?: string | null): Level => {
-  const v = String(risk || "").toLowerCase();
-  if (!v) return "unknown";
-  if (v.includes("ไม่มีความเสี่ยง") || v.includes("ไม่พบ") || v.includes("ไม่มีอาการ")) return "ok";
-  if (v.includes("สูง") || v.includes("อันตราย") || v.includes("รุนแรง") || v.includes("มาก")) return "high";
-  if (
-    v.includes("ไม่เพียงพอ") ||
-    v.includes("ปานกลาง") ||
-    v.includes("เสี่ยง") ||
-    v.includes("แนวโน้ม") ||
-    v.includes("ท้วม") ||
-    v.includes("ควร")
-  )
-    return "mid";
-  if (v.includes("ปกติ") || v.includes("เพียงพอ") || v.includes("น้อย") || v.includes("ดี")) return "ok";
-  return "unknown";
-};
-
 const isBloodPressure = (a: Assessment) =>
   String(a.assessment_name || "").toLowerCase().trim() === "blood pressure";
 
@@ -430,10 +412,12 @@ const displayScore = (a: Assessment) => {
 };
 
 const getLevel = (a: Assessment): Level => {
+  // 9Q ที่ตอบข้อคิดทำร้ายตนเอง = เสี่ยงสูงเสมอ ไม่ว่าคะแนนรวมเท่าไร
+  if (a.self_harm_flag) return "high";
   const cfg = getConfig(a.assessment_name);
   const s = scoreOf(a);
   if (cfg.levelFromScore && Number.isFinite(s)) return cfg.levelFromScore(s);
-  return levelFromText(a.risk_level);
+  return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
 const formatDate = (date?: string | null) =>
@@ -459,6 +443,7 @@ const resultHref = (a: Assessment) => {
 ========================================================= */
 
 export default function RecommendationHealthPage() {
+  const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [notifs, setNotifs] = useState<CalculatedNotification[]>([]);
   const [loading, setLoading] = useState(true);
@@ -492,6 +477,12 @@ export default function RecommendationHealthPage() {
           fetch(`/api/dashboard?userId=${encodeURIComponent(uid)}`, { cache: "no-store" }),
           fetch(`/api/notifications?userId=${encodeURIComponent(uid)}`, { cache: "no-store" }),
         ]);
+        // session หมดอายุ → กลับไปหน้า login
+        if (dashRes.status === 401) {
+          localStorage.removeItem("userId");
+          router.replace("/login");
+          return;
+        }
         const dash = await dashRes.json();
         const notif = await notifRes.json().catch(() => ({}));
 
@@ -506,7 +497,7 @@ export default function RecommendationHealthPage() {
       }
     };
     load();
-  }, []);
+  }, [router]);
 
   /* ---------- derive ---------- */
   const latest = data?.latestByType ?? [];
@@ -521,6 +512,8 @@ export default function RecommendationHealthPage() {
         })
         .sort(
           (a, b) =>
+            // ข้อคิดทำร้ายตนเองขึ้นก่อนเสมอ
+            Number(!!b.self_harm_flag) - Number(!!a.self_harm_flag) ||
             LEVEL_STYLE[getLevel(b)].n - LEVEL_STYLE[getLevel(a)].n ||
             new Date(b.assessed_at).getTime() - new Date(a.assessed_at).getTime()
         ),
@@ -1044,6 +1037,24 @@ function PlanCard({
         )}
         <ChevronDown size={20} className={`text-gray-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
+
+      {/* 9Q ตอบข้อคิดทำร้ายตนเอง → แสดงช่องทางช่วยเหลือเสมอ แม้ยังไม่เปิดการ์ด */}
+      {a.self_harm_flag && (
+        <div className="mx-5 sm:mx-6 mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-3">
+          <AlertTriangle size={20} className="text-[#b91c2b] shrink-0" />
+          <p className="flex-1 min-w-[220px] text-sm text-[#991b1b]">
+            <span className="font-bold">ผลประเมินพบความคิดทำร้ายตนเอง · </span>
+            โปรดขอความช่วยเหลือทันที และไปพบแพทย์ที่สถานพยาบาลใกล้บ้านเพื่อประเมินความเสี่ยงการฆ่าตัวตาย (8Q)
+          </p>
+          <a
+            href="tel:1323"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#b91c2b] text-white text-sm font-semibold hover:bg-[#991b1b] transition"
+          >
+            <Phone size={16} />
+            โทร 1323 สายด่วนสุขภาพจิต (24 ชม.)
+          </a>
+        </div>
+      )}
 
       {open && (
         <div className="px-5 sm:px-6 pb-6 flex flex-col gap-5">

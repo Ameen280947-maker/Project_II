@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
+import type { Pool } from "pg";
+import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import {
+  badRequest,
+  loadActiveChoices,
+  readJsonObject,
+  resolveChoiceAnswers,
+  userExists,
+} from "../_lib/validate";
 
-/* =========================================================
-   DATABASE
-========================================================= */
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-});
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* =========================================================
    CONSTANT
@@ -16,20 +20,76 @@ const pool = new Pool({
 const ASSESSMENT_TYPE_ID = 8;
 
 /* =========================================================
+   พฤติกรรมเนือยนิ่ง (ข้อ 2)
+   เอกสารอ้างอิงแปลผลแยกจากกิจกรรมทางกาย (ตารางที่ 20)
+   1 = ปกติ, 2 = เสี่ยงปานกลาง, 3 = เสี่ยงสูง
+========================================================= */
+
+const SEDENTARY_LEVEL: Record<number, string> = {
+  1: "ปกติ",
+  2: "เสี่ยงปานกลาง",
+  3: "เสี่ยงสูง",
+};
+
+async function getSedentaryResult(
+  client: { query: Pool["query"] },
+  score: number | null
+) {
+  if (score === null || !SEDENTARY_LEVEL[score]) {
+    return null;
+  }
+
+  const level = SEDENTARY_LEVEL[score];
+
+  const rec = await client.query(
+    `
+    SELECT recommendation_text
+    FROM recommendation
+    WHERE assessment_type_id = $1
+      AND risk_level = $2
+    LIMIT 1
+    `,
+    [ASSESSMENT_TYPE_ID, `พฤติกรรมเนือยนิ่ง-${level}`]
+  );
+
+  return {
+    score,
+    risk_level: level,
+    recommendation_text:
+      rec.rows[0]?.recommendation_text ?? null,
+  };
+}
+
+/* =========================================================
    GET
 ========================================================= */
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+
+  const assessmentIdParam =
+    searchParams.get("assessmentId");
+
+  /*
+    ดูผลได้เฉพาะของตัวเอง
+    ?userId= ถ้าส่งมาต้องตรงกับ session (ไม่งั้น 403)
+  */
+  let sessionUserId = 0;
+
+  if (assessmentIdParam) {
+    const auth = requireUser(
+      request,
+      searchParams.get("userId"),
+    );
+
+    if (!auth.ok) return auth.response;
+
+    sessionUserId = auth.userId;
+  }
+
   const client = await pool.connect();
 
   try {
-    const { searchParams } = new URL(request.url);
-
-    const assessmentIdParam =
-      searchParams.get("assessmentId");
-
-    const userIdParam =
-      searchParams.get("userId");
 
     /* =====================================================
        GET QUESTIONS
@@ -163,50 +223,37 @@ export async function GET(request: NextRequest) {
       WHERE v.assessment_id = $1
     `;
 
-    const resultParams: any[] = [
-      assessmentId,
-    ];
+    const resultParams = [assessmentId];
 
     /* =====================================================
-       CHECK USER OWNERSHIP
+       CHECK USER OWNERSHIP (ทุกครั้ง)
     ===================================================== */
 
-    if (userIdParam) {
-      const userId = Number(userIdParam);
+    const ownershipResult =
+      await client.query(
+        `
+        SELECT assessment_id
+        FROM assessment
+        WHERE assessment_id = $1
+          AND user_id = $2
+          AND assessment_type_id = $3
+        LIMIT 1
+        `,
+        [
+          assessmentId,
+          sessionUserId,
+          ASSESSMENT_TYPE_ID,
+        ]
+      );
 
-      if (
-        !Number.isInteger(userId) ||
-        userId <= 0
-      ) {
-        return NextResponse.json(
-          {
-            message: "User ID ไม่ถูกต้อง",
-          },
-          { status: 400 }
-        );
-      }
-
-      const ownershipResult =
-        await client.query(
-          `
-          SELECT assessment_id
-          FROM assessment
-          WHERE assessment_id = $1
-            AND user_id = $2
-          LIMIT 1
-          `,
-          [assessmentId, userId]
-        );
-
-      if (ownershipResult.rowCount === 0) {
-        return NextResponse.json(
-          {
-            message:
-              "ไม่พบผลการประเมินของผู้ใช้นี้",
-          },
-          { status: 404 }
-        );
-      }
+    if (ownershipResult.rowCount === 0) {
+      return NextResponse.json(
+        {
+          message:
+            "ไม่พบผลการประเมินของผู้ใช้นี้",
+        },
+        { status: 404 }
+      );
     }
 
     const result =
@@ -252,6 +299,27 @@ export async function GET(request: NextRequest) {
         ),
       }));
 
+    const sedentaryAnswer = await client.query(
+      `
+      SELECT aa.score
+      FROM assessment_answers aa
+      JOIN questions q
+        ON q.question_id = aa.question_id
+      WHERE aa.assessment_id = $1
+      ORDER BY q.display_order ASC, q.question_id ASC
+      OFFSET 1
+      LIMIT 1
+      `,
+      [assessmentId]
+    );
+
+    const sedentary = await getSedentaryResult(
+      client,
+      sedentaryAnswer.rows[0]
+        ? Number(sedentaryAnswer.rows[0].score)
+        : null
+    );
+
     return NextResponse.json(
       {
         assessment_id: Number(
@@ -275,6 +343,8 @@ export async function GET(request: NextRequest) {
           firstRow.assessed_at,
 
         answers,
+
+        sedentary,
       },
       { status: 200 }
     );
@@ -288,10 +358,6 @@ export async function GET(request: NextRequest) {
       {
         message:
           "ไม่สามารถโหลดข้อมูลแบบประเมินได้",
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unknown error",
       },
       { status: 500 }
     );
@@ -307,35 +373,41 @@ export async function GET(request: NextRequest) {
 export async function POST(
   request: NextRequest
 ) {
+  const body = await readJsonObject(request);
+
+  if (!body) {
+    return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+  }
+
+  /* =====================================================
+     VALIDATE USER
+     ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  ===================================================== */
+
+  const auth = requireUser(
+    request,
+    body.userId ?? body.user_id
+  );
+
+  if (!auth.ok) return auth.response;
+
+  const userId = auth.userId;
+
+  if (!Array.isArray(body.answers)) {
+    return badRequest("ไม่พบคำตอบแบบประเมิน");
+  }
+
+  const answers = body.answers as Array<{
+    question_id?: unknown;
+    choice_id?: unknown;
+  }>;
+
   const client = await pool.connect();
 
   try {
-    const body = await request.json();
-
-    const userId = Number(
-      body.userId
-    );
-
-    const answers = Array.isArray(
-      body.answers
-    )
-      ? body.answers
-      : [];
-
-    /* =====================================================
-       VALIDATE USER
-    ===================================================== */
-
-    if (
-      !Number.isInteger(userId) ||
-      userId <= 0
-    ) {
-      return NextResponse.json(
-        {
-          message:
-            "ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่",
-        },
-        { status: 400 }
+    if (!(await userExists(client, userId))) {
+      return badRequest(
+        "ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่"
       );
     }
 
@@ -382,172 +454,33 @@ export async function POST(
     }
 
     /* =====================================================
-       CHECK ANSWER COUNT
-    ===================================================== */
-
-    if (
-      answers.length !==
-      physicalQuestions.length
-    ) {
-      return NextResponse.json(
-        {
-          message: `กรุณาตอบคำถามให้ครบ ${physicalQuestions.length} ข้อ`,
-        },
-        { status: 400 }
-      );
-    }
-
-    /* =====================================================
-       PREPARE QUESTION IDS
-    ===================================================== */
-
-    const questionIds =
-      physicalQuestions.map(
-        (q) => Number(q.question_id)
-      );
-
-    /* =====================================================
-       GET ALL CHOICES
-    ===================================================== */
-
-    const choicesResult =
-      await client.query(
-        `
-        SELECT
-          choice_id,
-          question_id,
-          choice_text,
-          score,
-          display_order,
-          is_active
-        FROM question_choices
-        WHERE question_id = ANY($1::int[])
-          AND is_active = true
-        ORDER BY
-          question_id ASC,
-          display_order ASC,
-          choice_id ASC
-        `,
-        [questionIds]
-      );
-
-    const choices =
-      choicesResult.rows;
-
-    /* =====================================================
        VALIDATE ANSWERS
+       ตอบครบทุกข้อ ข้อละ 1 คำตอบ
+       ตัวเลือกต้องเป็นของคำถามนั้น คะแนนดึงจากฐานข้อมูล
     ===================================================== */
 
-    const validatedAnswers: {
-      question_id: number;
-      choice_id: number;
-      answer_value: string;
-      score: number;
-    }[] = [];
+    const resolved = resolveChoiceAnswers(
+      await loadActiveChoices(
+        client,
+        ASSESSMENT_TYPE_ID
+      ),
+      answers.map((answer) => ({
+        questionId: answer?.question_id,
+        choiceId: answer?.choice_id ?? null,
+      }))
+    );
 
-    for (
-      const answer of answers
-    ) {
-      const questionId =
-        Number(answer.question_id);
-
-      const choiceId =
-        Number(answer.choice_id);
-
-      /* ---------------------------------------------------
-         CHECK QUESTION
-      --------------------------------------------------- */
-
-      if (
-        !questionIds.includes(
-          questionId
-        )
-      ) {
-        return NextResponse.json(
-          {
-            message:
-              `ไม่พบ Question ID ${questionId}`,
-          },
-          { status: 400 }
-        );
-      }
-
-      /* ---------------------------------------------------
-         CHECK CHOICE
-      --------------------------------------------------- */
-
-      const choice =
-        choices.find(
-          (c) =>
-            Number(c.question_id) ===
-              questionId &&
-            Number(c.choice_id) ===
-              choiceId
-        );
-
-      if (!choice) {
-        return NextResponse.json(
-          {
-            message:
-              `ตัวเลือกไม่ถูกต้องสำหรับคำถาม ${questionId}`,
-          },
-          { status: 400 }
-        );
-      }
-
-      validatedAnswers.push({
-        question_id:
-          questionId,
-
-        choice_id:
-          choiceId,
-
-        answer_value:
-          String(
-            answer.answer_value ??
-              choice.choice_text
-          ),
-
-        score: Number(
-          choice.score
-        ),
-      });
+    if (!resolved.ok) {
+      return badRequest(resolved.message);
     }
 
-    /* =====================================================
-       CHECK DUPLICATE QUESTIONS
-    ===================================================== */
-
-    const uniqueQuestionIds =
-      new Set(
-        validatedAnswers.map(
-          (a) => a.question_id
-        )
-      );
-
-    if (
-      uniqueQuestionIds.size !==
-      physicalQuestions.length
-    ) {
-      return NextResponse.json(
-        {
-          message:
-            "คำตอบของแต่ละคำถามไม่ครบหรือมีคำถามซ้ำ",
-        },
-        { status: 400 }
-      );
-    }
-
-    /* =====================================================
-       CALCULATE TOTAL SCORE
-    ===================================================== */
-
-    const totalScore =
-      validatedAnswers.reduce(
-        (sum, answer) =>
-          sum + answer.score,
-        0
-      );
+    const validatedAnswers =
+      resolved.picked.map((choice) => ({
+        question_id: choice.question_id,
+        choice_id: choice.choice_id,
+        answer_value: choice.choice_text,
+        score: choice.score,
+      }));
 
     /* =====================================================
        FIND FIRST QUESTION
@@ -576,6 +509,24 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    /*
+      เอกสารอ้างอิงไม่มีคะแนนรวม 2 ข้อ
+      คะแนนที่บันทึกคือคะแนนกิจกรรมทางกาย (ข้อ 1, ตารางที่ 18)
+      ส่วนข้อ 2 แปลผลแยกเป็นพฤติกรรมเนือยนิ่ง (ตารางที่ 20)
+    */
+    const totalScore = activityAnswer.score;
+
+    const sedentaryQuestionId = physicalQuestions[1]
+      ? Number(physicalQuestions[1].question_id)
+      : null;
+
+    const sedentaryScore =
+      validatedAnswers.find(
+        (answer) =>
+          answer.question_id ===
+          sedentaryQuestionId
+      )?.score ?? null;
 
     /* =====================================================
        DETERMINE RISK LEVEL
@@ -795,6 +746,12 @@ export async function POST(
             .rows[0]
             .recommendation_text,
 
+        sedentary:
+          await getSedentaryResult(
+            client,
+            sedentaryScore
+          ),
+
         assessed_at:
           assessment.assessed_at,
       },
@@ -820,11 +777,6 @@ export async function POST(
       {
         message:
           "ไม่สามารถบันทึกผลการประเมินได้",
-
-        error:
-          error instanceof Error
-            ? error.message
-            : "Unknown error",
       },
       { status: 500 }
     );

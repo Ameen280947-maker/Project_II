@@ -13,7 +13,6 @@ import {
   RiskPill,
   StatCard,
   btnGhost,
-  btnPrimary,
   inputCls,
   thDate,
 } from "../components/ui";
@@ -144,7 +143,7 @@ export default function StaffUsersPage() {
 
       <section className="grid grid-cols-2 gap-4 xl:grid-cols-4">
         <StatCard label="ผู้ใช้ทั้งหมด" value={data?.stats.total} />
-        <StatCard label="ใช้งานใน 30 วัน" value={data?.stats.active} />
+        <StatCard label="เคลื่อนไหวใน 30 วัน" value={data?.stats.active} note="สมัครหรือทำแบบประเมิน" />
         <StatCard label="สมัครใหม่เดือนนี้" value={data ? `+${data.stats.newMonth}` : undefined} tone="ok" />
         <StatCard label="ถูกระงับ" value={data?.stats.suspended} tone={data?.stats.suspended ? "danger" : "brand"} />
       </section>
@@ -179,8 +178,9 @@ export default function StaffUsersPage() {
           </div>
         </div>
 
-        <div className={`overflow-x-auto ${loading ? "opacity-60" : ""}`}>
-          <table className="w-full min-w-[900px] text-sm">
+        <div className={loading ? "opacity-60" : ""}>
+          {/* จอใหญ่: ตาราง */}
+          <table className="hidden w-full text-sm lg:table">
             <thead>
               <tr className="border-b border-staff-line text-left text-xs font-semibold text-staff-muted">
                 <th className="py-3 pr-3 font-semibold">ผู้ใช้</th>
@@ -193,64 +193,57 @@ export default function StaffUsersPage() {
               </tr>
             </thead>
             <tbody>
-              {data?.users.map((u) => {
-                const st = STATUS_VIEW[u.status];
-                return (
-                  <tr key={u.userId} className="border-b border-staff-line/70 last:border-0">
-                    <td className="py-3 pr-3">
-                      <div className="flex items-center gap-3">
-                        <Avatar name={u.username} />
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold">{u.username}</p>
-                          <p className="truncate text-xs text-staff-muted">{u.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3">{thDate(u.createdAt)}</td>
-                    <td className="whitespace-nowrap px-3">{u.lastAssessed ? thDate(u.lastAssessed) : <span className="text-staff-muted">ยังไม่ได้ประเมิน</span>}</td>
-                    <td className="px-3 text-right font-bold">{u.assessments}</td>
-                    <td className="max-w-[220px] px-3">
-                      {!u.consent ? (
-                        <span className="inline-flex items-center gap-1 text-xs text-staff-muted" title="ผู้ใช้ไม่ได้ยินยอมให้เจ้าหน้าที่เห็นผลรายบุคคล">
-                          <Lock size={12} /> ไม่เปิดเผย
-                        </span>
-                      ) : u.worst ? (
-                        <RiskPill severity={u.worst.severity}>{u.worst.label}</RiskPill>
-                      ) : (
-                        <RiskPill severity={0}>-</RiskPill>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap px-3">
-                      <span className={`inline-flex items-center gap-1.5 font-semibold ${st.text}`}>
-                        <span className={`h-2 w-2 rounded-full ${st.dot}`} />
-                        {st.label}
-                      </span>
-                    </td>
-                    <td className="whitespace-nowrap pl-3 text-right">
-                      <div className="inline-flex gap-2">
-                        <button type="button" onClick={() => setViewId(u.userId)} className={`${btnGhost} h-9 rounded-xl px-3`}>
-                          ดูข้อมูล
-                        </button>
-                        {u.status === "suspended" ? (
-                          <button type="button" onClick={() => activate(u)} className={`${btnPrimary} h-9 rounded-xl px-3 shadow-none`}>
-                            เปิดใช้งาน
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setSuspendUser(u)}
-                            className="inline-flex h-9 items-center rounded-xl border border-[#f7c6c9] bg-white px-3 text-sm font-semibold text-risk-crit transition hover:bg-[#fff5f5]"
-                          >
-                            ระงับ
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+              {data?.users.map((u) => (
+                <tr key={u.userId} className="border-b border-staff-line/70 last:border-0">
+                  <td className="py-3 pr-3">
+                    <UserName u={u} />
+                  </td>
+                  <td className="whitespace-nowrap px-3">{thDate(u.createdAt)}</td>
+                  <td className="whitespace-nowrap px-3">{u.lastAssessed ? thDate(u.lastAssessed) : <span className="text-staff-muted">ยังไม่ได้ประเมิน</span>}</td>
+                  <td className="px-3 text-right font-bold">{u.assessments}</td>
+                  <td className="max-w-[220px] px-3">
+                    <RiskCell u={u} />
+                  </td>
+                  <td className="whitespace-nowrap px-3">
+                    <StatusBadge status={u.status} />
+                  </td>
+                  <td className="whitespace-nowrap pl-3 text-right">
+                    <Actions u={u} onView={() => setViewId(u.userId)} onSuspend={() => setSuspendUser(u)} onActivate={() => activate(u)} />
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
+
+          {/* จอเล็ก: การ์ด */}
+          <ul className="flex flex-col gap-3 lg:hidden">
+            {data?.users.map((u) => (
+              <li key={u.userId} className="rounded-2xl border border-staff-line p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <UserName u={u} />
+                  <StatusBadge status={u.status} />
+                </div>
+                <dl className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                  <div>
+                    <dt className="text-staff-muted">สมัครเมื่อ</dt>
+                    <dd className="font-semibold">{thDate(u.createdAt)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-staff-muted">ประเมินล่าสุด</dt>
+                    <dd className="font-semibold">{u.lastAssessed ? thDate(u.lastAssessed) : "-"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-staff-muted">จำนวนครั้ง</dt>
+                    <dd className="font-semibold">{u.assessments}</dd>
+                  </div>
+                </dl>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                  <RiskCell u={u} />
+                  <Actions u={u} onView={() => setViewId(u.userId)} onSuspend={() => setSuspendUser(u)} onActivate={() => activate(u)} />
+                </div>
+              </li>
+            ))}
+          </ul>
           {data && data.users.length === 0 && <Empty>ไม่พบผู้ใช้ตามเงื่อนไข</Empty>}
         </div>
 
@@ -288,6 +281,60 @@ export default function StaffUsersPage() {
             load();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+function UserName({ u }: { u: UserRow }) {
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar name={u.username} />
+      <div className="min-w-0">
+        <p className="truncate font-semibold">{u.username}</p>
+        <p className="truncate text-xs text-staff-muted">{u.email}</p>
+      </div>
+    </div>
+  );
+}
+
+function RiskCell({ u }: { u: UserRow }) {
+  if (!u.consent) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-staff-muted" title="ผู้ใช้ไม่ได้ยินยอมให้เจ้าหน้าที่เห็นผลรายบุคคล">
+        <Lock size={12} /> ไม่เปิดเผย
+      </span>
+    );
+  }
+  return u.worst ? <RiskPill severity={u.worst.severity}>{u.worst.label}</RiskPill> : <RiskPill severity={0}>-</RiskPill>;
+}
+
+function StatusBadge({ status }: { status: Status }) {
+  const st = STATUS_VIEW[status];
+  return (
+    <span className={`inline-flex shrink-0 items-center gap-1.5 text-sm font-semibold ${st.text}`}>
+      <span className={`h-2 w-2 rounded-full ${st.dot}`} />
+      {st.label}
+    </span>
+  );
+}
+
+const smallBtn = "inline-flex h-9 items-center rounded-xl border px-3 text-sm font-semibold transition";
+
+function Actions({ u, onView, onSuspend, onActivate }: { u: UserRow; onView: () => void; onSuspend: () => void; onActivate: () => void }) {
+  return (
+    <div className="inline-flex gap-2">
+      <button type="button" onClick={onView} className={`${smallBtn} border-staff-line bg-white text-staff-ink hover:border-staff-300`}>
+        ดูข้อมูล
+      </button>
+      {u.status === "suspended" ? (
+        <button type="button" onClick={onActivate} className={`${smallBtn} border-staff-600 bg-staff-600 text-white hover:bg-staff-700`}>
+          เปิดใช้งาน
+        </button>
+      ) : (
+        <button type="button" onClick={onSuspend} className={`${smallBtn} border-[#f7c6c9] bg-white text-risk-crit hover:bg-[#fff5f5]`}>
+          ระงับ
+        </button>
       )}
     </div>
   );

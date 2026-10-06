@@ -1,16 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Sidebar from "@/app/components/Sidebar";
 
 interface NumberStepperProps {
     id: string;
     label: string;
     unit: string;
-    value: number;
+    // เก็บเป็นข้อความ เพื่อให้ลบช่องจนว่างได้ (ไม่ขึ้น "0" นำหน้า เช่น "065")
+    value: string;
+    placeholder?: string;
     step?: number;
-    onChange: (next: number) => void;
+    onChange: (next: string) => void;
 }
 
 function NumberStepper({
@@ -18,9 +20,12 @@ function NumberStepper({
     label,
     unit,
     value,
+    placeholder,
     step = 1,
     onChange,
 }: NumberStepperProps) {
+    const current = Number(value) || 0;
+
     return (
         <div className="field">
             <label htmlFor={id}>
@@ -30,8 +35,11 @@ function NumberStepper({
                 <input
                     id={id}
                     type="number"
+                    inputMode="decimal"
+                    min={0}
                     value={value}
-                    onChange={(e) => onChange(Number(e.target.value))}
+                    placeholder={placeholder}
+                    onChange={(e) => onChange(e.target.value)}
                 />
                 <div className="unitControls">
                     <span className="unitLabel">{unit}</span>
@@ -39,7 +47,7 @@ function NumberStepper({
                         <button
                             type="button"
                             aria-label={`เพิ่ม${label}`}
-                            onClick={() => onChange(value + step)}
+                            onClick={() => onChange(String(current + step))}
                         >
                             <svg viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 8l6 6H6z" />
@@ -48,7 +56,7 @@ function NumberStepper({
                         <button
                             type="button"
                             aria-label={`ลด${label}`}
-                            onClick={() => onChange(Math.max(0, value - step))}
+                            onClick={() => onChange(String(Math.max(0, current - step)))}
                         >
                             <svg viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 16l-6-6h12z" />
@@ -110,11 +118,53 @@ const TIPS = [
 export default function WeightAssessmentPage() {
     const router = useRouter();
 
-    const [weight, setWeight] = useState<number>(65);
-    const [height, setHeight] = useState<number>(170);
+    // เริ่มว่าง แล้วเติมจากข้อมูลสุขภาพในโปรไฟล์ (ถ้ามี)
+    const [weight, setWeight] = useState("");
+    const [height, setHeight] = useState("");
 
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState("");
+
+    /* =========================================================
+       โหลดน้ำหนัก/ส่วนสูงจากโปรไฟล์ (รูปแบบเดียวกับหน้าเบาหวาน)
+    ========================================================= */
+
+    useEffect(() => {
+        const id = localStorage.getItem("userId");
+        if (!id) return;
+
+        const loadProfile = async () => {
+            try {
+                const response = await fetch(`/api/profile?userId=${id}`, {
+                    method: "GET",
+                    cache: "no-store",
+                });
+
+                // session หมดอายุ → กลับไปหน้า login
+                if (response.status === 401) {
+                    localStorage.removeItem("userId");
+                    router.replace("/login");
+                    return;
+                }
+
+                const data = await response.json();
+                if (!response.ok || !data.success) return;
+
+                const source = data.profile ?? data.healthProfile ?? data.data ?? data;
+                const w = Number(source.weight_kg ?? source.weight ?? 0);
+                const h = Number(source.height_cm ?? source.height ?? 0);
+
+                // ไม่ทับค่าที่ผู้ใช้พิมพ์ไปแล้ว
+                if (w > 0) setWeight((prev) => prev || String(w));
+                if (h > 0) setHeight((prev) => prev || String(h));
+            } catch (loadError) {
+                // โหลดไม่ได้ก็ให้กรอกเองได้ตามปกติ
+                console.error("BMI profile load error:", loadError);
+            }
+        };
+
+        void loadProfile();
+    }, [router]);
 
     /* =========================================================
        บันทึกลง Database
@@ -140,11 +190,18 @@ export default function WeightAssessmentPage() {
                 return;
             }
 
-            if (weight < 10 || weight > 400) {
+            if (!weight.trim() || !height.trim()) {
+                throw new Error("กรุณากรอกน้ำหนักและส่วนสูง");
+            }
+
+            const weightKg = Number(weight);
+            const heightCm = Number(height);
+
+            if (!Number.isFinite(weightKg) || weightKg < 10 || weightKg > 400) {
                 throw new Error("ค่าน้ำหนักไม่ถูกต้อง");
             }
 
-            if (height < 50 || height > 250) {
+            if (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250) {
                 throw new Error("ค่าส่วนสูงไม่ถูกต้อง");
             }
 
@@ -155,10 +212,17 @@ export default function WeightAssessmentPage() {
                 },
                 body: JSON.stringify({
                     userId,
-                    weightKg: weight,
-                    heightCm: height,
+                    weightKg,
+                    heightCm,
                 }),
             });
+
+            // session หมดอายุ → กลับไปหน้า login
+            if (response.status === 401) {
+                localStorage.removeItem("userId");
+                router.push("/login");
+                return;
+            }
 
             const data = (await response.json()) as SubmitResponse;
 
@@ -247,6 +311,7 @@ export default function WeightAssessmentPage() {
                                     label="น้ำหนัก (กิโลกรัม)"
                                     unit="KG"
                                     value={weight}
+                                    placeholder="เช่น 65"
                                     onChange={setWeight}
                                 />
                                 <NumberStepper
@@ -254,6 +319,7 @@ export default function WeightAssessmentPage() {
                                     label="ส่วนสูง (เซนติเมตร)"
                                     unit="CM"
                                     value={height}
+                                    placeholder="เช่น 170"
                                     onChange={setHeight}
                                 />
                             </div>

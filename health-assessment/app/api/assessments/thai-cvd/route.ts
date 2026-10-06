@@ -1,5 +1,14 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { getSession, requireUser } from "@/lib/session";
+import {
+  badRequest,
+  readJsonObject,
+  toId,
+  toIntInRange,
+  toNumberInRange,
+  userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,14 +43,25 @@ type AssessmentQuestion = {
 
 type SubmittedAnswer = {
   questionId: number;
-  answerValue?: string | number | null;
-  choiceId?: number | null;
+  answerValue?: unknown;
+  choiceId?: unknown;
 };
 
-type SubmitBody = {
-  userId: number;
-  answers: SubmittedAnswer[];
+/*
+  ช่วงค่าที่ยอมรับ (ตาม display_order ของคำถาม)
+  ข้อ 2-4 (เพศ / สูบบุหรี่ / เบาหวาน) ต้องเป็นตัวเลือกที่มีคะแนน 0 หรือ 1
+*/
+const NUMBER_RULES: Record<
+  number,
+  { min: number; max: number; integer: boolean; message: string }
+> = {
+  1: { min: 18, max: 100, integer: true, message: "อายุต้องเป็นจำนวนเต็ม 18-100 ปี" },
+  5: { min: 60, max: 250, integer: false, message: "ค่าความดันตัวบนต้องอยู่ระหว่าง 60-250 mmHg" },
+  6: { min: 40, max: 200, integer: false, message: "รอบเอวต้องอยู่ระหว่าง 40-200 ซม." },
+  7: { min: 120, max: 230, integer: false, message: "ส่วนสูงต้องอยู่ระหว่าง 120-230 ซม." },
 };
+
+const BOOLEAN_ORDERS = new Set([2, 3, 4]);
 
 /* =========================================================
    GET
@@ -53,34 +73,43 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
 
-    const assessmentId = Number(
-      url.searchParams.get("assessmentId"),
-    );
+    const assessmentIdParam = url.searchParams.get("assessmentId");
 
-    const userId = Number(url.searchParams.get("userId") ?? "1");
+    if (assessmentIdParam !== null) {
+      const auth = requireUser(request);
+      if (!auth.ok) return auth.response;
 
-    if (Number.isInteger(assessmentId) && assessmentId > 0) {
-      return getAssessmentResult(assessmentId);
+      const assessmentId = toId(assessmentIdParam);
+
+      if (assessmentId === null) {
+        return badRequest("assessmentId ไม่ถูกต้อง");
+      }
+
+      return getAssessmentResult(assessmentId, auth.userId);
     }
 
-    return getAssessmentQuestions(userId);
+    /*
+      Profile ใช้ผู้ใช้จาก session เท่านั้น
+      ถ้าส่ง ?userId= มาต้องตรงกับ session (ไม่งั้น 403)
+      ไม่มี session และไม่ได้ส่ง userId = ได้แค่คำถาม ไม่มี profile
+    */
+    const claimedUserId = url.searchParams.get("userId");
+    let profileUserId: number | null = null;
+
+    if (claimedUserId !== null || getSession(request)) {
+      const auth = requireUser(request, claimedUserId);
+      if (!auth.ok) return auth.response;
+      profileUserId = auth.userId;
+    }
+
+    return getAssessmentQuestions(profileUserId);
   } catch (error) {
-  
-  
-    console.error("========== POST Thai CVD ERROR ==========");
-    console.error(error);
-  
+    console.error("GET Thai CVD error:", error);
+
     return NextResponse.json(
       {
         success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "Unknown Error",
-        stack:
-          error instanceof Error
-            ? error.stack
-            : error,
+        message: "ไม่สามารถโหลดแบบประเมินได้",
       },
       { status: 500 },
     );
@@ -91,7 +120,7 @@ export async function GET(request: Request) {
    ดึงคำถามและข้อมูล Profile
 ========================================================= */
 
-async function getAssessmentQuestions(userId: number) {
+async function getAssessmentQuestions(userId: number | null) {
   const questionResult = await pool.query<QuestionRow>(
     `
     SELECT
@@ -150,7 +179,7 @@ async function getAssessmentQuestions(userId: number) {
 
   let profile = null;
 
-  if (Number.isInteger(userId) && userId > 0) {
+  if (userId !== null) {
     const profileResult = await pool.query(
       `
       SELECT
@@ -186,7 +215,7 @@ async function getAssessmentQuestions(userId: number) {
    ดึงผลประเมินและคำแนะนำ
 ========================================================= */
 
-async function getAssessmentResult(assessmentId: number) {
+async function getAssessmentResult(assessmentId: number, userId: number) {
   const result = await pool.query<{
     assessment_id: number;
     total_score: string | number | null;
@@ -210,9 +239,10 @@ async function getAssessmentResult(assessmentId: number) {
       ON r.rec_id = a.recommendation_id
     WHERE a.assessment_id = $1
       AND t.assessment_name = $2
+      AND a.user_id = $3
     LIMIT 1
     `,
-    [assessmentId, "Thai CVD"],
+    [assessmentId, "Thai CVD", userId],
   );
 
   if (result.rowCount === 0) {
@@ -247,47 +277,25 @@ async function getAssessmentResult(assessmentId: number) {
 ========================================================= */
 
 export async function POST(request: Request) {
+  const body = await readJsonObject(request);
+  if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = requireUser(request, body.userId ?? body.user_id);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  if (!Array.isArray(body.answers)) {
+    return badRequest("ข้อมูลที่ส่งมาไม่ถูกต้อง");
+  }
+
+  const submittedAnswers = body.answers as SubmittedAnswer[];
+
   const client = await pool.connect();
 
   try {
-    const body = (await request.json()) as SubmitBody;
-
-    if (
-      !Number.isInteger(body.userId) ||
-      body.userId <= 0 ||
-      !Array.isArray(body.answers)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ข้อมูลที่ส่งมาไม่ถูกต้อง",
-        },
-        { status: 400 },
-      );
-    }
-
-    await client.query("BEGIN");
-
-    const userResult = await client.query(
-      `
-      SELECT user_id
-      FROM users
-      WHERE user_id = $1
-      LIMIT 1
-      `,
-      [body.userId],
-    );
-
-    if (userResult.rowCount === 0) {
-      await client.query("ROLLBACK");
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: `ไม่พบผู้ใช้ user_id ${body.userId}`,
-        },
-        { status: 404 },
-      );
+    if (!(await userExists(client, userId))) {
+      return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
     const typeResult = await client.query<{
@@ -332,90 +340,122 @@ export async function POST(request: Request) {
       [assessmentTypeId],
     );
 
+    // ตัวเลือกทั้งหมดของคำถาม Thai CVD (ใช้หาคะแนนจากฐานข้อมูล)
+    const choiceResult = await client.query<{
+      choice_id: number;
+      question_id: number;
+      score: number;
+    }>(
+      `
+      SELECT qc.choice_id, qc.question_id, qc.score
+      FROM question_choices qc
+      INNER JOIN questions q
+        ON q.question_id = qc.question_id
+      WHERE q.assessment_type_id = $1
+        AND q.is_active = TRUE
+        AND qc.is_active = TRUE
+      `,
+      [assessmentTypeId],
+    );
+
     const validQuestionIds = new Set(
       questionResult.rows.map((question) => question.question_id),
     );
 
     const answerMap = new Map<number, SubmittedAnswer>();
 
-    for (const answer of body.answers) {
-      if (!validQuestionIds.has(answer.questionId)) {
-        throw new Error(
-          `question_id ${answer.questionId} ไม่ใช่คำถามของ Thai CVD`,
-        );
+    for (const answer of submittedAnswers) {
+      const questionId =
+        answer && typeof answer === "object" ? toId(answer.questionId) : null;
+
+      if (questionId === null || !validQuestionIds.has(questionId)) {
+        return badRequest("มีคำตอบที่ไม่ใช่คำถามของ Thai CVD");
       }
 
-      answerMap.set(answer.questionId, answer);
+      if (answerMap.has(questionId)) {
+        return badRequest("มีคำตอบซ้ำสำหรับคำถามข้อเดียวกัน");
+      }
+
+      answerMap.set(questionId, answer);
     }
 
+    // ทุกข้อใช้ในสูตร จึงต้องตอบครบทุกข้อ
     const missingQuestion = questionResult.rows.find(
-      (question) =>
-        question.is_required &&
-        !answerMap.has(question.question_id),
+      (question) => !answerMap.has(question.question_id),
     );
 
     if (missingQuestion) {
-      await client.query("ROLLBACK");
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: `กรุณาตอบคำถาม: ${missingQuestion.question_text}`,
-        },
-        { status: 400 },
-      );
+      return badRequest(`กรุณาตอบคำถาม: ${missingQuestion.question_text}`);
     }
 
+    /*
+      ค่าที่ใช้คำนวณ (key = display_order) และค่าที่จะบันทึก (key = question_id)
+    */
     const normalizedValues = new Map<number, number>();
+    const answersToSave = new Map<
+      number,
+      { choiceId: number | null; answerValue: string | null; score: number }
+    >();
 
     for (const question of questionResult.rows) {
-      const answer = answerMap.get(question.question_id);
-
-      if (!answer) {
-        continue;
-      }
+      const answer = answerMap.get(question.question_id)!;
 
       if (question.question_type === "choice") {
-        if (!answer.choiceId) {
-          throw new Error(
-            `คำถาม "${question.question_text}" ต้องมี choiceId`,
-          );
-        }
+        const choiceId = toId(answer.choiceId);
+        const choice =
+          choiceId === null
+            ? undefined
+            : choiceResult.rows.find(
+                (c) =>
+                  c.choice_id === choiceId &&
+                  c.question_id === question.question_id,
+              );
 
-        const choiceResult = await client.query<{
-          score: number;
-        }>(
-          `
-          SELECT score
-          FROM question_choices
-          WHERE choice_id = $1
-            AND question_id = $2
-            AND is_active = TRUE
-          LIMIT 1
-          `,
-          [answer.choiceId, question.question_id],
-        );
-
-        if (choiceResult.rowCount === 0) {
-          throw new Error(
+        if (!choice) {
+          return badRequest(
             `ตัวเลือกไม่ตรงกับคำถาม "${question.question_text}"`,
           );
         }
 
-        normalizedValues.set(
-          question.display_order,
-          Number(choiceResult.rows[0].score),
-        );
-      } else {
-        const value = Number(answer.answerValue);
+        const score = Number(choice.score);
 
-        if (!Number.isFinite(value)) {
-          throw new Error(
-            `ค่าของคำถาม "${question.question_text}" ไม่ถูกต้อง`,
+        normalizedValues.set(question.display_order, score);
+        answersToSave.set(question.question_id, {
+          choiceId: choice.choice_id,
+          answerValue: null,
+          score,
+        });
+      } else {
+        const rule = NUMBER_RULES[question.display_order];
+        const value = rule
+          ? rule.integer
+            ? toIntInRange(answer.answerValue, rule.min, rule.max)
+            : toNumberInRange(answer.answerValue, rule.min, rule.max)
+          : toNumberInRange(answer.answerValue, -1e9, 1e9);
+
+        if (value === null) {
+          return badRequest(
+            rule?.message ??
+              `ค่าของคำถาม "${question.question_text}" ไม่ถูกต้อง`,
           );
         }
 
         normalizedValues.set(question.display_order, value);
+        answersToSave.set(question.question_id, {
+          choiceId: null,
+          answerValue: String(value),
+          score: 0,
+        });
+      }
+
+      // เพศ / สูบบุหรี่ / เบาหวาน ในสูตรต้องเป็น 0 หรือ 1 เท่านั้น
+      if (
+        BOOLEAN_ORDERS.has(question.display_order) &&
+        ![0, 1].includes(normalizedValues.get(question.display_order)!)
+      ) {
+        return badRequest(
+          `คำตอบของคำถาม "${question.question_text}" ต้องเป็นใช่หรือไม่ใช่`,
+        );
       }
     }
 
@@ -454,28 +494,11 @@ export async function POST(request: Request) {
           value === undefined || !Number.isFinite(value),
       )
     ) {
-      await client.query("ROLLBACK");
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ข้อมูลสำหรับคำนวณ Thai CVD ไม่ครบ",
-        },
-        { status: 400 },
-      );
+      // คำถามในฐานข้อมูลไม่ครบ 7 ข้อ (ไม่ใช่ความผิดของผู้ใช้)
+      throw new Error("คำถาม Thai CVD ในฐานข้อมูลไม่ครบ");
     }
 
-    if ((height as number) <= 0) {
-      await client.query("ROLLBACK");
-
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ส่วนสูงต้องมากกว่า 0",
-        },
-        { status: 400 },
-      );
-    }
+    await client.query("BEGIN");
 
     const fullScore =
       0.079 * (age as number) +
@@ -490,7 +513,7 @@ export async function POST(request: Request) {
       (1 -
         Math.pow(
           0.978296,
-          fullScore - 7.720484,
+          Math.exp(fullScore - 7.720484),
         )) *
       100;
 
@@ -546,7 +569,7 @@ export async function POST(request: Request) {
       RETURNING assessment_id
       `,
       [
-        body.userId,
+        userId,
         assessmentTypeId,
         recommendation?.rec_id ?? null,
         Number(riskPercent.toFixed(2)),
@@ -557,45 +580,7 @@ export async function POST(request: Request) {
     const assessmentId =
       assessmentResult.rows[0].assessment_id;
 
-    for (const question of questionResult.rows) {
-      const answer = answerMap.get(question.question_id);
-
-      if (!answer) {
-        continue;
-      }
-
-      let choiceId: number | null = null;
-      let answerValue: string | null = null;
-      let answerScore = 0;
-
-      if (question.question_type === "choice") {
-        choiceId = answer.choiceId ?? null;
-
-        const choiceResult = await client.query<{
-          score: number;
-        }>(
-          `
-          SELECT score
-          FROM question_choices
-          WHERE choice_id = $1
-            AND question_id = $2
-          LIMIT 1
-          `,
-          [choiceId, question.question_id],
-        );
-
-        answerScore = Number(
-          choiceResult.rows[0]?.score ?? 0,
-        );
-      } else {
-        answerValue = String(answer.answerValue ?? "");
-      }
-      console.log(assessmentId);
-      console.log(question.question_id);
-      console.log(choiceId);
-      console.log(answerValue);
-      console.log(answerScore);
-
+    for (const [questionId, saved] of answersToSave) {
       await client.query(
         `
         INSERT INTO assessment_answers (
@@ -609,10 +594,10 @@ export async function POST(request: Request) {
         `,
         [
           assessmentId,
-          question.question_id,
-          choiceId,
-          answerValue,
-          answerScore,
+          questionId,
+          saved.choiceId,
+          saved.answerValue,
+          saved.score,
         ],
       );
     }
@@ -632,17 +617,14 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => {});
 
     console.error("POST Thai CVD error:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message:
-          error instanceof Error
-            ? error.message
-            : "เกิดข้อผิดพลาดในการบันทึกผลประเมิน",
+        message: "เกิดข้อผิดพลาดในการบันทึกผลประเมิน",
       },
       { status: 500 },
     );

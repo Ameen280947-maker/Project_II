@@ -11,7 +11,8 @@ import { USER_ROLE_ID } from "./auth";
    เรียกตอนเปิดหน้าภาพรวมและหน้าติดตาม (ข้อมูลน้อย ทำได้เร็ว)
 ========================================================= */
 
-export async function syncFollowUpCases() {
+// ผลล่าสุด (ใน 90 วัน) ที่ถึงเกณฑ์ต้องติดตาม แยกตามว่าผู้ใช้ยินยอมหรือไม่
+async function highRiskLatest(consented: boolean) {
   await loadCustomSeverities();
   const types = [...Object.keys(FOLLOW_UP_AT), ...customTypeNames()];
   const { rows } = await pool.query(
@@ -20,28 +21,48 @@ export async function syncFollowUpCases() {
        FROM assessment a
        JOIN assessment_types t USING (assessment_type_id)
        JOIN users u ON u.user_id = a.user_id
-       JOIN user_settings s ON s.user_id::text = a.user_id::text
+       LEFT JOIN user_settings s ON s.user_id::text = a.user_id::text
       WHERE u.role_id = $1
-        AND s.consent_staff IS TRUE
+        AND COALESCE(s.consent_staff, FALSE) = $3
         AND t.assessment_name = ANY($2)
         AND a.assessed_at >= NOW() - INTERVAL '90 days'
       ORDER BY a.user_id, a.assessment_type_id, a.assessed_at DESC`,
-    [USER_ROLE_ID, types]
+    [USER_ROLE_ID, types, consented]
   );
+  return rows
+    .map((r) => ({ ...r, sev: severityOf(r.assessment_name, r.risk_level) }))
+    .filter((r) => {
+      const threshold = followUpThreshold(r.assessment_name);
+      return threshold !== undefined && r.sev >= threshold;
+    });
+}
 
-  for (const r of rows) {
-    const sev = severityOf(r.assessment_name, r.risk_level);
-    const threshold = followUpThreshold(r.assessment_name);
-    if (threshold === undefined || sev < threshold) continue;
-    await pool.query(
-      `INSERT INTO follow_up_cases (user_id, assessment_id, assessment_type_id, severity)
-       SELECT $1, $2, $3, $4
-        WHERE NOT EXISTS (
-          SELECT 1 FROM follow_up_cases
-           WHERE user_id = $1 AND assessment_type_id = $3 AND status <> 'closed'
-        )
-       ON CONFLICT (assessment_id) DO NOTHING`,
-      [r.user_id, r.assessment_id, r.assessment_type_id, sev]
-    );
-  }
+// กันหลายคำขอ (เช่น Sidebar + หน้าภาพรวม) สร้างเคสพร้อมกันจนซ้ำ
+let running: Promise<void> | null = null;
+
+export function syncFollowUpCases() {
+  running ??= (async () => {
+    try {
+      for (const r of await highRiskLatest(true)) {
+        await pool.query(
+          `INSERT INTO follow_up_cases (user_id, assessment_id, assessment_type_id, severity)
+           SELECT $1, $2, $3, $4
+            WHERE NOT EXISTS (
+              SELECT 1 FROM follow_up_cases
+               WHERE user_id = $1 AND assessment_type_id = $3 AND status <> 'closed'
+            )
+           ON CONFLICT (assessment_id) DO NOTHING`,
+          [r.user_id, r.assessment_id, r.assessment_type_id, r.sev]
+        );
+      }
+    } finally {
+      running = null;
+    }
+  })();
+  return running;
+}
+
+// จำนวนผู้ใช้ที่ผลถึงเกณฑ์ติดตาม แต่ยังไม่ยินยอม (ตัวเลขรวมเท่านั้น ไม่ระบุตัวตน)
+export async function countHighRiskWithoutConsent() {
+  return new Set((await highRiskLatest(false)).map((r) => r.user_id)).size;
 }

@@ -99,9 +99,9 @@ function Recommendations() {
       <ErrorBox message={error} />
 
       <div className="flex flex-wrap items-center gap-3">
-        <label className="flex items-center gap-3 text-sm font-bold">
-          แบบประเมิน
-          <select value={typeId ?? ""} onChange={(e) => setTypeId(Number(e.target.value))} className={`${inputCls} w-64 bg-white`}>
+        <label className="flex w-full items-center gap-3 text-sm font-bold sm:w-auto">
+          <span className="shrink-0 whitespace-nowrap">แบบประเมิน</span>
+          <select value={typeId ?? ""} onChange={(e) => setTypeId(Number(e.target.value))} className={`${inputCls} min-w-0 flex-1 bg-white sm:w-64`}>
             {types.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.label}

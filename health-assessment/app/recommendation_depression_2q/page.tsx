@@ -66,6 +66,13 @@ function Depression2QRecommendationContent() {
           }
         );
 
+        // session หมดอายุ → กลับไปหน้า login
+        if (res.status === 401) {
+          localStorage.removeItem("userId");
+          window.location.replace("/login");
+          return;
+        }
+
         const data = await res.json();
 
         if (!res.ok) {

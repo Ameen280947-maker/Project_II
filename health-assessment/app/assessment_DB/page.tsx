@@ -23,11 +23,12 @@ type SubmitResponse = {
 export default function BloodPressureAssessmentPage() {
   const router = useRouter();
 
+  // เริ่มว่าง (แสดง placeholder) แทน 0 เพราะโปรไฟล์ไม่มีค่าความดัน
   const [systolic, setSystolic] =
-    useState(0);
+    useState("");
 
   const [diastolic, setDiastolic] =
-    useState(0);
+    useState("");
 
   const [submitting, setSubmitting] =
     useState(false);
@@ -71,20 +72,44 @@ export default function BloodPressureAssessmentPage() {
         }
 
         if (
-          systolic < 50 ||
-          systolic > 300
+          !systolic.trim() ||
+          !diastolic.trim()
         ) {
           throw new Error(
-            "ค่าความดันตัวบนไม่ถูกต้อง",
+            "กรุณากรอกค่าความดันตัวบนและตัวล่าง",
+          );
+        }
+
+        const systolicValue =
+          Number(systolic);
+
+        const diastolicValue =
+          Number(diastolic);
+
+        // ช่วงค่าเดียวกับ API (จำนวนเต็ม SBP 60-250, DBP 30-150 และตัวบนต้องมากกว่าตัวล่าง)
+        if (
+          !Number.isInteger(systolicValue) ||
+          systolicValue < 60 ||
+          systolicValue > 250
+        ) {
+          throw new Error(
+            "ค่าความดันตัวบนต้องเป็นจำนวนเต็มระหว่าง 60–250 mmHg",
           );
         }
 
         if (
-          diastolic < 30 ||
-          diastolic > 200
+          !Number.isInteger(diastolicValue) ||
+          diastolicValue < 30 ||
+          diastolicValue > 150
         ) {
           throw new Error(
-            "ค่าความดันตัวล่างไม่ถูกต้อง",
+            "ค่าความดันตัวล่างต้องเป็นจำนวนเต็มระหว่าง 30–150 mmHg",
+          );
+        }
+
+        if (systolicValue <= diastolicValue) {
+          throw new Error(
+            "ค่าความดันตัวบนต้องมากกว่าตัวล่าง",
           );
         }
 
@@ -102,11 +127,18 @@ export default function BloodPressureAssessmentPage() {
               body:
                 JSON.stringify({
                   userId,
-                  systolic,
-                  diastolic,
+                  systolic: systolicValue,
+                  diastolic: diastolicValue,
                 }),
             },
           );
+
+        // session หมดอายุ → กลับไปหน้า login
+        if (response.status === 401) {
+          localStorage.removeItem("userId");
+          router.push("/login");
+          return;
+        }
 
         const data =
           (await response.json()) as SubmitResponse;
@@ -220,6 +252,7 @@ export default function BloodPressureAssessmentPage() {
                   <PressureInput
                     label="Systolic (ค่าตัวบน)"
                     value={systolic}
+                    placeholder="เช่น 120"
                     onChange={
                       setSystolic
                     }
@@ -228,6 +261,7 @@ export default function BloodPressureAssessmentPage() {
                   <PressureInput
                     label="Diastolic (ค่าตัวล่าง)"
                     value={diastolic}
+                    placeholder="เช่น 80"
                     onChange={
                       setDiastolic
                     }
@@ -289,12 +323,14 @@ export default function BloodPressureAssessmentPage() {
 function PressureInput({
   label,
   value,
+  placeholder,
   onChange,
 }: {
   label: string;
-  value: number;
+  value: string;
+  placeholder?: string;
   onChange: (
-    value: number,
+    value: string,
   ) => void;
 }) {
   return (
@@ -308,15 +344,16 @@ function PressureInput({
 
         <input
           type="number"
+          inputMode="numeric"
+          min={0}
           value={value}
+          placeholder={placeholder}
           onChange={(event) =>
             onChange(
-              Number(
-                event.target.value,
-              ),
+              event.target.value,
             )
           }
-          className="min-w-0 flex-1 bg-transparent text-2xl font-bold text-[#b91c2b] outline-none"
+          className="min-w-0 flex-1 bg-transparent text-2xl font-bold text-[#b91c2b] outline-none placeholder:font-normal placeholder:text-[#c9c3c4]"
         />
 
         <span className="ml-3 text-xs font-semibold text-[#8b8c94]">

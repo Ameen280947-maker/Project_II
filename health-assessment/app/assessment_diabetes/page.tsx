@@ -15,9 +15,12 @@ import {
   CalendarDays,
   ChevronLeft,
   HeartPulse,
+  Lock,
   Ruler,
+  Save,
   Scale,
   UsersRound,
+  X,
 } from "lucide-react";
 
 import Sidebar from "@/app/components/Sidebar";
@@ -34,6 +37,23 @@ type HealthProfile = {
   waist_cm: number | null;
   sbp: number | null;
   dbp: number | null;
+
+  /*
+    หน้านี้ไม่ได้แสดง แต่ต้องส่งค่าเดิมกลับตอนบันทึก
+    เพราะ PUT /api/profile เขียนทับทุกช่อง
+  */
+  smoking: boolean;
+  has_diabetes: boolean;
+  family_diabetes: boolean | null;
+};
+
+/* ค่าที่แก้ไขได้ในโหมดแก้ไข (เก็บเป็น string ตามช่อง input) */
+type ProfileDraft = {
+  age: string;
+  gender: string;
+  height_cm: string;
+  weight_kg: string;
+  waist_cm: string;
 };
 
 type AssessmentResponse = {
@@ -109,6 +129,29 @@ export default function AssessmentDiabetesPage() {
 
   const [error, setError] =
     useState("");
+
+  const [successMessage, setSuccessMessage] =
+    useState("");
+
+  /* =======================================================
+     EDIT PROFILE
+     ทำงานแบบเดียวกับหน้าแบบประเมินโรคหัวใจและหลอดเลือด
+  ======================================================= */
+
+  const [isEditingProfile, setIsEditingProfile] =
+    useState(false);
+
+  const [savingProfile, setSavingProfile] =
+    useState(false);
+
+  const [draft, setDraft] =
+    useState<ProfileDraft>({
+      age: "",
+      gender: "",
+      height_cm: "",
+      weight_kg: "",
+      waist_cm: "",
+    });
 
   /* =========================================================
      LOAD PROFILE
@@ -236,6 +279,18 @@ export default function AssessmentDiabetesPage() {
                 source.diastolic_blood_pressure ??
                 0,
             ) || null,
+
+          smoking:
+            source.smoking === true,
+
+          has_diabetes:
+            source.has_diabetes === true,
+
+          family_diabetes:
+            typeof source.family_diabetes ===
+            "boolean"
+              ? source.family_diabetes
+              : null,
         };
 
         /* -----------------------------------------------
@@ -258,6 +313,17 @@ export default function AssessmentDiabetesPage() {
         }
 
         setProfile(normalized);
+
+        /* -----------------------------------------------
+           ประวัติเบาหวานในครอบครัว
+           ใช้ค่าจากข้อมูลสุขภาพเป็นค่าเริ่มต้น
+        ------------------------------------------------ */
+
+        if (normalized.family_diabetes !== null) {
+          setFamilyDiabetes(
+            normalized.family_diabetes,
+          );
+        }
 
         /* -----------------------------------------------
            ถ้ามี BP อยู่แล้ว
@@ -291,18 +357,202 @@ export default function AssessmentDiabetesPage() {
   }, [router]);
 
   /* =========================================================
-     BMI
+     START / CANCEL EDITING
   ========================================================= */
 
+  const startEditingProfile = () => {
+    if (!profile) {
+      return;
+    }
+
+    setError("");
+    setSuccessMessage("");
+
+    setDraft({
+      age: String(profile.age ?? ""),
+      gender: profile.gender ?? "",
+      height_cm: String(profile.height_cm ?? ""),
+      weight_kg: String(profile.weight_kg ?? ""),
+      waist_cm: String(profile.waist_cm ?? ""),
+    });
+
+    setIsEditingProfile(true);
+  };
+
+  const cancelEditingProfile = () => {
+    setIsEditingProfile(false);
+    setError("");
+    setSuccessMessage("");
+  };
+
+  /* =========================================================
+     SAVE PROFILE
+     PUT /api/profile (ช่วงค่าเดียวกับหน้า CVD และหน้าข้อมูลสุขภาพ)
+  ========================================================= */
+
+  const saveProfile = async () => {
+    try {
+      setSavingProfile(true);
+      setError("");
+      setSuccessMessage("");
+
+      if (!userId || !profile) {
+        throw new Error(
+          "ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่",
+        );
+      }
+
+      const age = Number(draft.age);
+      const height = Number(draft.height_cm);
+      const weight = Number(draft.weight_kg);
+      const waist = Number(draft.waist_cm);
+
+      if (
+        !Number.isInteger(age) ||
+        age < 18 ||
+        age > 100
+      ) {
+        throw new Error(
+          "อายุต้องอยู่ระหว่าง 18-100 ปี",
+        );
+      }
+
+      if (
+        draft.gender !== "male" &&
+        draft.gender !== "female"
+      ) {
+        throw new Error("กรุณาเลือกเพศ");
+      }
+
+      if (
+        !Number.isFinite(height) ||
+        height < 120 ||
+        height > 230
+      ) {
+        throw new Error(
+          "ส่วนสูงต้องอยู่ระหว่าง 120-230 ซม.",
+        );
+      }
+
+      if (
+        !Number.isFinite(weight) ||
+        weight < 30 ||
+        weight > 250
+      ) {
+        throw new Error(
+          "น้ำหนักต้องอยู่ระหว่าง 30-250 กก.",
+        );
+      }
+
+      if (
+        !Number.isFinite(waist) ||
+        waist < 40 ||
+        waist > 200
+      ) {
+        throw new Error(
+          "รอบเอวต้องอยู่ระหว่าง 40-200 ซม.",
+        );
+      }
+
+      const response = await fetch(
+        "/api/profile",
+        {
+          method: "PUT",
+
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+
+          body: JSON.stringify({
+            user_id: userId,
+
+            age,
+
+            gender: draft.gender,
+
+            height_cm: height,
+
+            weight_kg: weight,
+
+            waist_cm: waist,
+
+            smoking: profile.smoking,
+
+            has_diabetes:
+              profile.has_diabetes,
+
+            family_diabetes:
+              familyDiabetes ??
+              profile.family_diabetes ??
+              false,
+          }),
+        },
+      );
+
+      const data =
+        await response.json();
+
+      if (
+        !response.ok ||
+        !data.success
+      ) {
+        throw new Error(
+          data.message ??
+            "ไม่สามารถบันทึกข้อมูลสุขภาพได้",
+        );
+      }
+
+      setProfile({
+        ...profile,
+        age,
+        gender: draft.gender,
+        height_cm: height,
+        weight_kg: weight,
+        waist_cm: waist,
+        family_diabetes:
+          familyDiabetes ??
+          profile.family_diabetes,
+      });
+
+      setIsEditingProfile(false);
+
+      setSuccessMessage(
+        "บันทึกข้อมูลสุขภาพเรียบร้อยแล้ว",
+      );
+    } catch (saveError) {
+      console.error(
+        "SAVE PROFILE ERROR:",
+        saveError,
+      );
+
+      setError(
+        saveError instanceof Error
+          ? saveError.message
+          : "ไม่สามารถบันทึกข้อมูลสุขภาพได้",
+      );
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  /* =========================================================
+     BMI
+     ระหว่างแก้ไขคำนวณจากค่าที่กำลังกรอก
+  ========================================================= */
+
+  const bmiHeight = isEditingProfile
+    ? Number(draft.height_cm)
+    : profile?.height_cm ?? 0;
+
+  const bmiWeight = isEditingProfile
+    ? Number(draft.weight_kg)
+    : profile?.weight_kg ?? 0;
+
   const bmi =
-    profile &&
-    profile.height_cm &&
-    profile.weight_kg
-      ? profile.weight_kg /
-        Math.pow(
-          profile.height_cm / 100,
-          2,
-        )
+    bmiHeight > 0 && bmiWeight > 0
+      ? bmiWeight /
+        Math.pow(bmiHeight / 100, 2)
       : null;
 
   /* =========================================================
@@ -315,6 +565,19 @@ export default function AssessmentDiabetesPage() {
     event.preventDefault();
 
     setError("");
+    setSuccessMessage("");
+
+    /* -----------------------------------------------
+       ห้ามประเมินระหว่างแก้ไขข้อมูล
+       เพราะ API คำนวณจากข้อมูลสุขภาพที่บันทึกแล้ว
+    ------------------------------------------------ */
+
+    if (isEditingProfile) {
+      setError(
+        "กรุณาบันทึกหรือยกเลิกการแก้ไขข้อมูลสุขภาพก่อนประเมิน",
+      );
+      return;
+    }
 
     /* -----------------------------------------------
        USER
@@ -377,6 +640,21 @@ export default function AssessmentDiabetesPage() {
     if (diastolic < 30 || diastolic > 150) {
       setError(
         "ค่า DBP ควรอยู่ระหว่าง 30–150 mmHg",
+      );
+      return;
+    }
+
+    // API รับเฉพาะจำนวนเต็ม และตัวบนต้องมากกว่าตัวล่าง
+    if (!Number.isInteger(systolic) || !Number.isInteger(diastolic)) {
+      setError(
+        "ค่าความดันต้องเป็นจำนวนเต็ม",
+      );
+      return;
+    }
+
+    if (systolic <= diastolic) {
+      setError(
+        "ค่า SBP ต้องมากกว่า DBP",
       );
       return;
     }
@@ -584,6 +862,12 @@ export default function AssessmentDiabetesPage() {
             </div>
           )}
 
+          {successMessage && (
+            <div className="mt-6 rounded-2xl border border-[#cfe8c6] bg-[#eef8e9] px-5 py-4 text-sm font-semibold text-[#4f8a43]">
+              {successMessage}
+            </div>
+          )}
+
           {/* =================================================
               FORM
           ================================================= */}
@@ -606,71 +890,227 @@ export default function AssessmentDiabetesPage() {
 
                 <section className="rounded-[28px] border border-[#eee5e6] bg-white p-6 shadow-[0_16px_45px_rgba(35,25,30,0.05)] sm:p-8">
 
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#fff0f2] text-[#b91c2b]">
-                      <HeartPulse size={27} />
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#fff0f2] text-[#b91c2b]">
+                        <HeartPulse size={27} />
+                      </div>
+
+                      <div>
+                        <h2 className="text-xl font-bold">
+                          ข้อมูลสุขภาพ
+                        </h2>
+
+                        <p className="text-sm text-[#8b8d95]">
+                          ข้อมูลที่มีอยู่แล้วจะถูกดึงมาให้อัตโนมัติ
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <h2 className="text-xl font-bold">
-                        ข้อมูลสุขภาพ
-                      </h2>
+                    {!isEditingProfile ? (
+                      <button
+                        type="button"
+                        onClick={startEditingProfile}
+                        className="rounded-full bg-[#fff0f2] px-5 py-2.5 text-sm font-bold text-[#b91c2b] transition hover:bg-[#ffe4e8]"
+                      >
+                        แก้ไขข้อมูล
+                      </button>
+                    ) : (
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={cancelEditingProfile}
+                          disabled={savingProfile}
+                          className="flex items-center gap-2 rounded-full border border-[#ead9db] px-4 py-2.5 text-sm font-bold text-[#777780] transition hover:bg-[#faf8f8] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <X size={16} />
+                          ยกเลิก
+                        </button>
 
-                      <p className="text-sm text-[#8b8d95]">
-                        ข้อมูลที่มีอยู่แล้วจะถูกดึงมาให้อัตโนมัติ
-                      </p>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={saveProfile}
+                          disabled={savingProfile}
+                          className="flex items-center gap-2 rounded-full bg-[#b91c2b] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#9f1624] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <Save size={16} />
+                          {savingProfile
+                            ? "กำลังบันทึก..."
+                            : "บันทึก"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    className={`mt-5 flex items-center gap-2 rounded-2xl px-4 py-3 text-xs ${
+                      isEditingProfile
+                        ? "bg-[#fff7e8] text-[#856404]"
+                        : "bg-[#faf8f8] text-[#85858d]"
+                    }`}
+                  >
+                    <Lock
+                      size={15}
+                      className={
+                        isEditingProfile
+                          ? "shrink-0 text-[#c98b00]"
+                          : "shrink-0 text-[#b91c2b]"
+                      }
+                    />
+
+                    {isEditingProfile
+                      ? "คุณกำลังแก้ไขข้อมูลสุขภาพ สามารถปรับข้อมูลที่ต้องการได้"
+                      : "ข้อมูลส่วนนี้ดึงมาจากข้อมูลสุขภาพของคุณ กด “แก้ไขข้อมูล” หากต้องการปรับข้อมูล"}
                   </div>
 
                   <div className="mt-7 space-y-4">
 
-                    <InfoRow
-                      icon={<CalendarDays size={22} />}
-                      label="อายุ"
-                      value={
-                        profile?.age
-                          ? `${profile.age} ปี`
-                          : "--"
-                      }
-                    />
+                    {isEditingProfile ? (
+                      <>
+                        <EditRow
+                          icon={<CalendarDays size={22} />}
+                          label="อายุ"
+                          unit="ปี"
+                          value={draft.age}
+                          min={18}
+                          max={100}
+                          onChange={(value) =>
+                            setDraft((prev) => ({ ...prev, age: value }))
+                          }
+                        />
 
-                    <InfoRow
-                      icon={<UsersRound size={22} />}
-                      label="เพศ"
-                      value={
-                        profile?.gender === "male"
-                          ? "ชาย"
-                          : "หญิง"
-                      }
-                    />
+                        <div className="flex min-h-16 items-center rounded-2xl bg-[#faf8f8] px-4">
+                          <span className="mr-4 shrink-0 text-[#ef4962]">
+                            <UsersRound size={22} />
+                          </span>
 
-                    <InfoRow
-                      icon={<Ruler size={22} />}
-                      label="ส่วนสูง"
-                      value={`${profile?.height_cm ?? "--"} ซม.`}
-                    />
+                          <span className="font-semibold">
+                            เพศ
+                          </span>
 
-                    <InfoRow
-                      icon={<Scale size={22} />}
-                      label="น้ำหนัก"
-                      value={`${profile?.weight_kg ?? "--"} กก.`}
-                    />
+                          <div className="ml-auto grid grid-cols-2 overflow-hidden rounded-xl border border-[#e5e0e1]">
+                            {[
+                              { value: "female", label: "หญิง" },
+                              { value: "male", label: "ชาย" },
+                            ].map((option) => (
+                              <button
+                                key={option.value}
+                                type="button"
+                                onClick={() =>
+                                  setDraft((prev) => ({
+                                    ...prev,
+                                    gender: option.value,
+                                  }))
+                                }
+                                className={`h-10 px-5 text-sm font-semibold transition ${
+                                  draft.gender === option.value
+                                    ? "bg-[#f8e8ea] text-[#b91c2b]"
+                                    : "bg-white text-[#aaaab0] hover:bg-[#fceff1]"
+                                }`}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
 
-                    <InfoRow
-                      icon={<Activity size={22} />}
-                      label="BMI"
-                      value={
-                        bmi !== null
-                          ? bmi.toFixed(2)
-                          : "--"
-                      }
-                    />
+                        <EditRow
+                          icon={<Ruler size={22} />}
+                          label="ส่วนสูง"
+                          unit="ซม."
+                          value={draft.height_cm}
+                          min={120}
+                          max={230}
+                          onChange={(value) =>
+                            setDraft((prev) => ({ ...prev, height_cm: value }))
+                          }
+                        />
 
-                    <InfoRow
-                      icon={<Ruler size={22} />}
-                      label="รอบเอว"
-                      value={`${profile?.waist_cm ?? "--"} ซม.`}
-                    />
+                        <EditRow
+                          icon={<Scale size={22} />}
+                          label="น้ำหนัก"
+                          unit="กก."
+                          value={draft.weight_kg}
+                          min={30}
+                          max={250}
+                          onChange={(value) =>
+                            setDraft((prev) => ({ ...prev, weight_kg: value }))
+                          }
+                        />
+
+                        <InfoRow
+                          icon={<Activity size={22} />}
+                          label="BMI"
+                          value={
+                            bmi !== null
+                              ? bmi.toFixed(2)
+                              : "--"
+                          }
+                        />
+
+                        <EditRow
+                          icon={<Ruler size={22} />}
+                          label="รอบเอว"
+                          unit="ซม."
+                          value={draft.waist_cm}
+                          min={40}
+                          max={200}
+                          onChange={(value) =>
+                            setDraft((prev) => ({ ...prev, waist_cm: value }))
+                          }
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <InfoRow
+                          icon={<CalendarDays size={22} />}
+                          label="อายุ"
+                          value={
+                            profile?.age
+                              ? `${profile.age} ปี`
+                              : "--"
+                          }
+                        />
+
+                        <InfoRow
+                          icon={<UsersRound size={22} />}
+                          label="เพศ"
+                          value={
+                            profile?.gender === "male"
+                              ? "ชาย"
+                              : "หญิง"
+                          }
+                        />
+
+                        <InfoRow
+                          icon={<Ruler size={22} />}
+                          label="ส่วนสูง"
+                          value={`${profile?.height_cm ?? "--"} ซม.`}
+                        />
+
+                        <InfoRow
+                          icon={<Scale size={22} />}
+                          label="น้ำหนัก"
+                          value={`${profile?.weight_kg ?? "--"} กก.`}
+                        />
+
+                        <InfoRow
+                          icon={<Activity size={22} />}
+                          label="BMI"
+                          value={
+                            bmi !== null
+                              ? bmi.toFixed(2)
+                              : "--"
+                          }
+                        />
+
+                        <InfoRow
+                          icon={<Ruler size={22} />}
+                          label="รอบเอว"
+                          value={`${profile?.waist_cm ?? "--"} ซม.`}
+                        />
+                      </>
+                    )}
                   </div>
                 </section>
 
@@ -844,6 +1284,7 @@ export default function AssessmentDiabetesPage() {
                   type="submit"
                   disabled={
                     submitting ||
+                    isEditingProfile ||
                     familyDiabetes === null
                   }
                   className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#ef3e59] to-[#b91c2b] text-lg font-bold text-white shadow-[0_15px_32px_rgba(185,28,43,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
@@ -891,6 +1332,59 @@ function InfoRow({
       <span className="ml-auto font-bold text-[#b91c2b]">
         {value}
       </span>
+    </div>
+  );
+}
+
+/* =========================================================
+   EDIT ROW
+   แถวข้อมูลแบบกรอกได้ ใช้ในโหมดแก้ไขข้อมูลสุขภาพ
+========================================================= */
+
+function EditRow({
+  icon,
+  label,
+  unit,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  unit: string;
+  value: string;
+  min: number;
+  max: number;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <div className="flex min-h-16 items-center rounded-2xl bg-[#faf8f8] px-4">
+      <span className="mr-4 shrink-0 text-[#ef4962]">
+        {icon}
+      </span>
+
+      <span className="font-semibold">
+        {label}
+      </span>
+
+      <div className="ml-auto flex items-center gap-2">
+        <input
+          type="number"
+          inputMode="decimal"
+          min={min}
+          max={max}
+          value={value}
+          onChange={(event) =>
+            onChange(event.target.value)
+          }
+          className="h-11 w-24 rounded-xl border border-[#e7e1e2] bg-white px-3 text-right font-bold text-[#b91c2b] outline-none transition focus:border-[#ef4962]"
+        />
+
+        <span className="w-8 text-sm font-semibold text-[#8b8d95]">
+          {unit}
+        </span>
+      </div>
     </div>
   );
 }

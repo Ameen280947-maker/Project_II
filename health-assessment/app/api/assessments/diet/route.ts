@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import {
+  badRequest,
+  loadActiveChoices,
+  readJsonObject,
+  resolveChoiceAnswers,
+  userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,8 +35,6 @@ type Question = {
   question_order: number;
   choices: Choice[];
 };
-
-type AnswerMap = Record<string | number, number>;
 
 /* =====================================================
    DEFAULT QUESTIONS (FALLBACK)
@@ -241,6 +247,9 @@ export async function GET(request: NextRequest) {
        CASE 1: ดึงผลการประเมินจาก assessmentId
     -------------------------------------------------- */
     if (assessmentIdParam) {
+      const auth = requireUser(request);
+      if (!auth.ok) return auth.response;
+
       const assessmentId = Number(assessmentIdParam);
 
       if (!Number.isInteger(assessmentId) || assessmentId <= 0) {
@@ -266,9 +275,11 @@ export async function GET(request: NextRequest) {
           a.assessed_at
         FROM assessment a
         WHERE a.assessment_id = $1
+          AND a.user_id = $2
+          AND a.assessment_type_id = $3
         LIMIT 1
         `,
-        [assessmentId]
+        [assessmentId, auth.userId, ASSESSMENT_TYPE_ID]
       );
 
       if (assessmentResult.rowCount === 0) {
@@ -429,7 +440,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "ไม่สามารถโหลดแบบประเมินได้",
+        message: "ไม่สามารถโหลดแบบประเมินได้",
       },
       { status: 500 }
     );
@@ -442,131 +453,60 @@ export async function GET(request: NextRequest) {
 ===================================================== */
 
 export async function POST(request: NextRequest) {
+  const body = await readJsonObject(request);
+  if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = requireUser(request, body.user_id ?? body.userId);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  // รูปแบบคำตอบ: { [question_id]: choice_id }
+  const answers = body.answers;
+
+  if (
+    !answers ||
+    typeof answers !== "object" ||
+    Array.isArray(answers) ||
+    Object.keys(answers).length === 0
+  ) {
+    return badRequest("กรุณาตอบแบบประเมินให้ครบทุกข้อ");
+  }
+
   const client = await pool.connect();
 
   try {
-    const body = (await request.json()) as {
-      user_id?: number;
-      userId?: number;
-      answers?: AnswerMap;
-    };
-
-    const userId = Number(body.user_id ?? body.userId);
-    const answers = body.answers ?? {};
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ไม่พบ User ID ที่ถูกต้อง กรุณาเข้าสู่ระบบใหม่",
-        },
-        { status: 401 }
-      );
-    }
-
-    if (!answers || Object.keys(answers).length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "กรุณาตอบแบบประเมินให้ครบทุกข้อ",
-        },
-        { status: 400 }
-      );
-    }
-
-    /* -----------------------------------------------
-       LOAD QUESTIONS & CHOICES
-    ------------------------------------------------ */
-    const dbQuestionsResult = await client.query(
-      `
-      SELECT
-        q.question_id,
-        q.question_text,
-        q.display_order AS question_order,
-        qc.choice_id,
-        qc.choice_text,
-        qc.score AS option_score
-      FROM questions q
-      LEFT JOIN question_choices qc ON qc.question_id = q.question_id AND qc.is_active = true
-      WHERE q.assessment_type_id = $1 AND q.is_active = true
-      ORDER BY q.display_order ASC, q.question_id ASC
-      `,
-      [ASSESSMENT_TYPE_ID]
-    );
-
-    let activeQuestions: Question[] = [];
-
-    if (dbQuestionsResult.rowCount && dbQuestionsResult.rowCount > 0) {
-      const qMap = new Map<number, Question>();
-      for (const row of dbQuestionsResult.rows) {
-        if (!qMap.has(row.question_id)) {
-          qMap.set(row.question_id, {
-            question_id: row.question_id,
-            question_text: row.question_text,
-            question_order: row.question_order ?? row.question_id,
-            choices: [],
-          });
-        }
-        if (row.choice_id) {
-          qMap.get(row.question_id)!.choices.push({
-            choice_id: row.choice_id,
-            choice_text: row.choice_text,
-            option_score: Number(row.option_score ?? 0),
-          });
-        }
-      }
-      activeQuestions = Array.from(qMap.values());
-    }
-
-    if (activeQuestions.length === 0) {
-      activeQuestions = DEFAULT_QUESTIONS;
+    if (!(await userExists(client, userId))) {
+      return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
     /* -----------------------------------------------
        CALCULATE SCORES & VALIDATE
+       จับคู่ด้วย choice_id ของคำถามนั้นเท่านั้น (เดิมจับด้วยเลขคะแนนได้ด้วย)
+       คะแนนดึงจาก question_choices และต้องตอบครบทุกข้อ
     ------------------------------------------------ */
-    let totalScore = 0;
-    const answerRows: Array<{
-      question_id: number;
-      question_order: number;
-      question_text: string;
-      choice_id: number | null;
-      choice_text: string;
-      answer_value: number;
-      score: number;
-    }> = [];
+    const resolved = resolveChoiceAnswers(
+      await loadActiveChoices(client, ASSESSMENT_TYPE_ID),
+      Object.entries(answers as Record<string, unknown>).map(
+        ([questionId, choiceId]) => ({
+          questionId,
+          choiceId: choiceId ?? null,
+        })
+      )
+    );
 
-    for (let i = 0; i < activeQuestions.length; i++) {
-      const q = activeQuestions[i];
-      const selectedChoiceId = Number(answers[String(q.question_id)] ?? answers[q.question_id] ?? answers[String(i + 1)]);
-
-      if (!selectedChoiceId) {
-        return NextResponse.json(
-          {
-            success: false,
-            message: `กรุณาตอบคำถามข้อที่ ${q.question_order ?? i + 1}`,
-          },
-          { status: 400 }
-        );
-      }
-
-      const selectedChoice = q.choices.find(
-        (c) => c.choice_id === selectedChoiceId || c.option_score === selectedChoiceId
-      );
-
-      const score = selectedChoice ? Number(selectedChoice.option_score) : 0;
-      totalScore += score;
-
-      answerRows.push({
-        question_id: q.question_id,
-        question_order: q.question_order ?? i + 1,
-        question_text: q.question_text,
-        choice_id: selectedChoice?.choice_id ?? (selectedChoiceId > 10 ? selectedChoiceId : null),
-        choice_text: selectedChoice?.choice_text ?? `ตัวเลือก ${selectedChoiceId}`,
-        answer_value: selectedChoiceId,
-        score,
-      });
+    if (!resolved.ok) {
+      return badRequest(resolved.message);
     }
+
+    const totalScore = resolved.total;
+    const answerRows = resolved.picked.map((choice) => ({
+      question_id: choice.question_id,
+      question_order: choice.display_order,
+      choice_id: choice.choice_id,
+      choice_text: choice.choice_text,
+      score: choice.score,
+    }));
 
     /* -----------------------------------------------
        DOMAIN SCORES
@@ -598,15 +538,27 @@ export async function POST(request: NextRequest) {
     const fatRisk = getFatRisk(fatScore);
     const sodiumRisk = getSodiumRisk(sodiumScore);
 
-    const levels = [vegRisk.level, sugarRisk.level, fatRisk.level, sodiumRisk.level];
+    /*
+      เอกสารอ้างอิง (ตารางที่ 24) แปลผลแยก 4 ด้าน และใช้สีเขียว/เหลือง/ส้ม/แดง
+      ผักต้องกลับทิศ: ผัก "สูงมาก" = เขียว ส่วน "น้อย" = แดง
+      ผลรวมที่บันทึกใช้ด้านที่แย่ที่สุด (0 = เขียว ... 3 = แดง)
+    */
+    const VEG_TIER: Record<string, number> = { สูงมาก: 0, สูง: 1, ปานกลาง: 2, น้อย: 3 };
+    const RISK_TIER: Record<string, number> = { ต่ำ: 0, ปานกลาง: 1, สูง: 2, สูงมาก: 3 };
 
-    const overallRisk = levels.includes("สูงมาก")
-      ? "ควรปรับพฤติกรรมมาก"
-      : levels.includes("สูง")
-        ? "ควรปรับพฤติกรรม"
-        : levels.includes("ปานกลาง")
-          ? "ควรใส่ใจ"
-          : "พฤติกรรมเหมาะสม";
+    const worstTier = Math.max(
+      VEG_TIER[vegRisk.level],
+      RISK_TIER[sugarRisk.level],
+      RISK_TIER[fatRisk.level],
+      RISK_TIER[sodiumRisk.level],
+    );
+
+    const overallRisk = [
+      "พฤติกรรมเหมาะสม",
+      "ควรใส่ใจ",
+      "ควรปรับพฤติกรรม",
+      "ควรปรับพฤติกรรมมาก",
+    ][worstTier];
 
     /* -----------------------------------------------
        FETCH RECOMMENDATION FROM DB (MATCHING RISK KEYS)
@@ -676,13 +628,13 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => {});
     console.error("POST DIET ASSESSMENT ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "ไม่สามารถบันทึกผลการประเมินได้",
+        message: "ไม่สามารถบันทึกผลการประเมินได้",
       },
       { status: 500 }
     );

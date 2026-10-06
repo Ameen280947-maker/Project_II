@@ -1,14 +1,10 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/session";
+import { badRequest, readJsonObject, toIntInRange, userExists } from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type SubmitBody = {
-  userId: number;
-  systolic: number;
-  diastolic: number;
-};
 
 type QuestionRow = {
   question_id: number;
@@ -25,32 +21,24 @@ function calculateRiskLevel(
   diastolic: number,
 ) {
   /*
-    เรียงจากระดับรุนแรงที่สุดลงมา
-    เพื่อป้องกันค่าที่เข้าได้หลายเงื่อนไข
+    เรียงจากระดับรุนแรงที่สุดลงมา (เอกสารอ้างอิง ตารางที่ 4)
+    เช็กแค่ขอบล่างของแต่ละระดับ เพราะระดับที่สูงกว่าถูกคัดออกไปก่อนแล้ว
+    ค่าทศนิยม เช่น 139.5 จึงไม่ตกช่องว่างระหว่างระดับ
   */
 
   if (systolic >= 180 || diastolic >= 110) {
     return "ความดันโลหิตสูงอันตราย";
   }
 
-  if (
-    (systolic >= 160 && systolic <= 179) ||
-    (diastolic >= 100 && diastolic <= 109)
-  ) {
+  if (systolic >= 160 || diastolic >= 100) {
     return "น่าจะเป็นโรคความดันโลหิตสูง";
   }
 
-  if (
-    (systolic >= 140 && systolic <= 159) ||
-    (diastolic >= 90 && diastolic <= 99)
-  ) {
+  if (systolic >= 140 || diastolic >= 90) {
     return "อาจเป็นโรคความดันโลหิตสูง";
   }
 
-  if (
-    (systolic >= 130 && systolic <= 139) ||
-    (diastolic >= 85 && diastolic <= 89)
-  ) {
+  if (systolic >= 130 || diastolic >= 85) {
     return "ความดันโลหิตเริ่มสูง";
   }
 
@@ -67,6 +55,9 @@ function calculateRiskLevel(
 ========================================================= */
 
 export async function GET(request: Request) {
+  const auth = requireUser(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const url = new URL(request.url);
 
@@ -122,11 +113,12 @@ export async function GET(request: Request) {
            a.recommendation_id
 
       WHERE a.assessment_id = $1
+        AND a.user_id = $2
         AND t.assessment_name = 'Blood Pressure'
 
       LIMIT 1
       `,
-      [assessmentId],
+      [assessmentId, auth.userId],
     );
 
     if (
@@ -226,10 +218,7 @@ export async function GET(request: Request) {
       {
         success: false,
 
-        message:
-          error instanceof Error
-            ? error.message
-            : "ไม่สามารถโหลดผลประเมินได้",
+        message: "ไม่สามารถโหลดผลประเมินได้",
       },
       { status: 500 },
     );
@@ -242,89 +231,42 @@ export async function GET(request: Request) {
 ========================================================= */
 
 export async function POST(request: Request) {
+  const body = await readJsonObject(request);
+  if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = requireUser(request, body.userId ?? body.user_id);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  /* ================= Validation =================
+     ค่าความดันเป็นจำนวนเต็ม mmHg
+     SBP 60-250, DBP 30-150 และตัวบนต้องสูงกว่าตัวล่าง
+  ================================================= */
+
+  const systolic = toIntInRange(body.systolic, 60, 250);
+  const diastolic = toIntInRange(body.diastolic, 30, 150);
+
+  if (systolic === null) {
+    return badRequest("ค่าความดันตัวบน (SBP) ต้องเป็นจำนวนเต็ม 60-250 mmHg");
+  }
+
+  if (diastolic === null) {
+    return badRequest("ค่าความดันตัวล่าง (DBP) ต้องเป็นจำนวนเต็ม 30-150 mmHg");
+  }
+
+  if (systolic <= diastolic) {
+    return badRequest("ค่าความดันตัวบนต้องมากกว่าค่าความดันตัวล่าง");
+  }
+
   const client = await pool.connect();
 
   try {
-    const body =
-      (await request.json()) as SubmitBody;
-
-    const userId = Number(body.userId);
-    const systolic = Number(body.systolic);
-    const diastolic = Number(body.diastolic);
-
-    /* ================= Validation ================= */
-
-    if (
-      !Number.isInteger(userId) ||
-      userId <= 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "userId ไม่ถูกต้อง",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (
-      !Number.isFinite(systolic) ||
-      !Number.isFinite(diastolic)
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "กรุณากรอกค่าความดันให้ถูกต้อง",
-        },
-        { status: 400 },
-      );
-    }
-
-    if (
-      systolic < 50 ||
-      systolic > 300 ||
-      diastolic < 30 ||
-      diastolic > 200
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "ค่าความดันอยู่นอกช่วงที่ระบบรองรับ",
-        },
-        { status: 400 },
-      );
+    if (!(await userExists(client, userId))) {
+      return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
     await client.query("BEGIN");
-
-    /* ================= ตรวจ User ================= */
-
-    const userResult = await client.query(
-      `
-      SELECT user_id
-      FROM users
-      WHERE user_id = $1
-      LIMIT 1
-      `,
-      [userId],
-    );
-
-    if (
-      (userResult.rowCount ?? 0) === 0
-    ) {
-      await client.query("ROLLBACK");
-
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            `ไม่พบผู้ใช้ user_id ${userId}`,
-        },
-        { status: 404 },
-      );
-    }
 
     /* ================= Assessment Type ================= */
 
@@ -575,10 +517,7 @@ export async function POST(request: Request) {
       {
         success: false,
 
-        message:
-          error instanceof Error
-            ? error.message
-            : "ไม่สามารถบันทึกผลประเมินได้",
+        message: "ไม่สามารถบันทึกผลประเมินได้",
       },
       { status: 500 },
     );

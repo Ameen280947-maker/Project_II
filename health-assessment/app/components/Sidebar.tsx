@@ -15,8 +15,10 @@ import {
   Heart,
   History,
   LogOut,
+  Menu,
   Settings,
   UserRound,
+  X,
 } from "lucide-react";
 
 import type { ReactNode } from "react";
@@ -28,6 +30,31 @@ import { countAlerts, NOTIFICATIONS_UPDATED_EVENT } from "@/app/components/Notif
 ========================================================= */
 
 const COLLAPSE_KEY = "sidebarCollapsed";
+
+// ต้องตรงกับ FONT_SIZE_PX ในหน้าตั้งค่า
+const FONT_SIZE_PX: Record<string, string> = {
+  normal: "16px",
+  large: "18px",
+  xl: "20px",
+};
+
+// ข้อมูลผู้ใช้ที่เก็บไว้ในเครื่อง (ลบทิ้งตอนออกจากระบบ)
+const USER_STORAGE_KEYS = [
+  "userId",
+  "username",
+  "email",
+  "roleId",
+  "role",
+  "user",
+  "hasProfile",
+  "rememberLogin",
+];
+
+function clearUserStorage() {
+  for (const key of USER_STORAGE_KEYS) {
+    localStorage.removeItem(key);
+  }
+}
 
 /* =========================================================
    SIDEBAR
@@ -43,9 +70,61 @@ export default function Sidebar() {
   // เปิด animation หลังอ่านค่าที่จำไว้แล้ว กันไม่ให้แถบ "กระตุก" ตอนเปิดหน้า
   const [ready, setReady] = useState(false);
 
+  // เมนูแบบลิ้นชักบนมือถือ/แท็บเล็ต (จอแคบกว่า lg)
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [openedAt, setOpenedAt] = useState(pathname);
+
+  // เปลี่ยนหน้าแล้วปิดลิ้นชัก (ปรับ state ระหว่าง render ตามแนวทาง React แทน useEffect)
+  if (openedAt !== pathname) {
+    setOpenedAt(pathname);
+    setMobileOpen(false);
+  }
+
+  // ตอนเปิดลิ้นชัก: ล็อกการเลื่อนหน้าด้านหลัง และกด Esc เพื่อปิด
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previous;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [mobileOpen]);
+
+  // ตรวจ session ฝั่ง server ทุกครั้งที่เปิดหน้า
+  // ถ้าไม่มี (เช่น login ไว้ก่อนมีระบบ session หรือ session หมดอายุ) ให้เข้าสู่ระบบใหม่
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/auth/session", { cache: "no-store" })
+      .then((res) => {
+        if (!cancelled && res.status === 401) {
+          clearUserStorage();
+          router.replace("/login");
+        }
+      })
+      .catch(() => {
+        /* เครือข่ายมีปัญหา ไม่ต้องเด้งออก */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
   useEffect(() => {
     try {
       setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+
+      // ขนาดตัวอักษรที่เลือกไว้ในหน้าตั้งค่า (Tailwind ใช้หน่วย rem จึงขยายได้ทั้งหน้า)
+      const fontSize = localStorage.getItem("fontSize");
+      if (fontSize && fontSize in FONT_SIZE_PX) {
+        document.documentElement.style.fontSize = FONT_SIZE_PX[fontSize];
+      }
     } catch {
       /* ignore */
     }
@@ -114,15 +193,15 @@ export default function Sidebar() {
      LOGOUT
   ========================================================= */
 
-  const logout = () => {
-    localStorage.removeItem("userId");
-    localStorage.removeItem("username");
-    localStorage.removeItem("email");
-    localStorage.removeItem("roleId");
-    localStorage.removeItem("role");
-    localStorage.removeItem("user");
-    localStorage.removeItem("hasProfile");
-    localStorage.removeItem("rememberLogin");
+  const logout = async () => {
+    // ลบ session cookie ฝั่ง server ก่อน (ถ้าเรียกไม่สำเร็จก็ยังออกจากระบบในเครื่องต่อ)
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch {
+      /* ignore */
+    }
+
+    clearUserStorage();
 
     router.replace("/login");
   };
@@ -175,11 +254,112 @@ export default function Sidebar() {
 
   const badge = unreadNotifs > 0 ? (unreadNotifs > 9 ? "9+" : unreadNotifs) : undefined;
 
+  // ใช้ร่วมกันทั้งแถบด้านข้าง (จอใหญ่) และลิ้นชัก (มือถือ)
+  const menuItems: Omit<SidebarItemProps, "collapsed">[] = [
+    { href: "/profile", icon: <UserRound size={21} />, label: "ข้อมูลสุขภาพของคุณ", active: isProfileActive },
+    { href: "/assessment-type", icon: <ClipboardList size={21} />, label: "แบบประเมินสุขภาพ", active: isAssessmentActive },
+    { href: "/dashboard", icon: <BarChart3 size={21} />, label: "Dashboard", active: isResultActive },
+    { href: "/notifications", icon: <Bell size={21} />, label: "การแจ้งเตือน", active: isNotificationsActive, badge },
+    { href: "/history", icon: <History size={21} />, label: "ประวัติการประเมิน", active: isHistoryActive },
+    { href: "/recommendation-health", icon: <Heart size={21} />, label: "คำแนะนำสุขภาพ", active: isRecommendationActive },
+    { href: "/settings", icon: <Settings size={21} />, label: "ตั้งค่า", active: isSettingsActive },
+  ];
+
   /* =========================================================
      UI
   ========================================================= */
 
   return (
+    <>
+    {/* =====================================================
+        MOBILE TOP BAR (จอแคบกว่า lg)
+        globals.css เว้นที่ด้านบนของหน้าให้แถบนี้ (.mobile-topbar)
+    ===================================================== */}
+
+    <header className="mobile-topbar fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-[#eee5e6] bg-white/95 px-3 backdrop-blur lg:hidden">
+      <button
+        type="button"
+        onClick={() => setMobileOpen(true)}
+        aria-label="เปิดเมนู"
+        aria-expanded={mobileOpen}
+        aria-controls="mobile-menu"
+        className="relative grid h-10 w-10 place-items-center rounded-xl text-[#2f3037] transition hover:bg-[#f8f5f5]"
+      >
+        <Menu size={22} />
+        {badge != null && (
+          <span className="absolute right-1 top-1 h-2.5 w-2.5 rounded-full bg-[#b91c2b] ring-2 ring-white" />
+        )}
+      </button>
+
+      <Link href="/assessment-type" className="flex min-w-0 items-center gap-2">
+        <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#b91c2b] to-[#8a1420] text-white">
+          <Heart size={17} fill="currentColor" />
+        </span>
+        <span className="truncate font-bold text-[#2f3037]">Health Risk Assessment</span>
+      </Link>
+    </header>
+
+    {/* =====================================================
+        MOBILE DRAWER
+    ===================================================== */}
+
+    <div
+      className={`fixed inset-0 z-50 lg:hidden ${mobileOpen ? "" : "pointer-events-none"}`}
+      aria-hidden={!mobileOpen}
+    >
+      {/* พื้นหลังมืด กดเพื่อปิด */}
+      <div
+        onClick={() => setMobileOpen(false)}
+        className={`absolute inset-0 bg-[#2f3037]/40 transition-opacity duration-300 ${mobileOpen ? "opacity-100" : "opacity-0"}`}
+      />
+
+      <aside
+        id="mobile-menu"
+        role="dialog"
+        aria-modal="true"
+        aria-label="เมนูหลัก"
+        className={`absolute inset-y-0 left-0 flex w-[280px] max-w-[85vw] flex-col overflow-y-auto bg-white px-5 py-6 shadow-2xl transition-transform duration-300 ease-[cubic-bezier(.4,0,.2,1)] ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3 px-1">
+          <Link href="/assessment-type" className="flex min-w-0 items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-[#b91c2b] to-[#8a1420] text-white">
+              <Heart size={23} fill="currentColor" />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate font-bold text-[#2f3037]">Health Risk</span>
+              <span className="block text-xs text-[#96969e]">Assessment</span>
+            </span>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            aria-label="ปิดเมนู"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[#96969e] transition hover:bg-[#f8f5f5] hover:text-[#2f3037]"
+          >
+            <X size={22} />
+          </button>
+        </div>
+
+        <nav className="mt-8 space-y-2" aria-label="เมนูหลัก">
+          {menuItems.map((item) => (
+            <SidebarItem key={item.href} {...item} />
+          ))}
+        </nav>
+
+        <button
+          type="button"
+          onClick={logout}
+          className="mt-auto flex h-12 w-full shrink-0 items-center gap-3 rounded-2xl bg-[#fff0f2] px-4 font-semibold text-[#b91c2b] transition hover:bg-[#ffe4e8]"
+        >
+          <LogOut size={20} className="shrink-0" />
+          ออกจากระบบ
+        </button>
+      </aside>
+    </div>
+
     <aside
       data-collapsed={collapsed}
       className={`group/sidebar sticky top-0 hidden h-screen shrink-0 border-r border-[#eee5e6] bg-white py-7 lg:flex lg:flex-col ${
@@ -241,64 +421,9 @@ export default function Sidebar() {
       ===================================================== */}
 
       <nav className="mt-12 space-y-2" aria-label="เมนูหลัก">
-
-        <SidebarItem
-          href="/profile"
-          icon={<UserRound size={21} />}
-          label="ข้อมูลสุขภาพของคุณ"
-          active={isProfileActive}
-          collapsed={collapsed}
-        />
-
-        <SidebarItem
-          href="/assessment-type"
-          icon={<ClipboardList size={21} />}
-          label="แบบประเมินสุขภาพ"
-          active={isAssessmentActive}
-          collapsed={collapsed}
-        />
-
-        <SidebarItem
-          href="/dashboard"
-          icon={<BarChart3 size={21} />}
-          label="Dashboard"
-          active={isResultActive}
-          collapsed={collapsed}
-        />
-
-        <SidebarItem
-          href="/notifications"
-          icon={<Bell size={21} />}
-          label="การแจ้งเตือน"
-          active={isNotificationsActive}
-          badge={badge}
-          collapsed={collapsed}
-        />
-
-        <SidebarItem
-          href="/history"
-          icon={<History size={21} />}
-          label="ประวัติการประเมิน"
-          active={isHistoryActive}
-          collapsed={collapsed}
-        />
-
-        <SidebarItem
-          href="/recommendation-health"
-          icon={<Heart size={21} />}
-          label="คำแนะนำสุขภาพ"
-          active={isRecommendationActive}
-          collapsed={collapsed}
-        />
-
-        <SidebarItem
-          href="/settings"
-          icon={<Settings size={21} />}
-          label="ตั้งค่า"
-          active={isSettingsActive}
-          collapsed={collapsed}
-        />
-
+        {menuItems.map((item) => (
+          <SidebarItem key={item.href} {...item} collapsed={collapsed} />
+        ))}
       </nav>
 
       {/* =====================================================
@@ -327,6 +452,7 @@ export default function Sidebar() {
       </button>
 
     </aside>
+    </>
   );
 }
 

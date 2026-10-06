@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import {
+    badRequest,
+    loadActiveChoices,
+    readJsonObject,
+    resolveChoiceAnswers,
+    userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,18 +15,6 @@ export const dynamic = "force-dynamic";
 /* =========================================================
    TYPES
 ========================================================= */
-
-type SubmitBody = {
-    userId?: number;
-    user_id?: number;
-
-    answers: Array<{
-        questionId: number;
-        optionId: number;
-        answer: string;
-        score: number;
-    }>;
-};
 
 /* =========================================================
    HELPER
@@ -77,6 +73,9 @@ export async function GET(request: NextRequest) {
         ===================================================== */
 
         if (assessmentIdParam) {
+            const auth = requireUser(request);
+            if (!auth.ok) return auth.response;
+
             const assessmentId = Number(assessmentIdParam);
 
             if (
@@ -118,10 +117,11 @@ export async function GET(request: NextRequest) {
 
           WHERE a.assessment_id = $1
             AND a.assessment_type_id = $2
+            AND a.user_id = $3
 
           LIMIT 1
         `,
-                [assessmentId, stressTypeId],
+                [assessmentId, stressTypeId, auth.userId],
             );
 
             if (assessmentResult.rowCount === 0) {
@@ -373,125 +373,74 @@ export async function GET(request: NextRequest) {
 export async function POST(
     request: NextRequest,
 ) {
+    const body = await readJsonObject(request);
+    if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+    /* -----------------------------------------------------
+       User ID
+       ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+    ----------------------------------------------------- */
+
+    const auth = requireUser(request, body.userId ?? body.user_id);
+    if (!auth.ok) return auth.response;
+    const userId = auth.userId;
+
+    const answers = body.answers;
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+        return badRequest("กรุณาตอบแบบประเมินให้ครบทั้ง 5 ข้อ");
+    }
+
     const client = await pool.connect();
 
     try {
-        const body =
-            (await request.json()) as SubmitBody;
+        if (!(await userExists(client, userId))) {
+            return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
+        }
 
         /* -----------------------------------------------------
-           User ID
+           หา Assessment Type
         ----------------------------------------------------- */
 
-        const rawUserId =
-            body.userId ?? body.user_id;
+        const stressTypeId = await getStressAssessmentTypeId();
 
-        const userId = Number(rawUserId);
-
-        if (
-            !Number.isInteger(userId) ||
-            userId <= 0
-        ) {
+        if (!stressTypeId) {
             return NextResponse.json(
                 {
                     success: false,
                     message:
-                        "ไม่พบข้อมูลผู้ใช้งานที่ถูกต้อง",
+                        "ไม่พบประเภทแบบประเมินความเครียด",
                 },
-                { status: 400 },
+                { status: 404 },
             );
         }
 
         /* -----------------------------------------------------
-           Answers
+           ตรวจคำตอบและคำนวณคะแนน
+           คะแนนดึงจาก question_choices ตาม optionId
+           ไม่ใช้ score ที่หน้าเว็บส่งมา
         ----------------------------------------------------- */
 
-        const answers = body.answers;
+        const resolved = resolveChoiceAnswers(
+            await loadActiveChoices(client, stressTypeId),
+            answers.map((item) => ({
+                questionId: item?.questionId,
+                choiceId: item?.optionId ?? null,
+            })),
+        );
 
-        if (
-            !Array.isArray(answers) ||
-            answers.length !== 5
-        ) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message:
-                        "กรุณาตอบแบบประเมินให้ครบทั้ง 5 ข้อ",
-                },
-                { status: 400 },
-            );
+        if (!resolved.ok) {
+            return badRequest(resolved.message);
         }
 
-        /* -----------------------------------------------------
-           ตรวจสอบคำตอบ
-        ----------------------------------------------------- */
+        const totalScore = resolved.total;
 
-        for (const item of answers) {
-            if (
-                !Number.isInteger(
-                    Number(item.questionId),
-                ) ||
-                !Number.isInteger(
-                    Number(item.optionId),
-                )
-            ) {
-                return NextResponse.json(
-                    {
-                        success: false,
-                        message:
-                            "ข้อมูลคำตอบไม่ถูกต้อง",
-                    },
-                    { status: 400 },
-                );
-            }
-        }
-
-        /* -----------------------------------------------------
-           คำนวณคะแนน
-        ----------------------------------------------------- */
-
-        let totalScore = 0;
-
-        const answersToInsert: Array<{
-            question_id: number;
-            choice_id: number | null;
-            answer_value: string;
-            score: number;
-        }> = [];
-
-        for (const item of answers) {
-            const score = Number(item.score);
-
-            if (
-                !Number.isFinite(score) ||
-                score < 0 ||
-                score > 3
-            ) {
-                return NextResponse.json(
-                    {
-                        success: false,
-                        message:
-                            "คะแนนคำตอบไม่ถูกต้อง",
-                    },
-                    { status: 400 },
-                );
-            }
-
-            totalScore += score;
-
-            answersToInsert.push({
-                question_id:
-                    Number(item.questionId),
-
-                choice_id:
-                    Number(item.optionId),
-
-                answer_value:
-                    item.answer,
-
-                score,
-            });
-        }
+        const answersToInsert = resolved.picked.map((choice) => ({
+            question_id: choice.question_id,
+            choice_id: choice.choice_id,
+            answer_value: choice.choice_text,
+            score: choice.score,
+        }));
 
         /* -----------------------------------------------------
            ST-5 Interpretation
@@ -516,40 +465,6 @@ export async function POST(
             riskLevel = "เครียดมาก";
         } else if (totalScore >= 10) {
             riskLevel = "เครียดมากที่สุด";
-        }
-
-        /* -----------------------------------------------------
-           หา Assessment Type
-        ----------------------------------------------------- */
-
-        const stressTypeResult =
-            await client.query(
-                `
-          SELECT assessment_type_id
-          FROM assessment_types
-          WHERE
-            LOWER(assessment_name) =
-              LOWER('Stress')
-            OR assessment_name ILIKE '%ความเครียด%'
-            OR assessment_name ILIKE '%stress%'
-          ORDER BY assessment_type_id
-          LIMIT 1
-        `,
-            );
-
-        const stressTypeId =
-            stressTypeResult.rows[0]
-                ?.assessment_type_id;
-
-        if (!stressTypeId) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message:
-                        "ไม่พบประเภทแบบประเมินความเครียด",
-                },
-                { status: 404 },
-            );
         }
 
         /* -----------------------------------------------------
@@ -681,7 +596,7 @@ export async function POST(
                 recommendationId,
         });
     } catch (error) {
-        await client.query("ROLLBACK");
+        await client.query("ROLLBACK").catch(() => {});
 
         console.error(
             "POST STRESS ASSESSMENT ERROR:",

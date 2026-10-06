@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { syncUserNotifications } from "@/lib/notificationRules";
+import { requireUser } from "@/lib/session";
 
 /* =========================================================
    GET /api/notifications?userId=xxx
@@ -8,22 +9,11 @@ import { syncUserNotifications } from "@/lib/notificationRules";
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: "ไม่พบ User ID" },
-        { status: 400 }
-      );
-    }
-
-    const userIdNumber = Number(userId);
-    if (!Number.isInteger(userIdNumber) || userIdNumber <= 0) {
-      return NextResponse.json(
-        { success: false, message: "User ID ไม่ถูกต้อง" },
-        { status: 400 }
-      );
-    }
+    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(request, searchParams.get("userId"));
+    if (!auth.ok) return auth.response;
+    const userIdNumber = auth.userId;
 
     // ซิงค์และดึงการแจ้งเตือนทั้งหมดของผู้ใช้
     const notifications = await syncUserNotifications(pool, userIdNumber);
@@ -76,14 +66,10 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const { userId, notificationId, markAll } = body;
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, message: "ไม่พบ User ID" },
-        { status: 400 }
-      );
-    }
-
-    const userIdNumber = Number(userId);
+    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(request, userId);
+    if (!auth.ok) return auth.response;
+    const userIdNumber = auth.userId;
 
     if (markAll) {
       await pool.query(

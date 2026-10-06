@@ -1,14 +1,10 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/session";
+import { badRequest, readJsonObject, toNumberInRange, userExists } from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-type SubmitBody = {
-  userId?: number;
-  weightKg: number;
-  heightCm: number;
-};
 
 type QuestionRow = {
   question_id: number;
@@ -32,6 +28,9 @@ function mapBmiToLevel(bmi: number) {
    ดึงผล assessment BMI
 ========================================================= */
 export async function GET(request: Request) {
+  const auth = requireUser(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const url = new URL(request.url);
 
@@ -70,10 +69,11 @@ export async function GET(request: Request) {
       LEFT JOIN recommendation r
         ON r.rec_id = a.recommendation_id
       WHERE a.assessment_id = $1
+        AND a.user_id = $2
         AND t.assessment_name = 'BMI'
       LIMIT 1
       `,
-      [assessmentId],
+      [assessmentId, auth.userId],
     );
 
     if ((assessmentResult.rowCount ?? 0) === 0) {
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "ไม่สามารถโหลดผลประเมินได้",
+        message: "ไม่สามารถโหลดผลประเมินได้",
       },
       { status: 500 },
     );
@@ -152,44 +152,33 @@ export async function GET(request: Request) {
    บันทึกแบบประเมิน BMI
 ========================================================= */
 export async function POST(request: Request) {
+  const body = await readJsonObject(request);
+  if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = requireUser(request, body.userId ?? body.user_id);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  const weightKg = toNumberInRange(body.weightKg, 10, 400);
+  const heightCm = toNumberInRange(body.heightCm, 50, 250);
+
+  if (weightKg === null) {
+    return badRequest("ค่าน้ำหนักไม่ถูกต้อง");
+  }
+
+  if (heightCm === null) {
+    return badRequest("ค่าส่วนสูงไม่ถูกต้อง");
+  }
+
   const client = await pool.connect();
 
   try {
-    const body = (await request.json()) as SubmitBody;
-
-    const userId = Number(body.userId);
-    const weightKg = Number(body.weightKg);
-    const heightCm = Number(body.heightCm);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      return NextResponse.json({ success: false, message: "userId ไม่ถูกต้อง" }, { status: 400 });
-    }
-
-    if (!Number.isFinite(weightKg) || weightKg < 10 || weightKg > 400) {
-      return NextResponse.json({ success: false, message: "ค่าน้ำหนักไม่ถูกต้อง" }, { status: 400 });
-    }
-
-    if (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250) {
-      return NextResponse.json({ success: false, message: "ค่าส่วนสูงไม่ถูกต้อง" }, { status: 400 });
+    if (!(await userExists(client, userId))) {
+      return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
     await client.query("BEGIN");
-
-    /* ตรวจผู้ใช้ */
-    const userResult = await client.query(
-      `
-      SELECT user_id
-      FROM users
-      WHERE user_id = $1
-      LIMIT 1
-      `,
-      [userId],
-    );
-
-    if ((userResult.rowCount ?? 0) === 0) {
-      await client.query("ROLLBACK");
-      return NextResponse.json({ success: false, message: `ไม่พบผู้ใช้ user_id ${userId}` }, { status: 404 });
-    }
 
     /* หาประเภทแบบประเมิน */
     const typeResult = await client.query<{ assessment_type_id: number }>(
@@ -329,7 +318,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "ไม่สามารถบันทึกผลประเมินได้",
+        message: "ไม่สามารถบันทึกผลประเมินได้",
       },
       { status: 500 },
     );

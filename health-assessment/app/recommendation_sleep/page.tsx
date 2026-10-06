@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
     CheckCircle2,
     AlertTriangle,
@@ -34,14 +35,18 @@ type ResultData = {
 export default function RecommendationSleepPage() {
     const router = useRouter();
 
+    // undefined = ยังไม่ได้อ่าน URL, null = ไม่มี recordId
     const [recordId, setRecordId] =
-        useState<string | null>(null);
+        useState<string | null | undefined>(undefined);
 
     const [result, setResult] =
         useState<ResultData | null>(null);
 
     const [loading, setLoading] =
         useState(true);
+
+    const [error, setError] =
+        useState("");
 
     // =====================================================
     // อ่าน recordId จาก URL
@@ -78,6 +83,13 @@ export default function RecommendationSleepPage() {
                     }
                 );
 
+                // session หมดอายุ → กลับไปหน้า login
+                if (response.status === 401) {
+                    localStorage.removeItem("userId");
+                    router.replace("/login");
+                    return;
+                }
+
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -96,7 +108,7 @@ export default function RecommendationSleepPage() {
                     error
                 );
 
-                alert(
+                setError(
                     error instanceof Error
                         ? error.message
                         : "ไม่สามารถโหลดผลการประเมินได้"
@@ -107,13 +119,14 @@ export default function RecommendationSleepPage() {
         }
 
         loadResult();
-    }, [recordId]);
+    }, [recordId, router]);
 
     // =====================================================
     // Loading
     // =====================================================
 
-    if (loading || !recordId) {
+    // ไม่มี recordId → ข้ามไปแสดงหน้าไม่พบผลแทนการโหลดค้าง
+    if (recordId === undefined || (recordId && loading)) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#FCFBFA]">
 
@@ -154,7 +167,8 @@ export default function RecommendationSleepPage() {
                     </h2>
 
                     <p className="mt-2 text-[#888890]">
-                        กรุณากลับไปทำแบบประเมินใหม่
+                        {error ||
+                            "กรุณากลับไปทำแบบประเมินใหม่"}
                     </p>
 
                     <button
@@ -168,6 +182,13 @@ export default function RecommendationSleepPage() {
                     >
                         ทำแบบประเมินอีกครั้ง
                     </button>
+
+                    <Link
+                        href="/assessment-menu-behavior"
+                        className="mt-4 block text-sm font-semibold text-[#5D9F61] hover:underline"
+                    >
+                        กลับไปหน้าเมนูแบบประเมิน
+                    </Link>
 
                 </div>
 

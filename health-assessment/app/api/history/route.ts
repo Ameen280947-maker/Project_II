@@ -1,5 +1,6 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/session";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,9 +9,14 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
 
-    const userId = Number(
+    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(
+      request,
       url.searchParams.get("userId"),
     );
+    if (!auth.ok) return auth.response;
+
+    const userId = auth.userId;
 
     if (
       !Number.isInteger(userId) ||

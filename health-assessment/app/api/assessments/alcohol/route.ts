@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import {
+  badRequest,
+  readJsonObject,
+  toIntInRange,
+  userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,8 +14,6 @@ export const dynamic = "force-dynamic";
 /* =========================================================
    TYPES
 ========================================================= */
-
-type AnswerMap = Record<string | number, number | string>;
 
 type AlcoholOption = {
   value: number;
@@ -124,6 +129,9 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    const auth = requireUser(request);
+    if (!auth.ok) return auth.response;
+
     const assessmentId = Number(assessmentIdParam);
 
     if (!Number.isInteger(assessmentId) || assessmentId <= 0) {
@@ -133,6 +141,29 @@ export async function GET(request: NextRequest) {
           message: "Assessment ID ไม่ถูกต้อง",
         },
         { status: 400 }
+      );
+    }
+
+    /* ดูได้เฉพาะผลแอลกอฮอล์ของตัวเอง (ตรวจก่อนอ่านจาก view) */
+    const ownerResult = await pool.query(
+      `
+      SELECT 1
+      FROM assessment
+      WHERE assessment_id = $1
+        AND user_id = $2
+        AND assessment_type_id = $3
+      LIMIT 1
+      `,
+      [assessmentId, auth.userId, ASSESSMENT_TYPE_ID]
+    );
+
+    if (ownerResult.rowCount === 0) {
+      return NextResponse.json(
+        {
+          success: false,
+          message: "ไม่พบผลการประเมิน",
+        },
+        { status: 404 }
       );
     }
 
@@ -210,9 +241,11 @@ export async function GET(request: NextRequest) {
       LEFT JOIN users u ON u.user_id = a.user_id
       LEFT JOIN recommendation r ON r.rec_id = a.recommendation_id
       WHERE a.assessment_id = $1
+        AND a.user_id = $2
+        AND a.assessment_type_id = $3
       LIMIT 1
       `,
-      [assessmentId]
+      [assessmentId, auth.userId, ASSESSMENT_TYPE_ID]
     );
 
     if (assessmentResult.rowCount === 0) {
@@ -275,7 +308,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "ไม่สามารถโหลดข้อมูลได้",
+        message: "ไม่สามารถโหลดข้อมูลได้",
       },
       { status: 500 }
     );
@@ -288,62 +321,72 @@ export async function GET(request: NextRequest) {
 ========================================================= */
 
 export async function POST(request: NextRequest) {
+  const body = await readJsonObject(request);
+  if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+  /* =====================================================
+     VALIDATE USER
+     ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  ====================================================== */
+  const auth = requireUser(request, body.userId ?? body.user_id);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  /*
+    รูปแบบคำตอบ: { [ลำดับข้อ 1-7]: value ของตัวเลือกใน QUESTIONS }
+    คะแนนคิดจาก QUESTIONS ฝั่ง server เท่านั้น
+  */
+  const rawAnswers = body.answers;
+
+  if (!rawAnswers || typeof rawAnswers !== "object" || Array.isArray(rawAnswers)) {
+    return badRequest("ไม่พบคำตอบแบบประเมิน");
+  }
+
+  const answerEntries = Object.entries(rawAnswers as Record<string, unknown>);
+
+  if (answerEntries.some(([key]) => !QUESTIONS.some((q) => String(q.id) === key))) {
+    return badRequest("มีคำตอบที่ไม่ใช่คำถามของแบบประเมินนี้");
+  }
+
+  const answers = new Map<number, AlcoholOption>();
+
+  for (const [key, value] of answerEntries) {
+    const question = QUESTIONS.find((q) => String(q.id) === key)!;
+    const selected = toIntInRange(value, 1, question.options.length);
+    const option = question.options.find((opt) => opt.value === selected);
+
+    if (!option) {
+      return badRequest(`ตัวเลือกของคำถามข้อที่ ${question.id} ไม่ถูกต้อง`);
+    }
+
+    answers.set(question.id, option);
+  }
+
+  /* =====================================================
+     VALIDATE Q1
+  ====================================================== */
+  const q1 = answers.get(1)?.value;
+
+  if (q1 === undefined) {
+    return badRequest("กรุณาตอบคำถามข้อที่ 1");
+  }
+
+  /* =====================================================
+     CURRENT DRINKER VALIDATION (Q2 - Q7)
+  ====================================================== */
+  if (q1 === 3) {
+    for (let i = 2; i <= 7; i++) {
+      if (!answers.has(i)) {
+        return badRequest(`กรุณาตอบคำถามข้อที่ ${i}`);
+      }
+    }
+  }
+
   const client = await pool.connect();
 
   try {
-    const body = (await request.json()) as {
-      userId?: number;
-      username?: string;
-      answers?: AnswerMap;
-    };
-
-    const userId = Number(body.userId);
-    const answers = body.answers ?? {};
-
-    /* =====================================================
-       VALIDATE USER
-    ====================================================== */
-    if (!Number.isInteger(userId) || userId <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ไม่พบผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่",
-        },
-        { status: 401 }
-      );
-    }
-
-    /* =====================================================
-       VALIDATE Q1
-    ====================================================== */
-    const q1 = Number(answers["1"] ?? answers[1]);
-
-    if (![1, 2, 3].includes(q1)) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "กรุณาตอบคำถามข้อที่ 1",
-        },
-        { status: 400 }
-      );
-    }
-
-    /* =====================================================
-       CURRENT DRINKER VALIDATION (Q2 - Q7)
-    ====================================================== */
-    if (q1 === 3) {
-      for (let i = 2; i <= 7; i++) {
-        const value = Number(answers[String(i)] ?? answers[i]);
-        if (!Number.isInteger(value)) {
-          return NextResponse.json(
-            {
-              success: false,
-              message: `กรุณาตอบคำถามข้อที่ ${i}`,
-            },
-            { status: 400 }
-          );
-        }
-      }
+    if (!(await userExists(client, userId))) {
+      return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
     /* =====================================================
@@ -368,8 +411,7 @@ export async function POST(request: NextRequest) {
         const question = QUESTIONS.find((item) => item.id === i);
         if (!question) continue;
 
-        const selected = Number(answers[String(i)] ?? answers[i]);
-        const option = question.options.find((item) => item.value === selected);
+        const option = answers.get(question.id);
 
         if (option) {
           totalScore += option.score;
@@ -476,21 +518,26 @@ export async function POST(request: NextRequest) {
     });
 
     for (const q of questionsToSave) {
-      const selectedValue = Number(answers[String(q.id)] ?? answers[q.id]);
-      const matchedOption = q.options.find((opt) => opt.value === selectedValue);
+      // ตรวจแล้วข้างบนว่าตอบครบ และเป็นตัวเลือกที่มีจริง
+      const matchedOption = answers.get(q.id)!;
 
-      const optionText = matchedOption?.text ?? String(selectedValue);
-      const score = matchedOption?.score ?? 0;
+      const optionText = matchedOption.text;
+      const score = matchedOption.score;
 
-      // Find matched question in DB by display_order or position
+      // คำถามในฐานข้อมูลจับคู่ด้วย display_order เท่านั้น
       const matchingDbQuestionRows = dbQuestions.filter(
-        (dq) => dq.display_order === q.id || dq.question_id === q.id
+        (dq) => dq.display_order === q.id
       );
 
-      const dbQuestionId = matchingDbQuestionRows[0]?.question_id ?? q.id;
+      if (matchingDbQuestionRows.length === 0) {
+        throw new Error(`ไม่พบคำถามแอลกอฮอล์ข้อที่ ${q.id} ในฐานข้อมูล`);
+      }
 
+      const dbQuestionId = matchingDbQuestionRows[0].question_id;
+
+      // จับคู่ตัวเลือกด้วยข้อความเท่านั้น (ไม่จับด้วยคะแนน เพราะหลายตัวเลือกคะแนนเท่ากันได้)
       const matchedChoiceRow = matchingDbQuestionRows.find(
-        (dq) => dq.choice_text?.trim() === optionText.trim() || dq.score === score
+        (dq) => dq.choice_text?.trim() === optionText.trim()
       );
 
       const choiceId = matchedChoiceRow?.choice_id ?? null;
@@ -521,13 +568,13 @@ export async function POST(request: NextRequest) {
       recommendation_text: finalRecText,
     });
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => {});
     console.error("POST ALCOHOL ERROR:", error);
 
     return NextResponse.json(
       {
         success: false,
-        message: error instanceof Error ? error.message : "ไม่สามารถบันทึกผลการประเมินได้",
+        message: "ไม่สามารถบันทึกผลการประเมินได้",
       },
       { status: 500 }
     );

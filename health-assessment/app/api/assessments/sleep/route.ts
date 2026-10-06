@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import {
+    badRequest,
+    loadActiveChoices,
+    readJsonObject,
+    resolveChoiceAnswers,
+    userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,17 +15,6 @@ export const dynamic = "force-dynamic";
 /* =========================================================
    TYPES
 ========================================================= */
-
-type SubmitBody = {
-    userId?: number;
-    user_id?: number;
-    answers: Array<{
-        questionId: number;
-        optionId: number;
-        answer: string;
-        score: number;
-    }>;
-};
 
 /* =========================================================
    GET
@@ -34,6 +31,9 @@ export async function GET(request: NextRequest) {
            CASE 1: ดึงผลการประเมินจาก assessmentId
         ----------------------------------------------------- */
         if (assessmentIdParam) {
+            const auth = requireUser(request);
+            if (!auth.ok) return auth.response;
+
             const assessmentId = Number(assessmentIdParam);
 
             if (!Number.isInteger(assessmentId) || assessmentId <= 0) {
@@ -65,10 +65,11 @@ export async function GET(request: NextRequest) {
         LEFT JOIN recommendation r
           ON r.rec_id = a.recommendation_id
         WHERE a.assessment_id = $1
+          AND a.user_id = $2
           AND (t.assessment_name = 'Sleep' OR a.assessment_type_id = 9)
         LIMIT 1
         `,
-                [assessmentId]
+                [assessmentId, auth.userId]
             );
 
             if (assessmentResult.rowCount === 0) {
@@ -206,54 +207,50 @@ export async function GET(request: NextRequest) {
 ========================================================= */
 
 export async function POST(request: NextRequest) {
+    const body = await readJsonObject(request);
+    if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+    // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(request, body.userId ?? body.user_id);
+    if (!auth.ok) return auth.response;
+    const userId = auth.userId;
+
+    const answers = body.answers;
+
+    if (!Array.isArray(answers) || answers.length === 0) {
+        return badRequest("ไม่พบคำตอบแบบประเมิน");
+    }
+
     const client = await pool.connect();
 
     try {
-        const body = (await request.json()) as SubmitBody;
-
-        const rawUserId = body.userId ?? body.user_id;
-        const userId = Number(rawUserId);
-
-        if (!Number.isInteger(userId) || userId <= 0) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: "ไม่พบข้อมูลผู้ใช้งานที่ถูกต้อง",
-                },
-                { status: 400 }
-            );
+        if (!(await userExists(client, userId))) {
+            return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
         }
 
-        const answers = body.answers;
+        /*
+          คะแนนดึงจาก question_choices ตาม optionId
+          ไม่ใช้ score ที่หน้าเว็บส่งมา (เดิมรวมคะแนนจากเบราว์เซอร์ และอาจต่อเป็นข้อความ)
+        */
+        const resolved = resolveChoiceAnswers(
+            await loadActiveChoices(client, 9),
+            answers.map((item) => ({
+                questionId: item?.questionId,
+                choiceId: item?.optionId ?? null,
+            })),
+        );
 
-        if (!Array.isArray(answers) || answers.length === 0) {
-            return NextResponse.json(
-                {
-                    success: false,
-                    message: "ไม่พบคำตอบแบบประเมิน",
-                },
-                { status: 400 }
-            );
+        if (!resolved.ok) {
+            return badRequest(resolved.message);
         }
 
-        let totalScore = 0;
-        const answersToInsert: Array<{
-            question_id: number;
-            choice_id: number | null;
-            answer_value: string;
-            score: number;
-        }> = [];
-
-        for (const item of answers) {
-            totalScore += item.score;
-
-            answersToInsert.push({
-                question_id: item.questionId,
-                choice_id: item.optionId,
-                answer_value: item.answer,
-                score: item.score,
-            });
-        }
+        const totalScore = resolved.total;
+        const answersToInsert = resolved.picked.map((choice) => ({
+            question_id: choice.question_id,
+            choice_id: choice.choice_id,
+            answer_value: choice.choice_text,
+            score: choice.score,
+        }));
 
         let riskLevel = "เสี่ยงสูง";
         if (totalScore >= 3) {
@@ -331,7 +328,7 @@ export async function POST(request: NextRequest) {
             risk_level: riskLevel,
         });
     } catch (error) {
-        await client.query("ROLLBACK");
+        await client.query("ROLLBACK").catch(() => {});
         console.error("POST SLEEP ASSESSMENT ERROR:", error);
 
         return NextResponse.json(
