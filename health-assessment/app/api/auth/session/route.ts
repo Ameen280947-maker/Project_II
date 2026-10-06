@@ -1,0 +1,31 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/session";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+/* =========================================================
+   GET /api/auth/session
+   ตรวจว่ายังมี session ที่ใช้ได้อยู่หรือไม่
+   - มี   → 200 { success, user: { user_id, role_id } }
+   - ไม่มี → 401
+========================================================= */
+
+export async function GET(request: NextRequest) {
+  const session = getSession(request);
+
+  if (!session) {
+    return NextResponse.json(
+      { success: false, message: "กรุณาเข้าสู่ระบบใหม่" },
+      { status: 401 },
+    );
+  }
+
+  return NextResponse.json({
+    success: true,
+    user: {
+      user_id: session.userId,
+      role_id: session.roleId,
+    },
+  });
+}

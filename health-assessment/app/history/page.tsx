@@ -1004,21 +1004,21 @@ function getRiskDisplayName(
       risk.includes("high") ||
       risk.includes("สูง")
     ) {
-      return "ติดนิโคตินระดับสูง";
+      return "เสี่ยงสูง";
     }
 
     if (
       risk.includes("moderate") ||
       risk.includes("ปานกลาง")
     ) {
-      return "ติดนิโคตินระดับปานกลาง";
+      return "เสี่ยงปานกลาง";
     }
 
     if (
       risk.includes("low") ||
       risk.includes("ต่ำ")
     ) {
-      return "ติดนิโคตินระดับต่ำ";
+      return "เสี่ยงต่ำ";
     }
   }
 

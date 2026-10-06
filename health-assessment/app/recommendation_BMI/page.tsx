@@ -70,6 +70,13 @@ function BmiResultContent() {
                     { method: "GET", cache: "no-store" },
                 );
 
+                // session หมดอายุ → กลับไปหน้า login
+                if (response.status === 401) {
+                    localStorage.removeItem("userId");
+                    window.location.replace("/login");
+                    return;
+                }
+
                 const data = (await response.json()) as ResultResponse;
 
                 if (!response.ok || !data.success || !data.result) {
@@ -185,7 +192,7 @@ function BmiResultContent() {
                             style={{ borderColor: colors.ring, background: colors.bg }}
                         >
                             <span className="scoreValue" style={{ color: colors.text }}>
-                                {result.bmi.toFixed(1)}
+                                {result.bmi.toFixed(2)}
                             </span>
                             <span className="scoreUnit" style={{ color: colors.text }}>
                                 BMI
@@ -212,7 +219,7 @@ function BmiResultContent() {
                             </strong>{" "}
                             โดยมีค่าดัชนีมวลกาย (BMI) ประมาณ{" "}
                             <strong style={{ color: colors.text }}>
-                                {result.bmi.toFixed(1)}
+                                {result.bmi.toFixed(2)}
                             </strong>
                             {result.weightKg && result.heightCm && (
                                 <>
@@ -230,18 +237,13 @@ function BmiResultContent() {
                     <h3>แนวทางดูแลสุขภาพ</h3>
 
                     <div className="adviceGrid">
-                        <AdviceCard
-                            title="โภชนาการ"
-                            description="รับประทานผัก ผลไม้ และธัญพืช ลดอาหารหวาน มัน เค็ม และอาหารแปรรูป"
-                        />
-                        <AdviceCard
-                            title="การออกกำลังกาย"
-                            description="ออกกำลังกายระดับปานกลางอย่างน้อย 150 นาทีต่อสัปดาห์"
-                        />
-                        <AdviceCard
-                            title="ติดตามสุขภาพ"
-                            description="ชั่งน้ำหนักสม่ำเสมอ ควบคุมอาหาร และตรวจสุขภาพเป็นประจำ"
-                        />
+                        {getAdviceCards(result.riskLevel).map((card) => (
+                            <AdviceCard
+                                key={card.title}
+                                title={card.title}
+                                description={card.description}
+                            />
+                        ))}
                     </div>
                 </section>
 
@@ -462,6 +464,66 @@ function BmiResultContent() {
       `}</style>
         </main>
     );
+}
+
+/*
+  การ์ดแนวทางแยกตามระดับ ให้สอดคล้องกับคำแนะนำในเอกสารอ้างอิง ตารางที่ 12
+  ผอม = ควรเพิ่มน้ำหนัก, ปกติ = ควบคุมน้ำหนัก, น้ำหนักเกินขึ้นไป = ลดน้ำหนัก, อ้วนอันตราย = พบแพทย์
+*/
+function getAdviceCards(riskLevel: string) {
+    if (riskLevel === "ผอม") {
+        return [
+            {
+                title: "โภชนาการ",
+                description: "เพิ่มพลังงานจากอาหารให้ครบ 5 หมู่ เพิ่มโปรตีน และกินให้ตรงเวลา เพื่อเพิ่มน้ำหนักให้อยู่ในเกณฑ์ปกติ",
+            },
+            {
+                title: "การออกกำลังกาย",
+                description: "ออกกำลังกายแบบเสริมสร้างกล้ามเนื้อควบคู่กับการกินให้เพียงพอ",
+            },
+            {
+                title: "ติดตามสุขภาพ",
+                description: "ชั่งน้ำหนักสม่ำเสมอ หากน้ำหนักลดลงต่อเนื่องโดยไม่ทราบสาเหตุควรพบแพทย์",
+            },
+        ];
+    }
+
+    if (riskLevel === "ปกติ") {
+        return [
+            {
+                title: "โภชนาการ",
+                description: "กินอาหารให้ครบ 5 หมู่ เน้นผัก ผลไม้ ลดอาหารหวาน มัน เค็ม เพื่อคงน้ำหนักให้อยู่ในเกณฑ์ปกติ",
+            },
+            {
+                title: "การออกกำลังกาย",
+                description: "ออกกำลังกายระดับปานกลางอย่างน้อย 150 นาทีต่อสัปดาห์",
+            },
+            {
+                title: "ติดตามสุขภาพ",
+                description: "ชั่งน้ำหนักสม่ำเสมอเพื่อควบคุมน้ำหนักให้คงที่",
+            },
+        ];
+    }
+
+    return [
+        {
+            title: "โภชนาการ",
+            description: "ลดอาหารหวาน มัน เค็ม และอาหารแปรรูป ควบคุมปริมาณอาหาร เน้นผักและผลไม้รสไม่หวาน",
+        },
+        {
+            title: "การออกกำลังกาย",
+            description: "ออกกำลังกายระดับปานกลางอย่างน้อย 150 นาทีต่อสัปดาห์ เพื่อช่วยลดน้ำหนัก",
+        },
+        riskLevel === "อ้วนอันตราย"
+            ? {
+                  title: "พบแพทย์",
+                  description: "ความอ้วนอยู่ในระดับอันตราย ควรลดน้ำหนักอย่างเร่งด่วนและไปพบแพทย์",
+              }
+            : {
+                  title: "ติดตามสุขภาพ",
+                  description: "ชั่งน้ำหนักสม่ำเสมอ ตั้งเป้าลดน้ำหนักให้เข้าสู่เกณฑ์ปกติ และตรวจสุขภาพเป็นประจำ",
+              },
+    ];
 }
 
 function AdviceCard({

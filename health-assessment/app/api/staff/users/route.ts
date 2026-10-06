@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { logAccess, requireStaff, USER_ROLE_ID } from "@/lib/staff/auth";
 import { loadCustomSeverities } from "@/lib/customAssessments";
-import { EXCLUDED_TYPES, severityOf, typeLabel } from "@/lib/staff/riskLevels";
+import { EXCLUDED_TYPES, severityOf, riskLabel, typeLabel } from "@/lib/staff/riskLevels";
 
 /* =========================================================
    /api/staff/users
@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
         if (!cur || sev > cur.severity) {
           worst.set(r.user_id, {
             severity: sev,
-            label: sev === 0 ? "ปกติทุกด้าน" : `${typeLabel(r.assessment_name)} · ${r.risk_level}`,
+            label: sev === 0 ? "ปกติทุกด้าน" : `${typeLabel(r.assessment_name)} · ${riskLabel(r.assessment_name, r.risk_level)}`,
           });
         }
       }
@@ -149,7 +149,7 @@ async function userDetail(userId: number, staffId: number) {
     latest = res.rows
       .map((r) => ({
         assessment: typeLabel(r.assessment_name),
-        riskLevel: r.risk_level,
+        riskLevel: riskLabel(r.assessment_name, r.risk_level),
         severity: severityOf(r.assessment_name, r.risk_level),
         assessedAt: r.assessed_at,
       }))

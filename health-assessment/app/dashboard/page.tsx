@@ -7,6 +7,7 @@ import NotificationBell from "@/app/components/NotificationBell";
 import type { CalculatedNotification } from "@/lib/notificationRules";
 
 import Sidebar from "@/app/components/Sidebar";
+import { riskLevelOf, type Level } from "@/lib/riskLevel";
 import {
   Activity,
   AlertTriangle,
@@ -42,6 +43,7 @@ type Assessment = {
   diastolic?: number | string | null; // เฉพาะ Blood Pressure
   assessed_at: string;
   recommendation_text?: string | null;
+  self_harm_flag?: boolean; // 9Q: ตอบข้อคิดทำร้ายตนเอง > 0
 };
 
 type DashboardData = {
@@ -63,7 +65,6 @@ type NotifSummary = {
   upcomingCount: number;
 };
 
-type Level = "ok" | "mid" | "high" | "unknown";
 type Category = "mind" | "body";
 type Band = { from: number; to: number; label: string; color: string };
 
@@ -211,10 +212,12 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     max: 35,
     unit: "kg/m²",
     bands: [
-      { from: 15, to: 18.5, label: "น้ำหนักน้อย", color: BAND.blue },
+      // ชื่อช่วงตามเอกสารอ้างอิง ตารางที่ 12
+      { from: 15, to: 18.5, label: "ผอม", color: BAND.blue },
       { from: 18.5, to: 23, label: "ปกติ", color: BAND.green },
-      { from: 23, to: 25, label: "ท้วม", color: BAND.amber },
-      { from: 25, to: 35, label: "อ้วน", color: BAND.red },
+      { from: 23, to: 25, label: "น้ำหนักเกิน", color: BAND.amber },
+      { from: 25, to: 30, label: "อ้วน", color: BAND.red },
+      { from: 30, to: 35, label: "อ้วนอันตราย", color: BAND.red2 },
     ],
     tip: {
       title: "ดูแลน้ำหนักตัว",
@@ -286,29 +289,6 @@ const FALLBACK_CONFIG: TypeConfig = {
 const getConfig = (name?: string | null): TypeConfig =>
   TYPE_CONFIG[String(name || "").toLowerCase().trim()] ?? FALLBACK_CONFIG;
 
-/**
- * จัดระดับจากข้อความ risk_level
- * ลำดับการเช็คสำคัญ: "ไม่เพียงพอ" มีคำว่า "เพียงพอ" อยู่ข้างใน
- * จึงต้องเช็คคำเชิงลบก่อนคำเชิงบวกเสมอ
- */
-const levelFromText = (risk?: string | null): Level => {
-  const v = String(risk || "").toLowerCase();
-  if (!v) return "unknown";
-  if (v.includes("ไม่มีความเสี่ยง") || v.includes("ไม่พบ") || v.includes("ไม่มีอาการ")) return "ok";
-  if (v.includes("สูง") || v.includes("อันตราย") || v.includes("รุนแรง") || v.includes("มาก")) return "high";
-  if (
-    v.includes("ไม่เพียงพอ") ||
-    v.includes("ปานกลาง") ||
-    v.includes("เสี่ยง") ||
-    v.includes("แนวโน้ม") ||
-    v.includes("ท้วม") ||
-    v.includes("ควร")
-  )
-    return "mid";
-  if (v.includes("ปกติ") || v.includes("เพียงพอ") || v.includes("น้อย") || v.includes("ดี")) return "ok";
-  return "unknown";
-};
-
 const isBloodPressure = (a: Assessment) =>
   String(a.assessment_name || "").toLowerCase().trim() === "blood pressure";
 
@@ -340,11 +320,13 @@ const displayScore = (a: Assessment) => {
 };
 
 const getLevel = (a: Assessment): Level => {
+  // 9Q ที่ตอบข้อคิดทำร้ายตนเอง = เสี่ยงสูงเสมอ ไม่ว่าคะแนนรวมเท่าไร
+  if (a.self_harm_flag) return "high";
   const cfg = getConfig(a.assessment_name);
   if (cfg.levelFromScore && Number.isFinite(scoreOf(a))) {
     return cfg.levelFromScore(scoreOf(a));
   }
-  return levelFromText(a.risk_level);
+  return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
 const formatDateTime = (date?: string | null) =>
@@ -405,6 +387,13 @@ export default function DashboardPage() {
           }),
         ]);
 
+        // session หมดอายุ → กลับไปหน้า login
+        if (dashRes.status === 401) {
+          localStorage.removeItem("userId");
+          router.replace("/login");
+          return;
+        }
+
         const result = await dashRes.json();
         const notifResult = await notifRes.json();
 
@@ -426,7 +415,7 @@ export default function DashboardPage() {
     };
 
     loadDashboard();
-  }, []);
+  }, [router]);
 
   const openResult = (assessment: Assessment) => {
     const type = assessment.assessment_name?.toLowerCase().trim();
@@ -473,13 +462,6 @@ function PageShell({ children }: { children: ReactNode }) {
    CONTENT
 ========================================================= */
 
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return "สวัสดีตอนเช้า";
-  if (hour < 17) return "สวัสดีตอนบ่าย";
-  return "สวัสดีตอนเย็น";
-}
-
 function DashboardContent({
   data,
   userName,
@@ -509,7 +491,7 @@ function DashboardContent({
           <div className="min-w-0">
             <p className="text-sm font-semibold tracking-[0.18em] text-[#4F7A4C]">HEALTH DASHBOARD</p>
             <h1 className="mt-1.5 mb-1 font-[family-name:var(--font-anuphan)] text-2xl sm:text-3xl font-bold leading-tight">
-              {getGreeting()}
+              สวัสดี
               {userName && (
                 <>
                   ,{" "}
@@ -1154,11 +1136,27 @@ function AssessmentCard({
 function Recommendations({ items }: { items: Assessment[] }) {
   const needAttention = items
     .filter((a) => getLevel(a) === "high" || getLevel(a) === "mid")
-    .sort((a, b) => LEVEL_STYLE[getLevel(b)].n - LEVEL_STYLE[getLevel(a)].n);
+    // ข้อคิดทำร้ายตนเองขึ้นก่อนเสมอ
+    .sort(
+      (a, b) =>
+        Number(!!b.self_harm_flag) - Number(!!a.self_harm_flag) ||
+        LEVEL_STYLE[getLevel(b)].n - LEVEL_STYLE[getLevel(a)].n
+    );
   const goodOnes = items.filter((a) => getLevel(a) === "ok");
 
   const tips = needAttention.slice(0, 4).map((a) => {
     const cfg = getConfig(a.assessment_name);
+    if (a.self_harm_flag) {
+      return {
+        key: a.assessment_id,
+        level: "high" as Level,
+        source: `จาก ${a.assessment_name}`,
+        title: "ขอความช่วยเหลือทันที",
+        text:
+          "ผลประเมินพบความคิดทำร้ายตนเอง โปรดโทรสายด่วนสุขภาพจิต 1323 (ฟรี 24 ชั่วโมง) " +
+          "และไปพบแพทย์ที่สถานพยาบาลใกล้บ้านเพื่อประเมินความเสี่ยงการฆ่าตัวตาย (8Q)",
+      };
+    }
     return {
       key: a.assessment_id,
       level: getLevel(a),

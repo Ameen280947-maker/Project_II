@@ -15,7 +15,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type AssessmentResult = {
   assessmentId: number;
@@ -42,6 +42,7 @@ export default function RecommendationHealthPage() {
 
 function RecommendationContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
 
   const assessmentId = searchParams.get("assessmentId");
 
@@ -70,6 +71,13 @@ function RecommendationContent() {
           },
         );
 
+        // session หมดอายุ → กลับไปหน้า login
+        if (response.status === 401) {
+          localStorage.removeItem("userId");
+          router.replace("/login");
+          return;
+        }
+
         const data = (await response.json()) as ResultResponse;
 
         if (!response.ok || !data.success || !data.result) {
@@ -91,7 +99,7 @@ function RecommendationContent() {
     };
 
     void loadResult();
-  }, [assessmentId]);
+  }, [assessmentId, router]);
 
   if (loading) {
     return <LoadingPage />;
@@ -115,7 +123,7 @@ function RecommendationContent() {
           </p>
 
           <Link
-            href="/assessment_"
+            href="/assessment_CVD"
             className="mt-7 flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#b91c2b] font-bold text-white"
           >
             <ArrowLeft size={20} />
@@ -159,7 +167,16 @@ function RecommendationContent() {
           <div className="flex flex-col items-center">
             <RiskCircle score={result.riskPercent} />
 
-            <span className="mt-4 rounded-full bg-[#eaf7e8] px-5 py-2 font-semibold text-[#4f9857]">
+            {/* สีตามตารางที่ 2 ของเอกสารอ้างอิง: <10% เขียว, 10-<30% เหลือง, ≥30% แดง */}
+            <span
+              className={`mt-4 rounded-full px-5 py-2 font-semibold ${
+                result.riskPercent >= 30
+                  ? "bg-[#fde8eb] text-[#c81e3a]"
+                  : result.riskPercent >= 10
+                    ? "bg-[#fff6d6] text-[#9a7300]"
+                    : "bg-[#eaf7e8] text-[#4f9857]"
+              }`}
+            >
               {result.riskLevel}
             </span>
           </div>

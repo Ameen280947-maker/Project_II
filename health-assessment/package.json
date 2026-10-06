@@ -9,11 +9,13 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@types/nodemailer": "^8.0.2",
     "bcryptjs": "^3.0.3",
     "lightningcss-darwin-arm64": "^1.33.0",
     "lucide-react": "^1.25.0",
     "mysql2": "^3.24.1",
     "next": "16.2.11",
+    "nodemailer": "^10.0.15",
     "pg": "^8.22.0",
     "react": "19.2.4",
     "react-dom": "19.2.4"

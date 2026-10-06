@@ -1,5 +1,12 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/session";
+import {
+  badRequest,
+  readJsonObject,
+  toIntInRange,
+  userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,16 +14,6 @@ export const dynamic = "force-dynamic";
 /* =========================================================
    TYPES
 ========================================================= */
-
-type SubmitBody = {
-  userId?: number;
-  user_id?: number;
-
-  family_diabetes: boolean;
-
-  sbp?: number;
-  dbp?: number;
-};
 
 type QuestionRow = {
   question_id: number;
@@ -429,6 +426,17 @@ function calculateDiabetesRisk(
   };
 }
 
+/*
+  ตาราง recommendation เก็บระดับเป็นภาษาไทยตามเอกสารอ้างอิง (ตารางที่ 7)
+  ส่วน risk_level ใน assessment ยังเก็บเป็นคีย์อังกฤษเพราะหน้าเว็บใช้อยู่
+*/
+const RECOMMENDATION_LEVEL: Record<string, string> = {
+  low: "เสี่ยงน้อย",
+  moderate: "เสี่ยงปานกลาง",
+  high: "เสี่ยงสูง",
+  very_high: "เสี่ยงสูงมาก",
+};
+
 /* =========================================================
    GET
 ========================================================= */
@@ -436,6 +444,9 @@ function calculateDiabetesRisk(
 export async function GET(
   request: Request,
 ) {
+  const auth = requireUser(request);
+  if (!auth.ok) return auth.response;
+
   try {
     const url =
       new URL(request.url);
@@ -522,9 +533,11 @@ export async function GET(
           AND t.assessment_name =
               'Diabetes TDS'
 
+          AND a.user_id = $2
+
         LIMIT 1
         `,
-        [assessmentId],
+        [assessmentId, auth.userId],
       );
 
     if (
@@ -547,40 +560,12 @@ export async function GET(
       assessmentResult.rows[0];
 
     /* =====================================================
-       PROFILE
-    ===================================================== */
-
-    const profileResult =
-      await pool.query<{
-        profile: Record<
-          string,
-          unknown
-        >;
-      }>(
-        `
-        SELECT
-          to_jsonb(hp) AS profile
-
-        FROM health_profile hp
-
-        WHERE hp.user_id = $1
-
-        LIMIT 1
-        `,
-        [assessment.user_id],
-      );
-
-    const profile =
-      profileResult.rows[0]
-        ?.profile ?? {};
-
-    const profileData =
-      extractHealthProfile(
-        profile,
-      );
-
-    /* =====================================================
        ANSWERS
+       POST บันทึกค่าที่ใช้คำนวณไว้ใน assessment_answers
+       ตาม display_order:
+       1 อายุ, 2 เพศ (male/female), 3 ส่วนสูง, 4 น้ำหนัก,
+       5 รอบเอว, 6 SBP, 7 DBP, 8 ประวัติครอบครัว (มี/ไม่มี)
+       ผลเก่าต้องแสดงค่าตอนประเมิน ไม่ใช่ค่าใน health_profile ปัจจุบัน
     ===================================================== */
 
     const answersResult =
@@ -619,47 +604,85 @@ export async function GET(
         [assessmentId],
       );
 
+    const answerText = (displayOrder: number) => {
+      const value = answersResult.rows.find(
+        (answer) =>
+          answer.display_order === displayOrder,
+      )?.answer_value;
+
+      return value === null ||
+        value === undefined ||
+        value.trim() === ""
+        ? null
+        : value.trim();
+    };
+
+    const answerNumber = (displayOrder: number) => {
+      const value = Number(answerText(displayOrder) ?? NaN);
+      return Number.isFinite(value) ? value : null;
+    };
+
+    /* =====================================================
+       PROFILE (สำรอง ใช้เฉพาะค่าที่ไม่มีในคำตอบ)
+    ===================================================== */
+
+    let profileCache:
+      | ReturnType<typeof extractHealthProfile>
+      | null = null;
+
+    const getProfile = async () => {
+      if (!profileCache) {
+        const profileResult =
+          await pool.query<{
+            profile: Record<
+              string,
+              unknown
+            >;
+          }>(
+            `
+            SELECT
+              to_jsonb(hp) AS profile
+
+            FROM health_profile hp
+
+            WHERE hp.user_id = $1
+
+            LIMIT 1
+            `,
+            [assessment.user_id],
+          );
+
+        profileCache = extractHealthProfile(
+          profileResult.rows[0]?.profile ?? {},
+        );
+      }
+
+      return profileCache;
+    };
+
+    const savedGender = answerText(2);
+
+    const age =
+      answerNumber(1) ?? (await getProfile()).age;
+    const gender =
+      savedGender === "male" || savedGender === "female"
+        ? savedGender
+        : (await getProfile()).gender;
+    const heightCm =
+      answerNumber(3) ?? (await getProfile()).heightCm;
+    const weightKg =
+      answerNumber(4) ?? (await getProfile()).weightKg;
+    const waistCm =
+      answerNumber(5) ?? (await getProfile()).waistCm;
+    const finalSbp =
+      answerNumber(6) ?? (await getProfile()).systolic;
+    const finalDbp =
+      answerNumber(7) ?? (await getProfile()).diastolic;
+
     /* FAMILY */
 
-    const familyAnswer =
-      answersResult.rows.find(
-        (answer) =>
-          answer.display_order === 8,
-      );
-
     const familyDiabetes =
-      familyAnswer?.answer_value ===
-      "มี";
-
-    /* BP จาก assessment_answers
-       ถ้า profile ไม่มี */
-    const sbpAnswer =
-      answersResult.rows.find(
-        (answer) =>
-          answer.display_order === 6,
-      );
-
-    const dbpAnswer =
-      answersResult.rows.find(
-        (answer) =>
-          answer.display_order === 7,
-      );
-
-    const finalSbp =
-      profileData.systolic ??
-      (sbpAnswer?.answer_value
-        ? Number(
-            sbpAnswer.answer_value,
-          )
-        : null);
-
-    const finalDbp =
-      profileData.diastolic ??
-      (dbpAnswer?.answer_value
-        ? Number(
-            dbpAnswer.answer_value,
-          )
-        : null);
+      answerText(8) === "มี";
 
     /* =====================================================
        RESPONSE
@@ -675,27 +698,23 @@ export async function GET(
         user_id:
           assessment.user_id,
 
-        age:
-          profileData.age,
+        age,
 
-        gender:
-          profileData.gender,
+        gender,
 
         height_cm:
-          profileData.heightCm,
+          heightCm,
 
         weight_kg:
-          profileData.weightKg,
+          weightKg,
 
         bmi:
-          profileData.heightCm &&
-          profileData.weightKg
+          heightCm && weightKg
             ? Number(
                 (
-                  profileData.weightKg /
+                  weightKg /
                   Math.pow(
-                    profileData.heightCm /
-                      100,
+                    heightCm / 100,
                     2,
                   )
                 ).toFixed(2),
@@ -703,7 +722,7 @@ export async function GET(
             : null,
 
         waist_cm:
-          profileData.waistCm,
+          waistCm,
 
         sbp:
           finalSbp,
@@ -758,10 +777,7 @@ export async function GET(
       {
         success: false,
 
-        message:
-          error instanceof Error
-            ? error.message
-            : "ไม่สามารถโหลดผลประเมินได้",
+        message: "ไม่สามารถโหลดผลประเมินได้",
       },
       {
         status: 500,
@@ -777,145 +793,93 @@ export async function GET(
 export async function POST(
   request: Request,
 ) {
+  const body =
+    await readJsonObject(request);
+
+  if (!body) {
+    return badRequest(
+      "รูปแบบข้อมูลไม่ถูกต้อง",
+    );
+  }
+
+  /* =====================================================
+     USER
+     ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  ===================================================== */
+
+  const auth = requireUser(
+    request,
+    body.userId ?? body.user_id,
+  );
+
+  if (!auth.ok) return auth.response;
+
+  const userId = auth.userId;
+
+  /* =====================================================
+     FAMILY
+  ===================================================== */
+
+  if (
+    typeof body.family_diabetes !==
+    "boolean"
+  ) {
+    return badRequest(
+      "กรุณาระบุประวัติเบาหวานในครอบครัว",
+    );
+  }
+
+  const familyDiabetes =
+    body.family_diabetes;
+
+  /* =====================================================
+     BP
+     รับจากหน้า assessment (จำนวนเต็ม mmHg)
+     SBP 60-250, DBP 30-150 และตัวบนต้องสูงกว่าตัวล่าง
+  ===================================================== */
+
+  const submittedSbp =
+    toIntInRange(body.sbp, 60, 250);
+
+  const submittedDbp =
+    toIntInRange(body.dbp, 30, 150);
+
+  if (submittedSbp === null) {
+    return badRequest(
+      "ค่าความดันตัวบน (SBP) ต้องเป็นจำนวนเต็ม 60-250 mmHg",
+    );
+  }
+
+  if (submittedDbp === null) {
+    return badRequest(
+      "ค่าความดันตัวล่าง (DBP) ต้องเป็นจำนวนเต็ม 30-150 mmHg",
+    );
+  }
+
+  if (submittedSbp <= submittedDbp) {
+    return badRequest(
+      "ค่าความดันตัวบนต้องมากกว่าค่าความดันตัวล่าง",
+    );
+  }
+
   const client =
     await pool.connect();
 
   try {
-    const body =
-      (await request.json()) as SubmitBody;
-
-    /* =====================================================
-       USER
-    ===================================================== */
-
-    const userId =
-      Number(
-        body.userId ??
-          body.user_id,
-      );
-
     if (
-      !Number.isInteger(userId) ||
-      userId <= 0
+      !(await userExists(
+        client,
+        userId,
+      ))
     ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "userId ไม่ถูกต้อง",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    /* =====================================================
-       FAMILY
-    ===================================================== */
-
-    if (
-      typeof body.family_diabetes !==
-      "boolean"
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "กรุณาระบุประวัติเบาหวานในครอบครัว",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    /* =====================================================
-       BP
-       
-       สำคัญ:
-       รับจากหน้า assessment
-       ไม่บังคับว่าต้องอยู่ใน health_profile
-    ===================================================== */
-
-    const submittedSbp =
-      Number(body.sbp);
-
-    const submittedDbp =
-      Number(body.dbp);
-
-    if (
-      !Number.isFinite(
-        submittedSbp,
-      ) ||
-      submittedSbp <= 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "กรุณากรอกค่าความดันตัวบน (SBP)",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    if (
-      !Number.isFinite(
-        submittedDbp,
-      ) ||
-      submittedDbp <= 0
-    ) {
-      return NextResponse.json(
-        {
-          success: false,
-          message:
-            "กรุณากรอกค่าความดันตัวล่าง (DBP)",
-        },
-        {
-          status: 400,
-        },
-      );
-    }
-
-    /* =====================================================
-       BEGIN
-    ===================================================== */
-
-    await client.query("BEGIN");
-
-    /* =====================================================
-       USER
-    ===================================================== */
-
-    const userResult =
-      await client.query(
-        `
-        SELECT
-          user_id
-
-        FROM users
-
-        WHERE user_id = $1
-
-        LIMIT 1
-        `,
-        [userId],
-      );
-
-    if (
-      (userResult.rowCount ??
-        0) === 0
-    ) {
-      throw new Error(
-        `ไม่พบผู้ใช้ user_id ${userId}`,
+      return badRequest(
+        "ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่",
       );
     }
 
     /* =====================================================
        PROFILE
+       ข้อมูลไม่ครบ = ผู้ใช้ต้องไปกรอกก่อน (400 ไม่ใช่ 500)
     ===================================================== */
 
     const profileResult =
@@ -942,71 +906,58 @@ export async function POST(
       (profileResult.rowCount ??
         0) === 0
     ) {
-      throw new Error(
+      return badRequest(
         "ไม่พบข้อมูลสุขภาพของผู้ใช้ กรุณากรอกข้อมูลสุขภาพก่อน",
       );
     }
 
-    const profile =
-      profileResult.rows[0]
-        .profile;
-
     const profileData =
       extractHealthProfile(
-        profile,
+        profileResult.rows[0]
+          .profile,
       );
 
-    /* =====================================================
-       VALIDATE REQUIRED PROFILE
-       
-       ไม่ตรวจ SBP/DBP จาก profile
-    ===================================================== */
+    const { age, gender, heightCm, weightKg, waistCm } =
+      profileData;
 
-    if (
-      profileData.age === null
-    ) {
-      throw new Error(
+    if (age === null || age <= 0) {
+      return badRequest(
         "ไม่พบอายุในข้อมูลสุขภาพ",
       );
     }
 
     if (
-      profileData.gender !==
-        "male" &&
-      profileData.gender !==
-        "female"
+      gender !== "male" &&
+      gender !== "female"
     ) {
-      throw new Error(
+      return badRequest(
         "ไม่พบเพศในข้อมูลสุขภาพ",
       );
     }
 
     if (
-      profileData.heightCm ===
-        null ||
-      profileData.heightCm <= 0
+      heightCm === null ||
+      heightCm <= 0
     ) {
-      throw new Error(
+      return badRequest(
         "ไม่พบส่วนสูงในข้อมูลสุขภาพ",
       );
     }
 
     if (
-      profileData.weightKg ===
-        null ||
-      profileData.weightKg <= 0
+      weightKg === null ||
+      weightKg <= 0
     ) {
-      throw new Error(
+      return badRequest(
         "ไม่พบน้ำหนักในข้อมูลสุขภาพ",
       );
     }
 
     if (
-      profileData.waistCm ===
-        null ||
-      profileData.waistCm <= 0
+      waistCm === null ||
+      waistCm <= 0
     ) {
-      throw new Error(
+      return badRequest(
         "ไม่พบรอบเอวในข้อมูลสุขภาพ",
       );
     }
@@ -1097,14 +1048,14 @@ export async function POST(
 
     const result =
       calculateDiabetesRisk(
-        profileData.age,
-        profileData.gender,
-        profileData.heightCm,
-        profileData.weightKg,
-        profileData.waistCm,
+        age,
+        gender,
+        heightCm,
+        weightKg,
+        waistCm,
         systolic,
         diastolic,
-        body.family_diabetes,
+        familyDiabetes,
       );
 
     /* =====================================================
@@ -1135,7 +1086,8 @@ export async function POST(
         `,
         [
           assessmentTypeId,
-          result.riskLevel,
+          RECOMMENDATION_LEVEL[result.riskLevel] ??
+            result.riskLevel,
         ],
       );
 
@@ -1146,6 +1098,8 @@ export async function POST(
     /* =====================================================
        INSERT ASSESSMENT
     ===================================================== */
+
+    await client.query("BEGIN");
 
     const assessmentResult =
       await client.query<{
@@ -1245,33 +1199,33 @@ export async function POST(
     await insertAnswer(
       1,
       String(
-        profileData.age,
+        age,
       ),
     );
 
     await insertAnswer(
       2,
-      profileData.gender,
+      gender,
     );
 
     await insertAnswer(
       3,
       String(
-        profileData.heightCm,
+        heightCm,
       ),
     );
 
     await insertAnswer(
       4,
       String(
-        profileData.weightKg,
+        weightKg,
       ),
     );
 
     await insertAnswer(
       5,
       String(
-        profileData.waistCm,
+        waistCm,
       ),
     );
 
@@ -1287,7 +1241,7 @@ export async function POST(
 
     await insertAnswer(
       8,
-      body.family_diabetes
+      familyDiabetes
         ? "มี"
         : "ไม่มี",
     );
@@ -1317,19 +1271,19 @@ export async function POST(
             userId,
 
           age:
-            profileData.age,
+            age,
 
           gender:
-            profileData.gender,
+            gender,
 
           height_cm:
-            profileData.heightCm,
+            heightCm,
 
           weight_kg:
-            profileData.weightKg,
+            weightKg,
 
           waist_cm:
-            profileData.waistCm,
+            waistCm,
 
           sbp:
             systolic,
@@ -1341,7 +1295,7 @@ export async function POST(
             result.bmi,
 
           family_diabetes:
-            body.family_diabetes,
+            familyDiabetes,
 
           risk_percent:
             result.riskPercent,
@@ -1374,10 +1328,7 @@ export async function POST(
       {
         success: false,
 
-        message:
-          error instanceof Error
-            ? error.message
-            : "ไม่สามารถบันทึกผลประเมินได้",
+        message: "ไม่สามารถบันทึกผลประเมินได้",
       },
       {
         status: 500,

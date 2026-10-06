@@ -83,9 +83,10 @@ export default function ReportsPage() {
     ]);
   };
 
+  // เดือนที่มีการประเมินมากที่สุด (นับเดือนปัจจุบันด้วย แม้ยังไม่ครบเดือน)
   const peak = useMemo(() => {
-    const full = data?.trend.filter((t) => !t.partial) ?? [];
-    return full.length ? full.reduce((a, b) => (b.total > a.total ? b : a)) : null;
+    const all = data?.trend ?? [];
+    return all.length ? all.reduce((a, b) => (b.total > a.total ? b : a)) : null;
   }, [data]);
 
   return (
@@ -161,7 +162,7 @@ export default function ReportsPage() {
           {data && (
             <p className="mt-2 text-sm text-staff-muted">
               รวม {data.totals.assessments.toLocaleString("th-TH")} ครั้ง จากผู้ใช้ {data.totals.users.toLocaleString("th-TH")} คน
-              {peak && peak.total > 0 ? ` · สูงสุดในเดือน ${peak.label} (${peak.total} ครั้ง)` : ""} · ข้อมูลเดือนล่าสุดยังไม่ครบเดือน
+              {peak && peak.total > 0 ? ` · สูงสุดในเดือน ${peak.label} (${peak.total} ครั้ง${peak.partial ? " แม้ยังไม่ครบเดือน" : ""})` : ""} · ข้อมูลเดือนล่าสุดยังไม่ครบเดือน
             </p>
           )}
         </Card>
@@ -213,7 +214,7 @@ export default function ReportsPage() {
                   <th className="py-3 pr-3 text-left font-semibold">แบบประเมิน</th>
                   <th className="px-3 text-right font-semibold">จำนวนครั้ง</th>
                   <th className="px-3 text-right font-semibold">ผู้ใช้</th>
-                  <th className="px-3 text-right font-semibold">ความเสี่ยงสูง</th>
+                  <th className="px-3 text-right font-semibold" title="ร้อยละของผู้ใช้ที่ผลล่าสุดในช่วงนี้อยู่ระดับสูง">ความเสี่ยงสูง*</th>
                   <th className="px-3 text-right font-semibold">เทียบช่วงก่อน</th>
                   <th className="pl-3 text-right font-semibold">ประเมินซ้ำตามรอบ</th>
                 </tr>
@@ -235,6 +236,9 @@ export default function ReportsPage() {
             </table>
           </div>
           <p className="mt-4 flex items-center gap-1.5 text-xs text-staff-muted">
+            * ร้อยละของผู้ใช้ที่ผลล่าสุดในช่วงเวลานี้อยู่ระดับสูง · เทียบช่วงก่อนเป็นส่วนต่างจุดร้อยละ
+          </p>
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-staff-muted">
             <Lock size={13} /> รายงานแสดงเฉพาะข้อมูลรวม กลุ่มที่มีผู้ใช้น้อยกว่า {data?.minGroup ?? 5} คนจะไม่แสดงตัวเลข (–) เพื่อป้องกันการระบุตัวบุคคล
           </p>
         </Card>
@@ -277,7 +281,8 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
   const unit = metric === "total" ? " ครั้ง" : "%";
 
   return (
-    <div className="relative">
+    <div className="overflow-x-auto">
+      <div className="relative min-w-[560px]">
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="กราฟแนวโน้มรายเดือน" onMouseLeave={() => setHover(null)}>
         {ticks.map((t) => (
           <g key={t}>
@@ -328,6 +333,7 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
           </p>
         </div>
       )}
+      </div>
     </div>
   );
 }

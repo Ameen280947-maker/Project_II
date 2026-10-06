@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import {
+  loadActiveChoices,
+  readJsonObject,
+  resolveChoiceAnswers,
+  toId,
+  userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,18 +30,46 @@ type Answer = {
   choice_id: number;
 };
 
+/* หน้าเว็บ 2Q/9Q อ่านข้อความผิดพลาดจาก key "error" จึงส่งทั้ง error และ message */
+function fail(message: string, status = 400) {
+  return NextResponse.json(
+    { success: false, error: message, message },
+    { status }
+  );
+}
+
+/* ตรวจ session แล้วแปลงคำตอบ 401/403 ให้มี key "error" ด้วย */
+async function authorize(request: NextRequest, claimedUserId?: unknown) {
+  const auth = requireUser(request, claimedUserId);
+  if (auth.ok) return { ok: true as const, userId: auth.userId };
+
+  const data = (await auth.response.json()) as { message?: string };
+  return {
+    ok: false as const,
+    response: fail(data.message ?? "กรุณาเข้าสู่ระบบใหม่", auth.response.status),
+  };
+}
+
 /* =========================================================
    GET
    ========================================================= */
 
 export async function GET(request: NextRequest) {
+  const rawStage = request.nextUrl.searchParams.get("stage");
+  const assessmentIdParam = request.nextUrl.searchParams.get("assessmentId");
+
+  // ดูผลการประเมินได้เฉพาะของตัวเอง (?userId= ถ้าส่งมาต้องตรงกับ session)
+  let sessionUserId: number | null = null;
+
+  if (assessmentIdParam) {
+    const auth = await authorize(request, request.nextUrl.searchParams.get("userId"));
+    if (!auth.ok) return auth.response;
+    sessionUserId = auth.userId;
+  }
+
   const client = await pool.connect();
 
   try {
-    const rawStage = request.nextUrl.searchParams.get("stage");
-    const assessmentIdParam = request.nextUrl.searchParams.get("assessmentId");
-    const userId = request.nextUrl.searchParams.get("userId");
-
     /* -----------------------------------------------------
        1. กรณีขอผลการประเมิน (Result / Recommendation)
     ----------------------------------------------------- */
@@ -49,7 +85,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      let sql = `
+      const sql = `
         SELECT
           a.assessment_id,
           a.user_id,
@@ -67,19 +103,15 @@ export async function GET(request: NextRequest) {
           ON r.rec_id = a.recommendation_id
         WHERE a.assessment_id = $1
           AND a.assessment_type_id IN ($2, $3)
+          AND a.user_id = $4
       `;
 
-      const params: any[] = [assessmentId, TYPE_2Q, TYPE_9Q];
-
-      if (userId) {
-        const numericUserId = Number(userId);
-        if (Number.isInteger(numericUserId) && numericUserId > 0) {
-          sql += ` AND a.user_id = $4`;
-          params.push(numericUserId);
-        }
-      }
-
-      const result = await client.query(sql, params);
+      const result = await client.query(sql, [
+        assessmentId,
+        TYPE_2Q,
+        TYPE_9Q,
+        sessionUserId,
+      ]);
 
       if (result.rows.length === 0) {
         return NextResponse.json(
@@ -237,15 +269,7 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("Depression GET error:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "ไม่สามารถโหลดแบบประเมินได้",
-      },
-      { status: 500 }
-    );
+    return fail("ไม่สามารถโหลดแบบประเมินได้", 500);
   } finally {
     client.release();
   }
@@ -256,50 +280,32 @@ export async function GET(request: NextRequest) {
    ========================================================= */
 
 export async function POST(request: NextRequest) {
+  const body = await readJsonObject(request);
+  if (!body) return fail("รูปแบบข้อมูลไม่ถูกต้อง");
+
+  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = await authorize(request, body.userId ?? body.user_id);
+  if (!auth.ok) return auth.response;
+  const numericUserId = auth.userId;
+
+  const stage = body.stage;
+  const answers = body.answers as Answer[] | undefined;
+  const previousAssessmentId = body.previousAssessmentId;
+
+  if (stage !== "2q" && stage !== "9q") {
+    return fail("Stage ไม่ถูกต้อง (ต้องเป็น 2q หรือ 9q)");
+  }
+
+  if (!Array.isArray(answers) || answers.length === 0) {
+    return fail("กรุณาระบุคำตอบให้ครบถ้วน");
+  }
+
   const client = await pool.connect();
   let inTransaction = false;
 
   try {
-    const body = await request.json();
-
-    const {
-      userId,
-      stage,
-      answers,
-      previousAssessmentId,
-    }: {
-      userId: string | number;
-      stage: "2q" | "9q";
-      answers: Answer[];
-      previousAssessmentId?: number | null;
-    } = body;
-
-    const numericUserId = Number(userId);
-    if (!numericUserId || !Number.isInteger(numericUserId) || numericUserId <= 0) {
-      return NextResponse.json(
-        {
-          error: "User ID ไม่ถูกต้อง กรุณาเข้าสู่ระบบก่อนทำแบบประเมิน",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (stage !== "2q" && stage !== "9q") {
-      return NextResponse.json(
-        {
-          error: "Stage ไม่ถูกต้อง (ต้องเป็น 2q หรือ 9q)",
-        },
-        { status: 400 }
-      );
-    }
-
-    if (!Array.isArray(answers) || answers.length === 0) {
-      return NextResponse.json(
-        {
-          error: "กรุณาระบุคำตอบให้ครบถ้วน",
-        },
-        { status: 400 }
-      );
+    if (!(await userExists(client, numericUserId))) {
+      return fail("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
     const assessmentTypeId = stage === "2q" ? TYPE_2Q : TYPE_9Q;
@@ -325,89 +331,34 @@ export async function POST(request: NextRequest) {
     const questions = questionsResult.rows;
 
     if (questions.length === 0) {
-      return NextResponse.json(
-        {
-          error: "ไม่พบคำถามในฐานข้อมูล",
-        },
-        { status: 400 }
-      );
-    }
-
-    /* ตรวจว่าตอบครบทุกข้อที่จำเป็น */
-    const answeredQuestionIds = new Set(
-      answers.map((answer) => Number(answer.question_id))
-    );
-
-    const missingQuestions = questions.filter(
-      (question) =>
-        question.is_required &&
-        !answeredQuestionIds.has(Number(question.question_id))
-    );
-
-    if (missingQuestions.length > 0) {
-      return NextResponse.json(
-        {
-          error: `กรุณาตอบคำถามให้ครบ ${missingQuestions.length} ข้อ`,
-        },
-        { status: 400 }
-      );
+      return fail("ไม่พบคำถามในฐานข้อมูล");
     }
 
     /* -----------------------------------------------------
-       ตรวจ choices และคำนวณคะแนนอย่างปลอดภัย
+       ตรวจ choices และคำนวณคะแนนจากฐานข้อมูล
+       - ต้องตอบครบทุกข้อ ข้อละ 1 คำตอบ (เดิมตอบซ้ำได้ ทำให้คะแนนเกินเต็ม)
+       - ตัวเลือกต้องเป็นของคำถามนั้นในแบบประเมินนี้
     ----------------------------------------------------- */
-    const questionIds = questions.map((question) => question.question_id);
-
-    const choicesResult = await client.query(
-      `
-      SELECT
-        choice_id,
-        question_id,
-        choice_text,
-        score
-      FROM question_choices
-      WHERE question_id = ANY($1::int[])
-        AND is_active = TRUE
-      `,
-      [questionIds]
+    const resolved = resolveChoiceAnswers(
+      await loadActiveChoices(client, assessmentTypeId),
+      answers.map((answer) => ({
+        questionId: answer?.question_id,
+        choiceId: answer?.choice_id ?? null,
+      }))
     );
 
-    let totalScore = 0;
+    if (!resolved.ok) {
+      return fail(resolved.message);
+    }
 
-    const validatedAnswers = answers.map((answer) => {
-      const questionId = Number(answer.question_id);
-      const choiceId = Number(answer.choice_id);
+    const totalScore = resolved.total;
 
-      const question = questions.find(
-        (q) => Number(q.question_id) === questionId
-      );
-
-      if (!question) {
-        throw new Error(`ไม่พบข้อคำถามรหัส ${questionId}`);
-      }
-
-      const choice = choicesResult.rows.find(
-        (c) =>
-          Number(c.question_id) === questionId &&
-          Number(c.choice_id) === choiceId
-      );
-
-      if (!choice) {
-        throw new Error(
-          `ไม่พบตัวเลือกรหัส ${choiceId} ของคำถามข้อที่ ${question.display_order ?? questionId}`
-        );
-      }
-
-      const score = Number(choice.score ?? 0);
-      totalScore += score;
-
-      return {
-        question_id: questionId,
-        choice_id: choiceId,
-        answer_value: choice.choice_text,
-        score,
-      };
-    });
+    const validatedAnswers = resolved.picked.map((choice) => ({
+      question_id: choice.question_id,
+      choice_id: choice.choice_id,
+      answer_value: choice.choice_text,
+      score: choice.score,
+    }));
 
     /* -----------------------------------------------------
        STAGE: 2Q
@@ -506,57 +457,50 @@ export async function POST(request: NextRequest) {
     ----------------------------------------------------- */
     if (stage === "9q") {
       /* ตรวจสอบ previousAssessmentId ถ้ามีส่งมา */
-      if (previousAssessmentId) {
-        const prevId = Number(previousAssessmentId);
-        if (Number.isInteger(prevId) && prevId > 0) {
-          const previousResult = await client.query(
-            `
-            SELECT
-              assessment_id,
-              user_id,
-              assessment_type_id,
-              risk_level,
-              total_score
-            FROM assessment
-            WHERE assessment_id = $1
-              AND assessment_type_id = $2
-            `,
-            [prevId, TYPE_2Q]
+      if (
+        previousAssessmentId !== undefined &&
+        previousAssessmentId !== null &&
+        previousAssessmentId !== ""
+      ) {
+        const prevId = toId(previousAssessmentId);
+
+        if (prevId === null) {
+          return fail("รหัสผลการประเมิน 2Q ไม่ถูกต้อง");
+        }
+
+        const previousResult = await client.query(
+          `
+          SELECT
+            assessment_id,
+            user_id,
+            assessment_type_id,
+            risk_level,
+            total_score
+          FROM assessment
+          WHERE assessment_id = $1
+            AND assessment_type_id = $2
+          `,
+          [prevId, TYPE_2Q]
+        );
+
+        if (previousResult.rows.length === 0) {
+          return fail("ไม่พบผลการประเมิน 2Q ที่เกี่ยวข้อง");
+        }
+
+        const previous = previousResult.rows[0];
+
+        if (Number(previous.user_id) !== numericUserId) {
+          return fail("ไม่สามารถใช้ผลการประเมินของผู้ใช้อื่นได้", 403);
+        }
+
+        const has2QRisk =
+          Number(previous.total_score) > 0 ||
+          String(previous.risk_level).includes("เสี่ยง");
+
+        if (!has2QRisk) {
+          return fail(
+            "ผลประเมิน 2Q ของท่านไม่พบความเสี่ยงภาวะซึมเศร้า ไม่จำเป็นต้องประเมิน 9Q"
           );
-
-          if (previousResult.rows.length === 0) {
-            return NextResponse.json(
-              {
-                error: "ไม่พบผลการประเมิน 2Q ที่เกี่ยวข้อง",
-              },
-              { status: 400 }
-            );
-          }
-
-          const previous = previousResult.rows[0];
-
-          if (Number(previous.user_id) !== numericUserId) {
-            return NextResponse.json(
-              {
-                error: "ไม่สามารถใช้ผลการประเมินของผู้ใช้อื่นได้",
-              },
-              { status: 403 }
-            );
-          }
-
-          const has2QRisk =
-            Number(previous.total_score) > 0 ||
-            String(previous.risk_level).includes("เสี่ยง");
-
-          if (!has2QRisk) {
-            return NextResponse.json(
-              {
-                error:
-                  "ผลประเมิน 2Q ของท่านไม่พบความเสี่ยงภาวะซึมเศร้า ไม่จำเป็นต้องประเมิน 9Q",
-              },
-              { status: 400 }
-            );
-          }
         }
       }
 
@@ -669,15 +613,7 @@ export async function POST(request: NextRequest) {
 
     console.error("Depression POST error:", error);
 
-    return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "ไม่สามารถบันทึกผลการประเมินได้",
-      },
-      { status: 500 }
-    );
+    return fail("ไม่สามารถบันทึกผลการประเมินได้", 500);
   } finally {
     client.release();
   }

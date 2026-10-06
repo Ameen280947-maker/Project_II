@@ -3,13 +3,15 @@
    ใช้ร่วมกันทั้ง API และหน้าเว็บ
 ========================================================= */
 
-export const CASE_STATUSES = ["waiting", "in_progress", "referred", "closed"] as const;
+// ต้องตรงกับ CHECK constraint follow_up_cases_status_check ในฐานข้อมูล
+export const CASE_STATUSES = ["waiting", "progress", "referred", "closed"] as const;
 export type CaseStatus = (typeof CASE_STATUSES)[number];
 
 export const CASE_STATUS_LABEL: Record<CaseStatus, string> = {
   waiting: "รอติดตาม",
-  in_progress: "กำลังติดตาม",
-  referred: "ส่งต่อแพทย์แล้ว",
+  progress: "กำลังติดตาม",
+  // ระบบไม่ได้เชื่อมกับแพทย์/โรงพยาบาล: เจ้าหน้าที่แนะนำให้ผู้ใช้ไปพบแพทย์เอง (ค่า referred คงไว้ตาม constraint ในฐานข้อมูล)
+  referred: "แนะนำให้พบแพทย์แล้ว",
   closed: "ปิดเคส",
 };
 

@@ -54,8 +54,25 @@ export default function RegisterPage() {
       return;
     }
 
-    if (!email.includes("@")) {
+    // ชื่อผู้ใช้ 3-30 ตัวอักษร ไม่มีช่องว่าง (กติกาเดียวกับ API)
+    if (username.length < 3 || username.length > 30) {
+      setError("ชื่อผู้ใช้ต้องมี 3-30 ตัวอักษร");
+      return;
+    }
+
+    if (/\s/.test(username)) {
+      setError("ชื่อผู้ใช้ต้องไม่มีช่องว่าง");
+      return;
+    }
+
+    // ต้องมีโดเมนท้าย เช่น .com .ac.th
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       setError("กรุณากรอกอีเมลให้ถูกต้อง");
+      return;
+    }
+
+    if (!password.trim()) {
+      setError("รหัสผ่านต้องไม่เป็นช่องว่างทั้งหมด");
       return;
     }
 

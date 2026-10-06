@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { riskLevelOf } from "@/lib/riskLevel";
+import { requireUser } from "@/lib/session";
+
+// แบบประเมิน 9Q (ข้อสุดท้าย = คิดทำร้ายตนเอง)
+const TYPE_9Q = 14;
 
 /* =========================================================
    GET DASHBOARD
@@ -9,27 +14,11 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    const userId = searchParams.get("userId");
+    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
+    const auth = requireUser(request, searchParams.get("userId"));
+    if (!auth.ok) return auth.response;
 
-    if (!userId) {
-      return NextResponse.json(
-        {
-          message: "ไม่พบข้อมูลผู้ใช้",
-        },
-        { status: 400 }
-      );
-    }
-
-    const userIdNumber = Number(userId);
-
-    if (!Number.isInteger(userIdNumber)) {
-      return NextResponse.json(
-        {
-          message: "User ID ไม่ถูกต้อง",
-        },
-        { status: 400 }
-      );
-    }
+    const userIdNumber = auth.userId;
 
     /* =====================================================
        ดึงข้อมูลการประเมินของผู้ใช้คนนี้
@@ -49,7 +38,26 @@ export async function GET(request: NextRequest) {
         -- Blood Pressure ไม่ได้เก็บค่าไว้ใน total_score
         -- ค่าความดันอยู่ใน assessment_answers (ข้อ 1 = ตัวบน, ข้อ 2 = ตัวล่าง)
         bp.systolic,
-        bp.diastolic
+        bp.diastolic,
+
+        -- 9Q: ตอบข้อคิดทำร้ายตนเอง (ข้อสุดท้าย) คะแนน > 0 หรือไม่
+        (
+          a.assessment_type_id = $2
+          AND EXISTS (
+            SELECT 1
+            FROM assessment_answers aa
+            JOIN questions q
+              ON q.question_id = aa.question_id
+            WHERE aa.assessment_id = a.assessment_id
+              AND q.assessment_type_id = $2
+              AND q.display_order = (
+                SELECT MAX(q2.display_order)
+                FROM questions q2
+                WHERE q2.assessment_type_id = $2
+              )
+              AND COALESCE(aa.score, 0) > 0
+          )
+        ) AS self_harm_flag
 
       FROM assessment a
 
@@ -78,7 +86,7 @@ export async function GET(request: NextRequest) {
 
       ORDER BY a.assessed_at DESC, a.assessment_id DESC
       `,
-      [userIdNumber]
+      [userIdNumber, TYPE_9Q]
     );
 
     const assessments = result.rows;
@@ -108,16 +116,18 @@ export async function GET(request: NextRequest) {
 
     const riskAssessments = assessments.filter(
       (item) => {
-        const risk = String(
-          item.risk_level || ""
-        ).toLowerCase();
+        // 9Q ที่ตอบข้อคิดทำร้ายตนเอง ถือเป็นความเสี่ยงเสมอ
+        if (item.self_harm_flag) return true;
+
+        // ใช้เกณฑ์เดียวกับหน้า Dashboard (lib/riskLevel.ts)
+        const level = riskLevelOf(
+          item.assessment_name,
+          item.risk_level
+        );
 
         return (
-          risk.includes("สูง") ||
-          risk.includes("เสี่ยง") ||
-          risk.includes("อันตราย") ||
-          risk.includes("ไม่เพียงพอ") ||
-          risk.includes("ไม่มี")
+          level === "mid" ||
+          level === "high"
         );
       }
     ).length;

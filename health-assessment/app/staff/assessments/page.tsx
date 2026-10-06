@@ -429,9 +429,9 @@ function QuestionCard({
 
   return (
     <div className={`rounded-2xl border p-4 transition ${editing ? "border-staff-300 bg-staff-soft" : "border-staff-line"}`}>
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-staff-100 text-sm font-bold text-staff-700">{index + 1}</span>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-[calc(100%-44px)] sm:basis-auto">
           {editing ? (
             <textarea
               value={q.text}
@@ -447,7 +447,7 @@ function QuestionCard({
           )}
           <p className="mt-0.5 text-xs text-staff-muted">{q.type === "number" ? "กรอกเป็นตัวเลข" : `ตัวเลือก ${q.choices.length} ระดับ`}</p>
         </div>
-        <div className="flex shrink-0 gap-1">
+        <div className="ml-11 flex shrink-0 gap-1 sm:ml-0">
           <IconBtn label="เลื่อนขึ้น" disabled={index === 0} onClick={() => onMove(-1)}>
             <ArrowUp size={16} />
           </IconBtn>
@@ -464,7 +464,7 @@ function QuestionCard({
       </div>
 
       {q.type === "choice" && !editing && (
-        <div className="mt-3 flex flex-wrap gap-2 pl-11">
+        <div className="mt-3 flex flex-wrap gap-2 sm:pl-11">
           {q.choices.map((c, j) => (
             <span key={j} className="inline-flex items-center gap-2 rounded-xl bg-staff-bg px-3 py-1.5 text-sm">
               {c.text}
@@ -475,7 +475,7 @@ function QuestionCard({
       )}
 
       {q.type === "choice" && editing && (
-        <div className="mt-3 flex flex-col gap-2 pl-11">
+        <div className="mt-3 flex flex-col gap-2 sm:pl-11">
           {q.choices.map((c, j) => (
             <div key={j} className="flex items-center gap-2">
               <input value={c.text} onChange={(e) => setChoice(j, { text: e.target.value })} aria-label={`ตัวเลือกที่ ${j + 1}`} placeholder="ข้อความตัวเลือก" className={`${inputCls} bg-white`} />

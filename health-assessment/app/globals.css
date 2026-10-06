@@ -95,3 +95,11 @@ input[type="range"] {
   .staff-no-print { display: none !important; }
   body { background: white !important; }
 }
+
+/* แถบเมนูด้านบนบนมือถือ (app/components/Sidebar.tsx) เป็น fixed
+   เว้นที่ด้านบนของหน้าให้เท่าความสูงแถบ (h-14 = 3.5rem) เฉพาะจอแคบกว่า lg */
+@media (max-width: 1023.98px) {
+  body:has(.mobile-topbar) {
+    padding-top: 3.5rem;
+  }
+}

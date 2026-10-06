@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Sidebar from "@/app/components/Sidebar";
 
@@ -10,6 +10,8 @@ import {
     CheckCircle2,
     Brain,
     CalendarDays,
+    Phone,
+    AlertTriangle,
 } from "lucide-react";
 
 /* =========================================================
@@ -39,6 +41,7 @@ type AssessmentData = {
 
 function StressRecommendationContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
 
     const assessmentId = searchParams.get("assessmentId");
 
@@ -74,6 +77,13 @@ function StressRecommendationContent() {
                     },
                 );
 
+                // session หมดอายุ → กลับไปหน้า login
+                if (response.status === 401) {
+                    localStorage.removeItem("userId");
+                    router.replace("/login");
+                    return;
+                }
+
                 const result = await response.json();
 
                 if (
@@ -101,7 +111,7 @@ function StressRecommendationContent() {
         };
 
         loadResult();
-    }, [assessmentId]);
+    }, [assessmentId, router]);
 
     /* =======================================================
        COLOR / LEVEL STYLE
@@ -207,6 +217,16 @@ function StressRecommendationContent() {
         getLevelStyle(
             data.interpretation,
         );
+
+    /* =======================================================
+       ช่องทางช่วยเหลือ (ตามเกณฑ์ ST-5 กรมสุขภาพจิต)
+       8-9  เครียดมาก     → ควรพบแพทย์ภายใน 2 สัปดาห์
+       10-15 เครียดมากที่สุด → ต้องพบแพทย์ทันที
+    ======================================================= */
+
+    const score = Number(data.score);
+    const needsHelp = score >= 8;
+    const isSevere = score >= 10;
 
     /* =======================================================
        DATE
@@ -369,6 +389,46 @@ function StressRecommendationContent() {
                             </div>
                         </article>
                     </div>
+
+                    {/* =================================================
+                       HELP BOX (คะแนน 8 ขึ้นไป)
+                    ================================================= */}
+
+                    {needsHelp && (
+                        <div className="mt-6 rounded-[24px] border border-[#f4c9c2] bg-[#fff0ed] px-6 py-5">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                                <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#ffe1db] text-[#e83a24]">
+                                    <AlertTriangle
+                                        size={23}
+                                        strokeWidth={1.8}
+                                    />
+                                </div>
+
+                                <div className="flex-1">
+                                    <h3 className="font-bold text-[#c2321f]">
+                                        {isSevere
+                                            ? "เครียดมากที่สุด ต้องพบแพทย์ทันที"
+                                            : "เครียดมาก ควรพบแพทย์ภายใน 2 สัปดาห์"}
+                                    </h3>
+
+                                    <p className="mt-1 text-sm leading-6 text-[#7a4a43]">
+                                        {isSevere
+                                            ? "ความเครียดระดับนี้ต้องได้รับการดูแลจากแพทย์โดยเร็ว กรุณาไปพบแพทย์ที่สถานพยาบาลใกล้บ้านทันที"
+                                            : "ความเครียดระดับนี้ควรได้รับคำปรึกษาจากแพทย์ กรุณานัดพบแพทย์ที่สถานพยาบาลใกล้บ้านภายใน 2 สัปดาห์"}
+                                        {" "}หากรู้สึกไม่ไหวหรือต้องการคนรับฟัง โทรสายด่วนสุขภาพจิต 1323 ได้ฟรีตลอด 24 ชั่วโมง
+                                    </p>
+                                </div>
+
+                                <a
+                                    href="tel:1323"
+                                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-2xl bg-[#e83a24] px-5 py-3 font-semibold text-white transition hover:bg-[#c2321f]"
+                                >
+                                    <Phone size={18} />
+                                    โทร 1323
+                                </a>
+                            </div>
+                        </div>
+                    )}
 
                     {/* =================================================
                        DISCLAIMER

@@ -27,6 +27,16 @@ export const TYPE_LABELS: Record<string, string> = {
 
 export const typeLabel = (name: string) => TYPE_LABELS[name] ?? name;
 
+// ค่าผลที่เก็บเป็นภาษาอังกฤษในตาราง assessment → ข้อความไทยสำหรับแสดงผล
+const RISK_TEXT: Record<string, Record<string, string>> = {
+  "Diabetes TDS": { low: "เสี่ยงน้อย", moderate: "เสี่ยงปานกลาง", high: "เสี่ยงสูง", very_high: "เสี่ยงสูงมาก" },
+};
+
+export const riskLabel = (assessmentName: string, riskLevel: string | null | undefined) => {
+  const risk = String(riskLevel ?? "").trim();
+  return RISK_TEXT[assessmentName]?.[risk] ?? (risk || "-");
+};
+
 // ค่า risk_level → severity แยกตามแบบประเมิน (ตรงกับข้อมูลจริง)
 const MAP: Record<string, Record<string, Severity>> = {
   "9Q": {
@@ -57,7 +67,11 @@ const MAP: Record<string, Record<string, Severity>> = {
     high: 2, "เสี่ยงสูง": 2,
     very_high: 3, "เสี่ยงสูงมาก": 3,
   },
-  Smoking: { "ติดนิโคตินระดับต่ำ": 1, "ติดนิโคตินระดับปานกลาง": 1, "ติดนิโคตินระดับสูง": 2 },
+  // ระดับเดิม (ติดนิโคติน…) ยังอยู่ในประวัติเก่า ระดับใหม่ตามเอกสารอ้างอิงตารางที่ 14
+  Smoking: {
+    "ติดนิโคตินระดับต่ำ": 1, "ติดนิโคตินระดับปานกลาง": 1, "ติดนิโคตินระดับสูง": 2,
+    "เสี่ยงต่ำ": 0, "เสี่ยงปานกลาง": 1, "เสี่ยงสูง": 2,
+  },
   Alcohol: {
     "ไม่เคยดื่ม": 0, "ไม่เคยดื่มตลอดชีวิต": 0,
     "หยุดดื่มแล้ว": 0, "เคยดื่มแต่หยุดดื่มมาแล้ว 1 ปีขึ้นไป": 0,
@@ -66,7 +80,7 @@ const MAP: Record<string, Record<string, Severity>> = {
   },
   "Physical Activity": { "เพียงพอ": 0, "ไม่เพียงพอ": 1, "ไม่มีกิจกรรมทางกาย": 2 },
   Sleep: { "เพียงพอ": 0, "ไม่เพียงพอ": 1, "เสี่ยงสูง": 2 },
-  Diet: { "ควรใส่ใจ": 1, "ควรปรับพฤติกรรมมาก": 2 },
+  Diet: { "พฤติกรรมเหมาะสม": 0, "ควรใส่ใจ": 1, "ควรปรับพฤติกรรม": 1, "ควรปรับพฤติกรรมมาก": 2 },
 };
 
 // สำรองกรณีเจอค่าที่ยังไม่อยู่ในตาราง MAP (เช็คคำเชิงลบก่อนเสมอ)

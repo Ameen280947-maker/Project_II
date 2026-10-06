@@ -19,6 +19,11 @@ type Result = {
   recommendation_text: string;
   assessed_at: string;
   answers: Answer[];
+  sedentary?: {
+    score: number;
+    risk_level: string;
+    recommendation_text: string | null;
+  } | null;
 };
 
 /* =========================================================
@@ -318,6 +323,13 @@ function PhysicalActivityResultContent() {
           }
         );
 
+        // session หมดอายุ → กลับไปหน้า login
+        if (response.status === 401) {
+          localStorage.removeItem("userId");
+          router.replace("/login");
+          return;
+        }
+
         const data = await response.json();
 
         if (!response.ok) {
@@ -342,7 +354,7 @@ function PhysicalActivityResultContent() {
     };
 
     loadResult();
-  }, [assessmentId]);
+  }, [assessmentId, router]);
 
   /* =========================================================
      LOADING
@@ -438,13 +450,27 @@ function PhysicalActivityResultContent() {
     : "-";
 
   /* =========================================================
-     MAX SCORE
-     
-     Physical Activity มี 2 ข้อ
-     คะแนนสูงสุดข้อ ละ 3 คะแนน
+     SCORE
+
+     เอกสารอ้างอิงแปลผลกิจกรรมทางกายจากข้อ 1 (ตารางที่ 18) เต็ม 3 คะแนน
+     ใช้คะแนนจากคำตอบข้อแรก เพราะผลเก่าบันทึก total_score เป็นผลรวม 2 ข้อ
   ========================================================= */
 
-  const maxScore = 6;
+  const maxScore = 3;
+
+  const activityScore =
+    result.answers[0]?.answer_score ??
+    result.total_score;
+
+  /* สีพฤติกรรมเนือยนิ่งตามตารางที่ 20: ปกติ เขียว / เสี่ยงปานกลาง เหลือง / เสี่ยงสูง แดง */
+  const sedentary = result.sedentary;
+
+  const sedentaryColor =
+    sedentary?.risk_level === "เสี่ยงสูง"
+      ? { color: "#b91c2b", bg: "#fff0f1" }
+      : sedentary?.risk_level === "เสี่ยงปานกลาง"
+        ? { color: "#c48a32", bg: "#fff7e8" }
+        : { color: "#6d9b6b", bg: "#edf7e9" };
 
   /* =========================================================
      MAIN UI
@@ -513,7 +539,7 @@ function PhysicalActivityResultContent() {
                 </>
               }
               onClick={() =>
-                router.push("/assessment")
+                router.push("/assessment-type")
               }
             />
 
@@ -530,7 +556,7 @@ function PhysicalActivityResultContent() {
               label="ประวัติการประเมิน"
               onClick={() =>
                 router.push(
-                  "/assessment-history"
+                  "/history"
                 )
               }
             />
@@ -540,7 +566,7 @@ function PhysicalActivityResultContent() {
               label="คำแนะนำสุขภาพ"
               onClick={() =>
                 router.push(
-                  "/recommendation"
+                  "/recommendation-health"
                 )
               }
             />
@@ -561,9 +587,18 @@ function PhysicalActivityResultContent() {
 
             <button
               type="button"
-              onClick={() => {
-                localStorage.removeItem("userId");
-                router.push("/login");
+              onClick={async () => {
+                // ลบ session cookie ฝั่ง server ก่อน (ถ้าเรียกไม่สำเร็จก็ยังออกจากระบบในเครื่องต่อ)
+                try {
+                  await fetch("/api/auth/logout", { method: "POST" });
+                } catch {
+                  /* ignore */
+                }
+                // ลบข้อมูลผู้ใช้ในเครื่อง (key เดียวกับ Sidebar)
+                for (const key of ["userId", "username", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"]) {
+                  localStorage.removeItem(key);
+                }
+                router.replace("/login");
               }}
               className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl bg-[#fff0f1] text-[#b91c2b] font-medium hover:bg-[#ffe5e7] transition"
             >
@@ -638,7 +673,7 @@ function PhysicalActivityResultContent() {
                 {/* Label */}
 
                 <p className="text-[15px] font-semibold text-[#6a6a6d]">
-                  คะแนนรวม
+                  คะแนนกิจกรรมทางกาย
                 </p>
 
                 {/* Score */}
@@ -646,7 +681,7 @@ function PhysicalActivityResultContent() {
                 <div className="flex items-baseline gap-2 mt-2">
 
                   <span className="text-[60px] leading-none font-bold text-[#292a2e]">
-                    {result.total_score}
+                    {activityScore}
                   </span>
 
                   <span className="text-[19px] text-[#888]">
@@ -721,6 +756,50 @@ function PhysicalActivityResultContent() {
             </div>
 
             {/* =================================================
+                SEDENTARY (ตารางที่ 20)
+            ================================================= */}
+
+            {sedentary && (
+              <div className="mt-7 bg-white rounded-[28px] border border-[#e9e7e4] shadow-[0_4px_20px_rgba(0,0,0,0.025)] px-8 md:px-10 py-8">
+
+                <div className="flex flex-wrap items-center justify-between gap-4">
+
+                  <div>
+                    <h2 className="text-[22px] font-bold text-[#343539]">
+                      พฤติกรรมเนือยนิ่ง
+                    </h2>
+
+                    <p className="text-[14px] text-[#999] mt-1">
+                      นั่งหรือเอนกายต่อเนื่อง 2 ชั่วโมงขึ้นไป · {sedentary.score} คะแนน
+                    </p>
+                  </div>
+
+                  <div
+                    className="px-6 py-2.5 rounded-full font-semibold text-[16px]"
+                    style={{
+                      backgroundColor: sedentaryColor.bg,
+                      color: sedentaryColor.color,
+                    }}
+                  >
+                    {sedentary.risk_level}
+                  </div>
+
+                </div>
+
+                <p
+                  className="mt-6 rounded-2xl px-5 py-5 text-[15px] md:text-[16px] leading-7 text-[#55565b] whitespace-pre-line"
+                  style={{
+                    backgroundColor: sedentaryColor.bg,
+                  }}
+                >
+                  {sedentary.recommendation_text ||
+                    "ไม่พบคำแนะนำในฐานข้อมูล"}
+                </p>
+
+              </div>
+            )}
+
+            {/* =================================================
                 NOTE
             ================================================= */}
 
@@ -761,7 +840,7 @@ function PhysicalActivityResultContent() {
                 type="button"
                 onClick={() =>
                   router.push(
-                    "/assessment-history"
+                    "/history"
                   )
                 }
                 className="px-7 py-4 rounded-2xl border border-[#e4e0dc] bg-white text-[#55565b] font-semibold text-[15px] hover:bg-[#fafafa] transition"

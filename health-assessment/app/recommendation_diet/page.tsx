@@ -101,6 +101,13 @@ function DietRecommendationContent() {
           },
         );
 
+        // session หมดอายุ → กลับไปหน้า login
+        if (response.status === 401) {
+          localStorage.removeItem("userId");
+          window.location.replace("/login");
+          return;
+        }
+
         const result =
           (await response.json()) as ResultResponse;
 
@@ -469,52 +476,23 @@ function DomainCard({
 
   const level = result.level;
 
-  const isWarning =
-    level === "ปานกลาง";
-
-  const isDanger =
-    level === "สูง" ||
-    level === "สูงมาก";
-
   /*
-   * สำหรับ "ผัก"
-   * ระดับสูง / สูงมาก = ผลดี
-   *
-   * สำหรับด้านอื่น
-   * ระดับสูง / สูงมาก = ควรระวัง
+   * สีตามตารางที่ 24 ของเอกสารอ้างอิง (0 = เขียว ... 3 = แดง)
+   * ผัก: สูงมาก เขียว / สูง เหลือง / ปานกลาง ส้ม / น้อย แดง
+   * ด้านอื่น: ต่ำ เขียว / ปานกลาง เหลือง / สูง ส้ม / สูงมาก แดง
    */
 
-  const isVegetableGood =
-    title === "ผัก" &&
-    (level === "สูง" ||
-      level === "สูงมาก");
+  const tier =
+    title === "ผัก"
+      ? ({ สูงมาก: 0, สูง: 1, ปานกลาง: 2, น้อย: 3 } as Record<string, number>)[level] ?? 0
+      : ({ ต่ำ: 0, ปานกลาง: 1, สูง: 2, สูงมาก: 3 } as Record<string, number>)[level] ?? 0;
 
-  let box =
-    "bg-[#eef9e9] text-[#57965c]";
-
-  /* ผักระดับสูง/สูงมาก = ดี */
-
-  if (isVegetableGood) {
-    box =
-      "bg-[#eef9e9] text-[#57965c]";
-  }
-
-  /* ระดับปานกลาง */
-
-  if (isWarning) {
-    box =
-      "bg-[#fff8e8] text-[#a77723]";
-  }
-
-  /* ระดับสูง/สูงมาก ของด้านอื่น = อันตราย */
-
-  if (
-    isDanger &&
-    !isVegetableGood
-  ) {
-    box =
-      "bg-[#fff0f2] text-[#b91c2b]";
-  }
+  const box = [
+    "bg-[#eef9e9] text-[#57965c]",
+    "bg-[#fff8e8] text-[#a77723]",
+    "bg-[#fff1e3] text-[#c2620c]",
+    "bg-[#fff0f2] text-[#b91c2b]",
+  ][tier];
 
   return (
     <article className="rounded-2xl border border-[#eee5e6] bg-[#fcfbfb] p-4">

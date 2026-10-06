@@ -33,6 +33,16 @@ type Result = {
   assessedAt: string;
 };
 
+const NOT_FOUND_TEXT = "ไม่พบแบบประเมินนี้ หรือยังไม่เปิดให้ใช้งาน";
+
+// session หมดอายุ → ล้างข้อมูลแล้วกลับไปหน้า login
+const toLoginOn401 = (res: Response, router: ReturnType<typeof useRouter>) => {
+  if (res.status !== 401) return false;
+  localStorage.removeItem("userId");
+  router.replace("/login");
+  return true;
+};
+
 const SEV_STYLE = [
   { box: "bg-[#eef8e9] border-[#d6ecd0]", text: "text-[#3f7f45]" },
   { box: "bg-[#fff8e8] border-[#f6e2b4]", text: "text-[#a77723]" },
@@ -61,6 +71,10 @@ function Content() {
   const params = useParams<{ id: string }>();
   const resultId = Number(useSearchParams().get("result")) || null;
   const typeId = Number(params.id);
+  // id ที่ไม่ใช่ตัวเลข (เช่น /assessment/abc) → แสดงข้อความเดียวกับ id ที่ไม่มีในระบบ
+  if (!Number.isInteger(typeId) || typeId <= 0) {
+    return <Message text={NOT_FOUND_TEXT} />;
+  }
   return resultId ? <ResultView key={resultId} assessmentId={resultId} typeId={typeId} /> : <Form key={typeId} typeId={typeId} />;
 }
 
@@ -78,10 +92,14 @@ function Form({ typeId }: { typeId: number }) {
 
   useEffect(() => {
     fetch(`/api/assessments/custom?type=${typeId}`, { cache: "no-store" })
-      .then((r) => r.json())
-      .then((d) => (d.success ? setData(d.assessment) : setLoadError(d.message)))
+      .then((r) => (toLoginOn401(r, router) ? null : r.json()))
+      .then((d) => {
+        if (!d) return;
+        if (d.success && d.assessment) setData(d.assessment);
+        else setLoadError(d.message || NOT_FOUND_TEXT);
+      })
       .catch(() => setLoadError("โหลดแบบประเมินไม่สำเร็จ"));
-  }, [typeId]);
+  }, [typeId, router]);
 
   const answered = data ? data.questions.filter((q) => answers[q.id]).length : 0;
 
@@ -198,16 +216,21 @@ function Form({ typeId }: { typeId: number }) {
 ========================================================= */
 
 function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: number }) {
+  const router = useRouter();
   const [r, setR] = useState<Result | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     const userId = localStorage.getItem("userId") ?? "";
     fetch(`/api/assessments/custom?assessmentId=${assessmentId}&userId=${userId}`, { cache: "no-store" })
-      .then((res) => res.json())
-      .then((d) => (d.success ? setR(d.result) : setError(d.message)))
+      .then((res) => (toLoginOn401(res, router) ? null : res.json()))
+      .then((d) => {
+        if (!d) return;
+        if (d.success) setR(d.result);
+        else setError(d.message || "ไม่พบผลการประเมิน");
+      })
       .catch(() => setError("โหลดผลการประเมินไม่สำเร็จ"));
-  }, [assessmentId]);
+  }, [assessmentId, router]);
 
   if (error) return <Message text={error} />;
   if (!r) return <Spinner />;

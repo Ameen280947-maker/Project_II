@@ -1,21 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Pool } from "pg";
 import crypto from "crypto";
+import pool from "@/lib/db";
+import {
+  isMailerConfigured,
+  OTP_VALID_MINUTES,
+  sendOtpEmail,
+} from "@/lib/mailer";
+import { otpRateLimits } from "@/lib/rateLimit";
 
-/* =========================================================
-   DATABASE
-========================================================= */
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-
-  ssl:
-    process.env.NODE_ENV === "production"
-      ? {
-          rejectUnauthorized: false,
-        }
-      : undefined,
-});
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
 /* =========================================================
    TYPES
@@ -38,6 +32,26 @@ function generateOtp() {
 ========================================================= */
 
 export async function POST(request: NextRequest) {
+  /*
+    Production ต้องตั้งค่า Gmail ก่อน
+    ตรวจก่อนค้นหา user เพื่อให้ตอบเหมือนกันทุกอีเมล
+  */
+  const mailerReady = isMailerConfigured();
+
+  if (!mailerReady && process.env.NODE_ENV === "production") {
+    console.error("FORGOT PASSWORD: ยังไม่ได้ตั้งค่า GMAIL_USER / GMAIL_APP_PASSWORD");
+
+    return NextResponse.json(
+      {
+        success: false,
+        message: "ระบบส่งอีเมลยังไม่พร้อมใช้งาน กรุณาติดต่อเจ้าหน้าที่",
+      },
+      {
+        status: 503,
+      },
+    );
+  }
+
   const client = await pool.connect();
 
   try {
@@ -65,7 +79,7 @@ export async function POST(request: NextRequest) {
        2. ตรวจรูปแบบ Email
     ===================================================== */
 
-    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
     if (!emailPattern.test(email)) {
       return NextResponse.json(
@@ -78,6 +92,28 @@ export async function POST(request: NextRequest) {
         },
       );
     }
+
+    /* =====================================================
+       2.1 จำกัดจำนวนครั้ง: 3 ครั้ง / อีเมล / 15 นาที
+
+       นับทุกคำขอ รวมถึงอีเมลที่ไม่มีในระบบ
+       เพื่อไม่ให้ใช้ความต่างของคำตอบเดาว่าใครมีบัญชี
+    ===================================================== */
+
+    if (otpRateLimits.forgotPassword.isLimited(email)) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "ขอรหัส OTP บ่อยเกินไป กรุณารอประมาณ 15 นาทีแล้วลองใหม่อีกครั้ง",
+        },
+        {
+          status: 429,
+        },
+      );
+    }
+
+    otpRateLimits.forgotPassword.hit(email);
 
     /* =====================================================
        3. ค้นหา User จาก Database
@@ -132,7 +168,7 @@ export async function POST(request: NextRequest) {
       OTP ใช้ได้ 10 นาที
     */
 
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + OTP_VALID_MINUTES * 60 * 1000);
 
     /* =====================================================
        5. Hash OTP ก่อนเก็บ Database
@@ -193,36 +229,59 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT");
 
+    // OTP ใหม่ → เริ่มนับการกรอกผิดใหม่
+    otpRateLimits.verifyOtpFailures.reset(email);
+
     /* =====================================================
-       7. ส่ง Email
+       7. ส่ง Email (Gmail SMTP)
 
-       ตอนนี้ยังไม่ได้เชื่อม Email Provider
-
-       สำหรับ Development ให้ดู OTP
-       ใน Terminal ของ Next.js ก่อน
+       ยังไม่ได้ตั้งค่า Gmail และไม่ใช่ production
+       → แสดง OTP ใน Terminal และส่ง devOtp กลับไปให้ทดสอบ
+       ตั้งค่า Gmail แล้ว → ส่งอีเมลจริงเท่านั้น ไม่ส่ง OTP กลับ Frontend
     ===================================================== */
 
-    if (process.env.NODE_ENV !== "production") {
+    if (!mailerReady) {
       console.log("====================================");
-      console.log("PASSWORD RESET OTP");
+      console.log("PASSWORD RESET OTP (DEV: ยังไม่ได้ตั้งค่า Gmail)");
       console.log("------------------------------------");
       console.log("User ID :", userId);
       console.log("Email   :", email);
       console.log("OTP     :", otp);
       console.log("Expire  :", expiresAt);
       console.log("====================================");
+
+      return NextResponse.json(
+        {
+          success: true,
+
+          message:
+            "เราได้ส่งรหัสยืนยันสำหรับตั้งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว",
+
+          // DEV ONLY: ใช้ทดสอบเมื่อยังไม่ได้ตั้งค่า Gmail
+          devOtp: otp,
+        },
+        {
+          status: 200,
+        },
+      );
     }
 
-    /*
-      ภายหลังสามารถเพิ่มการส่ง Email จริงตรงนี้
+    try {
+      await sendOtpEmail(email, otp);
+    } catch (mailError) {
+      console.error("FORGOT PASSWORD SEND EMAIL ERROR:", mailError);
 
-      เช่น:
-      - Resend
-      - Nodemailer
-      - SendGrid
-
-      ห้ามส่ง OTP กลับ Frontend ใน Production
-    */
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "ไม่สามารถส่งอีเมลได้ในขณะนี้ กรุณาลองใหม่อีกครั้ง",
+        },
+        {
+          status: 502,
+        },
+      );
+    }
 
     /* =====================================================
        8. Response
@@ -234,20 +293,6 @@ export async function POST(request: NextRequest) {
 
         message:
           "เราได้ส่งรหัสยืนยันสำหรับตั้งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว",
-
-        /*
-          DEV ONLY
-
-          เอาไว้ทดสอบระบบก่อนมี Email Provider
-
-          Production จะไม่ส่ง OTP ออกไป
-        */
-
-        ...(process.env.NODE_ENV !== "production"
-          ? {
-              devOtp: otp,
-            }
-          : {}),
       },
       {
         status: 200,

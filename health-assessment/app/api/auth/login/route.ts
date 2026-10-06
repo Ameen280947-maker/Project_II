@@ -5,6 +5,7 @@ import {
 
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
+import { setSessionCookie } from "@/lib/session";
 
 export const runtime = "nodejs";
 
@@ -45,11 +46,14 @@ export async function POST(
 
     /* =========================
        หา User
+
+       1) ตรงตัวพิมพ์ก่อน
+       2) ไม่เจอ → เทียบแบบไม่สนตัวพิมพ์
+          ใช้ได้เฉพาะเมื่อเจอบัญชีเดียว
+          (กันกรณีบัญชีเก่ามีชื่อซ้ำกันต่างแค่ตัวพิมพ์)
     ========================= */
 
-    const result =
-      await pool.query(
-        `
+    const userSelect = `
         SELECT
           u.user_id,
           u.username,
@@ -63,17 +67,35 @@ export async function POST(
 
         LEFT JOIN roles r
           ON r.role_id = u.role_id
+    `;
 
+    let result =
+      await pool.query(
+        `${userSelect}
         WHERE u.username = $1
-
         LIMIT 1
         `,
         [username],
       );
 
+    if ((result.rowCount ?? 0) === 0) {
+      const caseInsensitive =
+        await pool.query(
+          `${userSelect}
+          WHERE LOWER(u.username) = LOWER($1)
+          LIMIT 2
+          `,
+          [username],
+        );
+
+      if ((caseInsensitive.rowCount ?? 0) === 1) {
+        result = caseInsensitive;
+      }
+    }
+
     if (
-      (result.rowCount ?? 0) ===
-      0
+      (result.rowCount ?? 0) !==
+      1
     ) {
       return NextResponse.json(
         {
@@ -155,7 +177,7 @@ export async function POST(
        Login สำเร็จ
     ========================= */
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       success: true,
 
       message:
@@ -195,6 +217,18 @@ export async function POST(
             : null,
       },
     });
+
+    // ตั้ง session cookie (HttpOnly) ให้ API ใช้ระบุตัวผู้ใช้
+    setSessionCookie(response, {
+      userId: Number(user.user_id),
+      roleId:
+        user.role_id === null ||
+        user.role_id === undefined
+          ? null
+          : Number(user.role_id),
+    });
+
+    return response;
   } catch (error) {
     console.error(
       "LOGIN API ERROR:",

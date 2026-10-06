@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { requireUser } from "@/lib/session";
+import {
+  badRequest,
+  loadActiveChoices,
+  readJsonObject,
+  resolveChoiceAnswers,
+  userExists,
+} from "../_lib/validate";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,12 +15,6 @@ export const dynamic = "force-dynamic";
 /* =========================================================
    TYPES
 ========================================================= */
-
-type SubmitBody = {
-  userId?: number;
-  user_id?: number;
-  answers: Record<string | number, string>;
-};
 
 /* =========================================================
    GET
@@ -29,6 +31,9 @@ export async function GET(request: NextRequest) {
        CASE 1: ดึงผลการประเมินจาก assessmentId
     ----------------------------------------------------- */
     if (assessmentIdParam) {
+      const auth = requireUser(request);
+      if (!auth.ok) return auth.response;
+
       const assessmentId = Number(assessmentIdParam);
 
       if (!Number.isInteger(assessmentId) || assessmentId <= 0) {
@@ -60,10 +65,11 @@ export async function GET(request: NextRequest) {
         LEFT JOIN recommendation r
           ON r.rec_id = a.recommendation_id
         WHERE a.assessment_id = $1
+          AND a.user_id = $2
           AND t.assessment_name = 'Smoking'
         LIMIT 1
         `,
-        [assessmentId]
+        [assessmentId, auth.userId]
       );
 
       if (assessmentResult.rowCount === 0) {
@@ -188,112 +194,68 @@ export async function GET(request: NextRequest) {
 ========================================================= */
 
 export async function POST(request: NextRequest) {
+  const body = await readJsonObject(request);
+  if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
+
+  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
+  const auth = requireUser(request, body.userId ?? body.user_id);
+  if (!auth.ok) return auth.response;
+  const userId = auth.userId;
+
+  // รูปแบบเดิม: { [question_id]: ข้อความตัวเลือก }
+  const answers = body.answers;
+
+  if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
+    return badRequest("ไม่พบคำตอบแบบประเมิน");
+  }
+
   const client = await pool.connect();
 
   try {
-    const body = (await request.json()) as SubmitBody;
-
-    const rawUserId = body.userId ?? body.user_id;
-    const userId = Number(rawUserId);
-
-    if (!Number.isInteger(userId) || userId <= 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ไม่พบข้อมูลผู้ใช้งานที่ถูกต้อง",
-        },
-        { status: 400 }
-      );
+    if (!(await userExists(client, userId))) {
+      return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
-    const answers = body.answers;
-
-    if (!answers || typeof answers !== "object") {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "ไม่พบคำตอบแบบประเมิน",
-        },
-        { status: 400 }
-      );
-    }
-
-    // ดึงตัวเลือกและคะแนนของคำถามสูบบุหรี่ (assessment_type_id = 6)
-    const choicesResult = await client.query(
-      `
-      SELECT
-        qc.choice_id,
-        qc.question_id,
-        qc.choice_text,
-        qc.score
-      FROM question_choices qc
-      INNER JOIN questions q
-        ON q.question_id = qc.question_id
-      WHERE q.assessment_type_id = 6
-        AND qc.is_active = true
-      `
-    );
-
-    const choicesRows = choicesResult.rows as Array<{
-      choice_id: number;
-      question_id: number;
-      choice_text: string;
-      score: number;
-    }>;
-
-    const questionIds = Object.keys(answers)
-      .map(Number)
-      .filter((id) => Number.isInteger(id) && id > 0);
-
-    if (questionIds.length === 0) {
-      return NextResponse.json(
-        {
-          success: false,
-          message: "กรุณาตอบคำถามอย่างน้อย 1 ข้อ",
-        },
-        { status: 400 }
-      );
-    }
-
-    let totalScore = 0;
-    const answersToInsert: Array<{
-      question_id: number;
-      choice_id: number | null;
-      answer_value: string;
-      score: number;
-    }> = [];
-
-    for (const questionId of questionIds) {
-      const selectedAnswer = String(answers[questionId] ?? "").trim();
-
-      const matchedChoice = choicesRows.find(
-        (c) =>
-          c.question_id === questionId &&
-          c.choice_text.trim() === selectedAnswer
-      );
-
-      const score = matchedChoice ? Number(matchedChoice.score) : 0;
-      totalScore += score;
-
-      answersToInsert.push({
-        question_id: questionId,
-        choice_id: matchedChoice?.choice_id ?? null,
-        answer_value: selectedAnswer,
-        score,
-      });
-    }
+    // ตัวเลือกและคะแนนของคำถามสูบบุหรี่ (assessment_type_id = 6)
+    const choicesRows = await loadActiveChoices(client, 6);
 
     /*
-     * การแปลผลระดับการติดนิโคติน (HSI Index):
-     * 0-2 คะแนน: ติดนิโคตินระดับต่ำ
-     * 3-4 คะแนน: ติดนิโคตินระดับปานกลาง
-     * 5-6 คะแนน: ติดนิโคตินระดับสูง
+      เอกสารอ้างอิงคิดคะแนนรวมจากข้อ 1-4 จึงต้องตอบครบทุกข้อ
+      ด้วยข้อความตัวเลือกที่มีอยู่จริง (คะแนนดึงจากฐานข้อมูล)
+    */
+    const resolved = resolveChoiceAnswers(
+      choicesRows,
+      Object.entries(answers as Record<string, unknown>).map(
+        ([questionId, choiceText]) => ({
+          questionId,
+          choiceText: typeof choiceText === "string" ? choiceText : null,
+        }),
+      ),
+    );
+
+    if (!resolved.ok) {
+      return badRequest(resolved.message);
+    }
+
+    const totalScore = resolved.total;
+    const answersToInsert = resolved.picked.map((choice) => ({
+      question_id: choice.question_id,
+      choice_id: choice.choice_id,
+      answer_value: choice.choice_text,
+      score: choice.score,
+    }));
+
+    /*
+     * การแปลผลตามเอกสารอ้างอิง ตารางที่ 14 (คะแนนรวมข้อ 1-4):
+     * 0 คะแนน: เสี่ยงต่ำ
+     * 1-4 คะแนน: เสี่ยงปานกลาง
+     * 5-8 คะแนน: เสี่ยงสูง
      */
-    let riskLevel = "ติดนิโคตินระดับต่ำ";
+    let riskLevel = "เสี่ยงต่ำ";
     if (totalScore >= 5) {
-      riskLevel = "ติดนิโคตินระดับสูง";
-    } else if (totalScore >= 3) {
-      riskLevel = "ติดนิโคตินระดับปานกลาง";
+      riskLevel = "เสี่ยงสูง";
+    } else if (totalScore >= 1) {
+      riskLevel = "เสี่ยงปานกลาง";
     }
 
     // ดึง recommendation_id ที่ตรงกับระดับความเสี่ยง
@@ -364,7 +326,7 @@ export async function POST(request: NextRequest) {
       risk_level: riskLevel,
     });
   } catch (error) {
-    await client.query("ROLLBACK");
+    await client.query("ROLLBACK").catch(() => {});
     console.error("POST SMOKING ASSESSMENT ERROR:", error);
 
     return NextResponse.json(

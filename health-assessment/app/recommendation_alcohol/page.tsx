@@ -139,6 +139,13 @@ function AlcoholRecommendationContent() {
             },
           );
 
+        // session หมดอายุ → กลับไปหน้า login
+        if (response.status === 401) {
+          localStorage.removeItem("userId");
+          window.location.replace("/login");
+          return;
+        }
+
         const data =
           (await response.json()) as ResultResponse;
 
