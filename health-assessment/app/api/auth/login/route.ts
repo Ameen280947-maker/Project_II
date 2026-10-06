@@ -56,6 +56,7 @@ export async function POST(
           u.email,
           u.password_hash,
           u.role_id,
+          u.is_active,
           r.role_name
 
         FROM users u
@@ -108,6 +109,23 @@ export async function POST(
         },
         {
           status: 401,
+        },
+      );
+    }
+
+    /* =========================
+       บัญชีถูกระงับโดยเจ้าหน้าที่
+    ========================= */
+
+    if (user.is_active === false) {
+      return NextResponse.json(
+        {
+          success: false,
+          message:
+            "บัญชีนี้ถูกระงับการใช้งาน กรุณาติดต่อเจ้าหน้าที่",
+        },
+        {
+          status: 403,
         },
       );
     }
@@ -166,6 +184,15 @@ export async function POST(
           false = ยังไม่เคยกรอก
         */
         hasProfile,
+
+        /*
+          หน้าแรกหลังเข้าสู่ระบบตามบทบาท
+          3 = staff → /staff
+        */
+        homePath:
+          user.role_id === 3
+            ? "/staff"
+            : null,
       },
     });
   } catch (error) {

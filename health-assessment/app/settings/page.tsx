@@ -44,6 +44,8 @@ type Settings = {
   consent_health_at: string | null;
   consent_research: boolean;
   consent_research_at: string | null;
+  consent_staff: boolean;
+  consent_staff_at: string | null;
 };
 
 type Profile = {
@@ -106,17 +108,14 @@ const formatDate = (d?: string | null, yearFormat: Settings["year_format"] = "be
 // อ่านข้อมูลโปรไฟล์แบบยืดหยุ่น เพราะ /api/profile อาจตั้งชื่อฟิลด์ต่างกัน
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const readProfile = (raw: any): Profile => {
-  // ข้อมูลบัญชี (username, email, วันสมัคร) อยู่ใน raw.user
-  // ส่วน raw.profile คือข้อมูลสุขภาพ จึงใช้เป็นตัวสำรองเท่านั้น
-  const u = raw?.user ?? {};
-  const p = raw?.profile ?? raw?.data ?? {};
+  const p = raw?.profile ?? raw?.user ?? raw?.data ?? raw ?? {};
   const first = p.first_name ?? p.firstName ?? "";
   const last = p.last_name ?? p.lastName ?? "";
   return {
-    name: u.username || [first, last].filter(Boolean).join(" ") || p.name || p.username || "",
-    email: u.email || p.email || "",
-    phone: u.phone ?? p.phone ?? p.phone_number ?? p.tel ?? "",
-    createdAt: u.created_at ?? p.created_at ?? p.createdAt ?? null,
+    name: [first, last].filter(Boolean).join(" ") || p.name || p.username || "",
+    email: p.email ?? "",
+    phone: p.phone ?? p.phone_number ?? p.tel ?? "",
+    createdAt: p.created_at ?? p.createdAt ?? null,
   };
 };
 
@@ -300,7 +299,7 @@ export default function SettingsPage() {
               {/* SUB NAV */}
               <nav
                 aria-label="หมวดการตั้งค่า"
-                className="w-full lg:w-60 shrink-0 bg-white border border-gray-100 rounded-3xl p-2 shadow-sm flex lg:flex-col gap-1 overflow-x-auto"
+                className="w-full lg:w-60 shrink-0 bg-white border border-gray-100 rounded-3xl p-2 shadow-sm lg:sticky lg:top-6 flex lg:flex-col gap-1 overflow-x-auto"
               >
                 {SECTIONS.map((s) => (
                   <a
@@ -327,7 +326,7 @@ export default function SettingsPage() {
                 <Card id="account" title="บัญชีผู้ใช้" desc="ข้อมูลที่ใช้เข้าสู่ระบบและติดต่อคุณ">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-red-50 text-[#b91c2b] text-2xl font-bold flex items-center justify-center shrink-0">
-                      {(profile?.name || "U").trim().charAt(0).toUpperCase()}
+                      {(profile?.name || "U").trim().charAt(0)}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-lg font-bold text-gray-800">{profile?.name || "-"}</p>
@@ -559,6 +558,20 @@ export default function SettingsPage() {
                         if (!v && !window.confirm("หากถอนความยินยอม ระบบจะไม่สามารถประเมินและให้คำแนะนำได้ ต้องการดำเนินการต่อหรือไม่?")) return;
                         save({ consent_health: v });
                       }}
+                    />
+                  </Row>
+                  <Row
+                    title="ยินยอมให้เจ้าหน้าที่เข้าถึงผลประเมินเพื่อติดตามดูแล"
+                    desc={
+                      settings.consent_staff
+                        ? `เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะติดต่อเพื่อให้คำแนะนำ · ยินยอมเมื่อ ${formatDate(settings.consent_staff_at, settings.year_format)}`
+                        : "เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะเห็นผลประเมินและติดต่อคุณเพื่อให้คำแนะนำ"
+                    }
+                  >
+                    <Toggle
+                      label="ยินยอมให้เจ้าหน้าที่ติดตามดูแล"
+                      checked={settings.consent_staff}
+                      onChange={(v) => save({ consent_staff: v })}
                     />
                   </Row>
                   <Row
