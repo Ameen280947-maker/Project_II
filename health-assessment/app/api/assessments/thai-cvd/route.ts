@@ -9,6 +9,7 @@ import {
   toNumberInRange,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -104,6 +105,7 @@ export async function GET(request: Request) {
 
     return getAssessmentQuestions(profileUserId);
   } catch (error) {
+    void logSystemError("GET /api/assessments/thai-cvd", error);
     console.error("GET Thai CVD error:", error);
 
     return NextResponse.json(
@@ -617,6 +619,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    void logSystemError("POST /api/assessments/thai-cvd", error);
     await client.query("ROLLBACK").catch(() => {});
 
     console.error("POST Thai CVD error:", error);

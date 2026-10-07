@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    PATCH /api/settings/account
@@ -55,6 +56,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: "เปลี่ยนชื่อผู้ใช้เรียบร้อยแล้ว", user: rows[0] });
   } catch (error) {
+    void logSystemError("PATCH /api/settings/account", error);
     // กันกรณีมีคนใช้ชื่อเดียวกันพร้อมกัน (unique constraint)
     if ((error as { code?: string }).code === "23505") {
       return NextResponse.json({ success: false, message: "ชื่อผู้ใช้นี้ถูกใช้งานแล้ว" }, { status: 409 });

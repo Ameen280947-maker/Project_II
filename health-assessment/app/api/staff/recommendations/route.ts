@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { logAccess, requireStaff } from "@/lib/staff/auth";
 import { loadCustomSeverities } from "@/lib/customAssessments";
 import { EXCLUDED_TYPES, severityOf, typeLabel } from "@/lib/staff/riskLevels";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    /api/staff/recommendations
@@ -88,6 +89,7 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => (a.range && b.range ? a.range.min - b.range.min : a.severity - b.severity || a.id - b.id)),
     });
   } catch (error) {
+    void logSystemError("GET /api/staff/recommendations", error);
     console.error("GET /api/staff/recommendations error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดคำแนะนำได้" }, { status: 500 });
   }
@@ -130,6 +132,7 @@ export async function PUT(request: NextRequest) {
     );
     return NextResponse.json({ success: true });
   } catch (error) {
+    void logSystemError("PUT /api/staff/recommendations", error);
     console.error("PUT /api/staff/recommendations error:", error);
     return NextResponse.json({ success: false, message: "บันทึกคำแนะนำไม่สำเร็จ" }, { status: 500 });
   }

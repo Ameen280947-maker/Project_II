@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { badRequest, readJsonObject, toNumberInRange, userExists } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -136,6 +137,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/bmi", error);
     console.error("GET BMI ERROR:", error);
     return NextResponse.json(
       {
@@ -309,6 +311,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    void logSystemError("POST /api/assessments/bmi", error);
     try {
       await client.query("ROLLBACK");
     } catch {}

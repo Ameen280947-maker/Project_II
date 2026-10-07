@@ -133,9 +133,9 @@ export default function AdminSystemPage() {
             />
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-3">
+          <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
             {/* รายการตรวจ */}
-            <Card className="lg:col-span-2">
+            <Card className="min-w-0 lg:col-span-2">
               <h2 className="mb-4 text-lg font-bold">ผลการตรวจสอบ</h2>
               <ul className="divide-y divide-[#eef1f7]">
                 {data.checks.map((c) => (
@@ -150,7 +150,7 @@ export default function AdminSystemPage() {
               </ul>
             </Card>
 
-            <div className="space-y-6">
+            <div className="min-w-0 space-y-6">
               {/* ผู้ใช้ตามบทบาท */}
               <Card>
                 <h2 className="mb-4 text-lg font-bold">ผู้ใช้ตามบทบาท</h2>
@@ -182,8 +182,8 @@ export default function AdminSystemPage() {
                 <dl className="space-y-2 text-sm">
                   {Object.entries(data.server).map(([k, v]) => (
                     <div key={k} className="flex justify-between gap-3">
-                      <dt className="text-[#64748b]">{SERVER_LABEL[k] ?? k}</dt>
-                      <dd className="truncate text-right font-medium">{v}</dd>
+                      <dt className="shrink-0 text-[#64748b]">{SERVER_LABEL[k] ?? k}</dt>
+                      <dd className="min-w-0 truncate text-right font-medium" title={String(v)}>{v}</dd>
                     </div>
                   ))}
                 </dl>

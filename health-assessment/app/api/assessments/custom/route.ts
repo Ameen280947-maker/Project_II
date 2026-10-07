@@ -10,6 +10,7 @@ import {
   toId,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    /api/assessments/custom  (แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม)
@@ -66,6 +67,7 @@ export async function GET(request: NextRequest) {
       assessment: { id: typeId, name: t.rows[0].assessment_name, description: t.rows[0].description, questions },
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/custom", error);
     console.error("GET /api/assessments/custom error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดแบบประเมินได้" }, { status: 500 });
   }
@@ -167,6 +169,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, assessmentId, totalScore: total, riskLevel: level.riskLevel });
   } catch (error) {
+    void logSystemError("POST /api/assessments/custom", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST /api/assessments/custom error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถบันทึกผลการประเมินได้" }, { status: 500 });

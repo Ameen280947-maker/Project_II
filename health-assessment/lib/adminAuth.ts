@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/adminSchema";
+import { getSession } from "@/lib/session";
 
 /* =========================================================
    ตรวจสิทธิ์ System Admin สำหรับ API /api/admin/*
 
-   ฝั่งหน้าเว็บส่ง header  x-user-id  (ค่าจาก localStorage "userId")
-   ฝั่ง server จะเช็กกับฐานข้อมูลอีกครั้งว่า role_name = 'system_admin'
-   ถ้าไม่ใช่ จะตอบ 403 กลับไป
-
-   หมายเหตุ: ระบบ login ปัจจุบันยังไม่ได้ใช้ session/JWT
-   การเช็กนี้จึงกันได้ระดับหนึ่ง ถ้าจะใช้งานจริงควรเปลี่ยนเป็น session cookie
+   อ่านผู้ใช้จาก session cookie (ตั้งตอน login, ลงลายเซ็น HMAC)
+   แล้วเช็กกับฐานข้อมูลอีกครั้งว่า role_name = 'system_admin'
+   - ไม่มี session → 401
+   - ไม่ใช่ admin  → 403
+   ไม่เชื่อ header / userId ที่หน้าเว็บส่งมา
 ========================================================= */
 
 export const ADMIN_ROLE = "system_admin";
@@ -25,9 +25,10 @@ type AdminCheck =
   | { ok: false; response: NextResponse };
 
 export async function requireAdmin(request: NextRequest): Promise<AdminCheck> {
-  const userId = Number(request.headers.get("x-user-id"));
+  const session = getSession(request);
+  const userId = session?.userId ?? 0;
 
-  if (!Number.isInteger(userId) || userId <= 0) {
+  if (!session || !Number.isInteger(userId) || userId <= 0) {
     return {
       ok: false,
       response: NextResponse.json(

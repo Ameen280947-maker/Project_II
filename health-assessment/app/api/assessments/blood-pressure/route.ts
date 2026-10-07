@@ -2,6 +2,7 @@ import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { badRequest, readJsonObject, toIntInRange, userExists } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -209,6 +210,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/blood-pressure", error);
     console.error(
       "GET BLOOD PRESSURE ERROR:",
       error,
@@ -504,6 +506,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    void logSystemError("POST /api/assessments/blood-pressure", error);
     try {
       await client.query("ROLLBACK");
     } catch {}

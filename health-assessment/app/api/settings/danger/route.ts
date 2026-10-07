@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs"; // ⬅️ ถ้าโปรเจคใช้แพ็กเกจ "bcrypt" ให้เปลี่ยนเป็น import bcrypt from "bcrypt"
 import pool from "@/lib/db";
 import { clearSessionCookie, requireUser } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    POST /api/settings/danger
@@ -87,6 +88,7 @@ export async function POST(request: NextRequest) {
     if (action === "delete") clearSessionCookie(response);
     return response;
   } catch (error) {
+    void logSystemError("POST /api/settings/danger", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST /api/settings/danger error:", error);
     return NextResponse.json({ success: false, message: "ดำเนินการไม่สำเร็จ ข้อมูลยังไม่ถูกลบ" }, { status: 500 });

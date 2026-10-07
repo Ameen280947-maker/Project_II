@@ -7,6 +7,7 @@ import {
   toIntInRange,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -768,6 +769,7 @@ export async function GET(
         answersResult.rows,
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/diabetes", error);
     console.error(
       "GET DIABETES ERROR:",
       error,
@@ -1313,6 +1315,7 @@ export async function POST(
       },
     );
   } catch (error) {
+    void logSystemError("POST /api/assessments/diabetes", error);
     try {
       await client.query(
         "ROLLBACK",

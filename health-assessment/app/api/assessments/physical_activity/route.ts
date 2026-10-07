@@ -9,6 +9,7 @@ import {
   resolveChoiceAnswers,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -349,6 +350,7 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    void logSystemError("GET /api/assessments/physical_activity", error);
     console.error(
       "GET Physical Activity Error:",
       error

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    GET  /api/settings?userId=...   → อ่านการตั้งค่า (ถ้ายังไม่มีจะคืนค่าเริ่มต้น)
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
       settings: { ...DEFAULTS, ...(rows[0] ?? {}) },
     });
   } catch (error) {
+    void logSystemError("GET /api/settings", error);
     console.error("GET /api/settings error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดการตั้งค่าได้" }, { status: 500 });
   }
@@ -126,6 +128,7 @@ export async function PUT(request: NextRequest) {
 
     return NextResponse.json({ success: true, settings: { ...DEFAULTS, ...rows[0] } });
   } catch (error) {
+    void logSystemError("PUT /api/settings", error);
     console.error("PUT /api/settings error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถบันทึกการตั้งค่าได้" }, { status: 500 });
   }

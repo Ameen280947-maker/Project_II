@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { logAccess, requireStaff } from "@/lib/staff/auth";
 import { loadCustomSeverities } from "@/lib/customAssessments";
 import { EXCLUDED_TYPES, TYPE_LABELS, severityOf, typeLabel } from "@/lib/staff/riskLevels";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    /api/staff/assessments
@@ -123,6 +124,7 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (error) {
+    void logSystemError("GET /api/staff/assessments", error);
     console.error("GET /api/staff/assessments error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดแบบประเมินได้" }, { status: 500 });
   }
@@ -239,6 +241,7 @@ export async function PUT(request: NextRequest) {
     await logAccess(staffId, null, "publish_assessment", `type ${typeId} · ${questions.length} ข้อ`);
     return NextResponse.json({ success: true });
   } catch (error) {
+    void logSystemError("PUT /api/staff/assessments", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("PUT /api/staff/assessments error:", error);
     return NextResponse.json({ success: false, message: "เผยแพร่ไม่สำเร็จ" }, { status: 500 });
@@ -278,6 +281,7 @@ export async function PATCH(request: NextRequest) {
     await logAccess(auth.staff.userId, null, body.isActive ? "enable_assessment" : "disable_assessment", `type ${typeId}`);
     return NextResponse.json({ success: true });
   } catch (error) {
+    void logSystemError("PATCH /api/staff/assessments", error);
     console.error("PATCH /api/staff/assessments error:", error);
     return NextResponse.json({ success: false, message: "บันทึกไม่สำเร็จ" }, { status: 500 });
   }
@@ -306,6 +310,7 @@ export async function POST(request: NextRequest) {
     await logAccess(auth.staff.userId, null, "create_assessment", name);
     return NextResponse.json({ success: true, id: rows[0].assessment_type_id });
   } catch (error) {
+    void logSystemError("POST /api/staff/assessments", error);
     console.error("POST /api/staff/assessments error:", error);
     return NextResponse.json({ success: false, message: "สร้างแบบประเมินไม่สำเร็จ" }, { status: 500 });
   }
@@ -397,6 +402,7 @@ async function saveLevels(typeId: number, raw: unknown[], staffId: number) {
     await logAccess(staffId, null, "save_assessment_levels", `type ${typeId} · ${levels.length} ระดับ`);
     return NextResponse.json({ success: true });
   } catch (error) {
+    void logSystemError("POST /api/staff/assessments", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("PUT levels /api/staff/assessments error:", error);
     return NextResponse.json({ success: false, message: "บันทึกเกณฑ์แปลผลไม่สำเร็จ" }, { status: 500 });
@@ -453,6 +459,7 @@ export async function DELETE(request: NextRequest) {
     await logAccess(auth.staff.userId, null, "delete_assessment", `type ${typeId} · ${name}`);
     return NextResponse.json({ success: true });
   } catch (error) {
+    void logSystemError("DELETE /api/staff/assessments", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("DELETE /api/staff/assessments error:", error);
     return NextResponse.json({ success: false, message: "ลบแบบประเมินไม่สำเร็จ" }, { status: 500 });

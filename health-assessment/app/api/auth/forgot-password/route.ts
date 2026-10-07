@@ -7,6 +7,7 @@ import {
   sendOtpEmail,
 } from "@/lib/mailer";
 import { otpRateLimits } from "@/lib/rateLimit";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,12 +34,10 @@ function generateOtp() {
 
 export async function POST(request: NextRequest) {
   /*
-    Production ต้องตั้งค่า Gmail ก่อน
+    ต้องตั้งค่า Gmail ก่อนเสมอ (OTP ส่งทางอีเมลเท่านั้น ไม่แสดงใน Terminal)
     ตรวจก่อนค้นหา user เพื่อให้ตอบเหมือนกันทุกอีเมล
   */
-  const mailerReady = isMailerConfigured();
-
-  if (!mailerReady && process.env.NODE_ENV === "production") {
+  if (!isMailerConfigured()) {
     console.error("FORGOT PASSWORD: ยังไม่ได้ตั้งค่า GMAIL_USER / GMAIL_APP_PASSWORD");
 
     return NextResponse.json(
@@ -234,41 +233,13 @@ export async function POST(request: NextRequest) {
 
     /* =====================================================
        7. ส่ง Email (Gmail SMTP)
-
-       ยังไม่ได้ตั้งค่า Gmail และไม่ใช่ production
-       → แสดง OTP ใน Terminal และส่ง devOtp กลับไปให้ทดสอบ
-       ตั้งค่า Gmail แล้ว → ส่งอีเมลจริงเท่านั้น ไม่ส่ง OTP กลับ Frontend
+       ส่งอีเมลจริงเท่านั้น ไม่ส่ง OTP กลับ Frontend และไม่แสดงใน Terminal
     ===================================================== */
-
-    if (!mailerReady) {
-      console.log("====================================");
-      console.log("PASSWORD RESET OTP (DEV: ยังไม่ได้ตั้งค่า Gmail)");
-      console.log("------------------------------------");
-      console.log("User ID :", userId);
-      console.log("Email   :", email);
-      console.log("OTP     :", otp);
-      console.log("Expire  :", expiresAt);
-      console.log("====================================");
-
-      return NextResponse.json(
-        {
-          success: true,
-
-          message:
-            "เราได้ส่งรหัสยืนยันสำหรับตั้งรหัสผ่านใหม่ไปยังอีเมลของคุณแล้ว",
-
-          // DEV ONLY: ใช้ทดสอบเมื่อยังไม่ได้ตั้งค่า Gmail
-          devOtp: otp,
-        },
-        {
-          status: 200,
-        },
-      );
-    }
 
     try {
       await sendOtpEmail(email, otp);
     } catch (mailError) {
+      void logSystemError("POST /api/auth/forgot-password", mailError);
       console.error("FORGOT PASSWORD SEND EMAIL ERROR:", mailError);
 
       return NextResponse.json(

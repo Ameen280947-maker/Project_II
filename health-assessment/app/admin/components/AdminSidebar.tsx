@@ -16,18 +16,21 @@ import type { ReactNode } from "react";
    SIDEBAR สำหรับ System Admin (โทนน้ำเงินเข้ม)
 ========================================================= */
 
-const MENU: { href: string; label: string; icon: ReactNode }[] = [
-  { href: "/admin", label: "ตรวจสอบระบบ", icon: <Activity size={21} /> },
-  { href: "/admin/database", label: "ดูแลฐานข้อมูล", icon: <Database size={21} /> },
-  { href: "/admin/errors", label: "แก้ไขข้อผิดพลาด", icon: <Bug size={21} /> },
-  { href: "/admin/backup", label: "สำรองข้อมูล", icon: <HardDriveDownload size={21} /> },
+// short = ชื่อสั้นสำหรับแถบเมนูบนมือถือ (4 ช่องต้องพอดีจอ)
+const MENU: { href: string; label: string; short: string; icon: ReactNode }[] = [
+  { href: "/admin", label: "ตรวจสอบระบบ", short: "ตรวจสอบ", icon: <Activity size={21} /> },
+  { href: "/admin/database", label: "ดูแลฐานข้อมูล", short: "ฐานข้อมูล", icon: <Database size={21} /> },
+  { href: "/admin/errors", label: "แก้ไขข้อผิดพลาด", short: "ข้อผิดพลาด", icon: <Bug size={21} /> },
+  { href: "/admin/backup", label: "สำรองข้อมูล", short: "สำรอง", icon: <HardDriveDownload size={21} /> },
 ];
 
 export default function AdminSidebar({ username }: { username: string }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  const logout = () => {
+  const logout = async () => {
+    // ลบ session cookie ฝั่ง server ด้วย ไม่งั้น cookie ยังใช้เรียก API ต่อได้
+    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     ["userId", "username", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"].forEach(
       (key) => localStorage.removeItem(key),
     );
@@ -96,7 +99,7 @@ export default function AdminSidebar({ username }: { username: string }) {
             <LogOut size={20} />
           </button>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-3">
+        <nav className="grid grid-cols-4 gap-1 px-2 pb-2">
           {MENU.map((item) => {
             const active =
               item.href === "/admin" ? pathname === "/admin" : pathname.startsWith(item.href);
@@ -104,11 +107,13 @@ export default function AdminSidebar({ username }: { username: string }) {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex shrink-0 items-center gap-2 rounded-xl px-3 py-2 text-sm ${
+                aria-current={active ? "page" : undefined}
+                className={`flex min-w-0 flex-col items-center gap-1 rounded-xl px-1 py-2 text-xs ${
                   active ? "bg-white text-[#1e3a8a]" : "text-blue-100"
                 }`}
               >
-                {item.label}
+                {item.icon}
+                <span className="w-full truncate text-center">{item.short}</span>
               </Link>
             );
           })}

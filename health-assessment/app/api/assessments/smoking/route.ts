@@ -8,6 +8,7 @@ import {
   resolveChoiceAnswers,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -177,6 +178,7 @@ export async function GET(request: NextRequest) {
       questions: Array.from(questionMap.values()),
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/smoking", error);
     console.error("GET SMOKING ASSESSMENT ERROR:", error);
     return NextResponse.json(
       {
@@ -326,6 +328,7 @@ export async function POST(request: NextRequest) {
       risk_level: riskLevel,
     });
   } catch (error) {
+    void logSystemError("POST /api/assessments/smoking", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST SMOKING ASSESSMENT ERROR:", error);
 

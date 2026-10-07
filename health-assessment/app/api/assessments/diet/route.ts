@@ -8,6 +8,7 @@ import {
   resolveChoiceAnswers,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -224,6 +225,7 @@ async function fetchDietRecommendationsFromDB(keys: string[]): Promise<{
       firstRecId,
     };
   } catch (err) {
+    void logSystemError("/api/assessments/diet", err);
     console.error("FETCH RECOMMENDATION FROM DB ERROR:", err);
     return {
       recommendationMap,
@@ -436,6 +438,7 @@ export async function GET(request: NextRequest) {
       questions: DEFAULT_QUESTIONS,
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/diet", error);
     console.error("GET DIET ASSESSMENT ERROR:", error);
     return NextResponse.json(
       {
@@ -628,6 +631,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    void logSystemError("POST /api/assessments/diet", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST DIET ASSESSMENT ERROR:", error);
 

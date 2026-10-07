@@ -11,7 +11,7 @@ import {
   PrimaryButton,
   StatusBadge,
 } from "../components/AdminUI";
-import { adminFetch, formatDateTime } from "../components/adminApi";
+import { adminFetch, formatBytes, formatDateTime } from "../components/adminApi";
 
 /* =========================================================
    หน้า: ดูแลฐานข้อมูล  (/admin/database)
@@ -22,6 +22,7 @@ type TableInfo = {
   rows: number;
   dead_rows: number;
   size: string;
+  total_bytes: number;
   last_vacuum: string | null;
   last_analyze: string | null;
 };
@@ -168,13 +169,14 @@ export default function AdminDatabasePage() {
                       <td className={`px-4 py-3 text-right ${t.dead_rows > t.rows * 0.2 && t.dead_rows > 50 ? "font-semibold text-[#b45309]" : ""}`}>
                         {t.dead_rows.toLocaleString()}
                       </td>
-                      <td className="px-4 py-3 text-right">{t.size}</td>
+                      <td className="px-4 py-3 text-right">{formatBytes(t.total_bytes)}</td>
                       <td className="px-4 py-3 text-[#64748b]">{formatDateTime(t.last_vacuum)}</td>
                       <td className="px-6 py-3 text-right">
                         <div className="inline-flex gap-2">
                           <button
                             disabled={busy !== null}
                             onClick={() => run(`a-${t.table_name}`, { action: "analyze", table: t.table_name })}
+                            title="อัปเดตสถิติของตาราง ช่วยให้ค้นหาข้อมูลเร็วขึ้น (ไม่แก้ข้อมูล)"
                             className="rounded-xl px-3 py-1.5 text-xs font-semibold text-[#1e3a8a] hover:bg-[#eef2ff] disabled:opacity-40"
                           >
                             {busy === `a-${t.table_name}` ? "..." : "Analyze"}
@@ -182,6 +184,7 @@ export default function AdminDatabasePage() {
                           <button
                             disabled={busy !== null}
                             onClick={() => run(`v-${t.table_name}`, { action: "vacuum", table: t.table_name })}
+                            title="เคลียร์แถวที่ถูกลบ/แก้ไขแล้ว (dead rows) และอัปเดตสถิติ (ไม่ลบข้อมูลที่ใช้งาน)"
                             className="rounded-xl bg-[#e8eefc] px-3 py-1.5 text-xs font-semibold text-[#1e3a8a] hover:bg-[#dbe4fb] disabled:opacity-40"
                           >
                             {busy === `v-${t.table_name}` ? "..." : "Vacuum"}

@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { logAccess, requireStaff, USER_ROLE_ID } from "@/lib/staff/auth";
 import { loadCustomSeverities } from "@/lib/customAssessments";
 import { EXCLUDED_TYPES, severityOf, riskLabel, typeLabel } from "@/lib/staff/riskLevels";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    /api/staff/users
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest) {
       }),
     });
   } catch (error) {
+    void logSystemError("GET /api/staff/users", error);
     console.error("GET /api/staff/users error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดรายชื่อผู้ใช้ได้" }, { status: 500 });
   }
@@ -205,6 +207,7 @@ export async function PATCH(request: NextRequest) {
     await logAccess(auth.staff.userId, userId, action === "suspend" ? "suspend_user" : "activate_user", reason || undefined);
     return NextResponse.json({ success: true });
   } catch (error) {
+    void logSystemError("PATCH /api/staff/users", error);
     console.error("PATCH /api/staff/users error:", error);
     return NextResponse.json({ success: false, message: "บันทึกไม่สำเร็จ" }, { status: 500 });
   }

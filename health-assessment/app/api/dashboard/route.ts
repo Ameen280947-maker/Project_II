@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { riskLevelOf } from "@/lib/riskLevel";
 import { requireUser } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 // แบบประเมิน 9Q (ข้อสุดท้าย = คิดทำร้ายตนเอง)
 const TYPE_9Q = 14;
@@ -173,6 +174,7 @@ export async function GET(request: NextRequest) {
       assessments,
     });
   } catch (error) {
+    void logSystemError("GET /api/dashboard", error);
     console.error(
       "Dashboard API Error:",
       error

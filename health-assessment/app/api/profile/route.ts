@@ -4,6 +4,7 @@ import {
   NextRequest,
   NextResponse,
 } from "next/server";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -202,6 +203,7 @@ export async function GET(
       hasProfile: true,
     });
   } catch (error) {
+    void logSystemError("GET /api/profile", error);
     console.error(
       "GET PROFILE ERROR:",
       error,
