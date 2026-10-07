@@ -95,7 +95,7 @@ export default function StaffOverviewPage() {
       {/* KPI */}
       <section className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${loading ? "opacity-60" : ""}`}>
         <StatCard label="ผู้ใช้งานทั้งหมด" value={data?.kpi.totalUsers} note={`+${data?.kpi.newUsers ?? 0} คน ใน ${rangeNoun}`} />
-        <StatCard label={`การประเมินใน ${rangeNoun}`} value={data?.kpi.assessments} note="ไม่รวมแบบประเมินสุขภาพช่องปาก และ Diabetes Risk" />
+        <StatCard label={`การประเมินใน ${rangeNoun}`} value={data?.kpi.assessments} />
         <StatCard
           label="ผู้มีความเสี่ยงสูงรอติดตาม"
           value={data?.kpi.waiting}

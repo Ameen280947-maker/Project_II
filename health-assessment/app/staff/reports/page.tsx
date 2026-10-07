@@ -259,14 +259,22 @@ function Filter({ label, value, onChange, children }: { label: string; value: st
 }
 
 /* =========================================================
-   กราฟเส้นแนวโน้ม (SVG + เส้นชี้/กล่องข้อมูลเมื่อชี้)
+   กราฟเส้นแนวโน้ม
+   - แต่ละช่วงระหว่างเดือนมีสีตามทิศทาง: เทอร์ควอยซ์ = ทิศทางที่ดี, ส้ม = ทิศทางที่ควรระวัง
+     (จำนวนการประเมิน: เพิ่ม = ดี / % ความเสี่ยงสูง: ลด = ดี)
+   - มีป้าย ▲/▼ และตัวเลขกำกับทุกช่วง ไม่ได้สื่อด้วยสีอย่างเดียว (ผ่านการตรวจสีสำหรับคนตาบอดสีแล้ว)
+   - ช่วงที่ไปถึงเดือนที่ยังไม่ครบ หรือข้ามเดือนที่ไม่แสดงค่า (ผู้ใช้ < 5 คน) เป็นเส้นประ
 ========================================================= */
+
+const C_GOOD = "#0a9a8c";
+const C_WATCH = "#d9622b";
+const C_FLAT = "#9fb5b2";
 
 function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 720;
-  const H = 240;
-  const pad = { l: 40, r: 16, t: 16, b: 30 };
+  const H = 260;
+  const pad = { l: 40, r: 24, t: 34, b: 30 };
   const vals = data.map((d) => (metric === "total" ? d.total : d.highPct));
   const maxRaw = Math.max(1, ...vals.map((v) => v ?? 0));
   const step = niceStep(maxRaw);
@@ -274,65 +282,170 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
   const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
   const x = (i: number) => pad.l + (data.length === 1 ? (W - pad.l - pad.r) / 2 : (i * (W - pad.l - pad.r)) / (data.length - 1));
   const y = (v: number) => pad.t + (1 - v / max) * (H - pad.t - pad.b);
-  const pts = vals.map((v, i) => (v === null ? null : ([x(i), y(v)] as const)));
-  const valid = pts.filter((p): p is readonly [number, number] => p !== null);
-  const line = valid.map((p, i) => `${i ? "L" : "M"}${p[0]},${p[1]}`).join(" ");
-  const area = valid.length > 1 ? `${line} L${valid[valid.length - 1][0]},${y(0)} L${valid[0][0]},${y(0)} Z` : "";
   const unit = metric === "total" ? " ครั้ง" : "%";
+  const upIsGood = metric === "total";
+
+  // ช่วงระหว่างจุดที่มีค่าติดกัน (ข้ามเดือนที่ไม่แสดงค่าได้) · i = จุดต้น, j = จุดปลาย
+  const shown = vals.flatMap((v, i) => (v === null ? [] : [i]));
+  const segments = shown.slice(1).map((j, n) => {
+    const i = shown[n];
+    const a = vals[i] as number;
+    const b = vals[j] as number;
+    const diff = Math.round((b - a) * 10) / 10;
+    const color = diff === 0 ? C_FLAT : diff > 0 === upIsGood ? C_GOOD : C_WATCH;
+    return { i, j, a, b, diff, color, gap: j - i > 1, partial: data[j].partial };
+  });
+  const hidden = vals.some((v) => v === null);
+
+  const fmtDiff = (n: number) => `${n > 0 ? "▲ +" : n < 0 ? "▼ −" : "■ "}${Math.abs(n).toLocaleString("th-TH")}${metric === "total" ? "" : " จุด"}`;
 
   return (
-    <div className="overflow-x-auto">
-      <div className="relative min-w-[560px]">
-      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="กราฟแนวโน้มรายเดือน" onMouseLeave={() => setHover(null)}>
-        {ticks.map((t) => (
-          <g key={t}>
-            <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#e6efed" strokeDasharray={t ? "3 4" : undefined} />
-            <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#557270">
-              {t}
-            </text>
-          </g>
-        ))}
-        {area && <path d={area} fill="#0aa898" opacity="0.1" />}
-        <path d={line} fill="none" stroke="#05827a" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
-        {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={pad.t} y2={y(0)} stroke="#98eee0" strokeWidth="1.5" />}
-        {pts.map(
-          (p, i) =>
-            p && (
-              <circle key={i} cx={p[0]} cy={p[1]} r={hover === i ? 6 : 4.5} fill="white" stroke="#05827a" strokeWidth="2" strokeDasharray={data[i].partial ? "2 2" : undefined} />
-            )
-        )}
-        {data.map((d, i) => (
-          <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#557270">
-            {d.label}
-          </text>
-        ))}
-        {/* พื้นที่รับการชี้ (กว้างกว่าจุด) */}
-        {data.map((_, i) => (
-          <rect
-            key={i}
-            x={x(i) - (W - pad.l - pad.r) / Math.max(1, data.length - 1) / 2}
-            y={0}
-            width={(W - pad.l - pad.r) / Math.max(1, data.length - 1)}
-            height={H}
-            fill="transparent"
-            onMouseEnter={() => setHover(i)}
-          />
-        ))}
-      </svg>
-      {hover !== null && (
-        <div
-          className="pointer-events-none absolute top-2 -translate-x-1/2 rounded-xl border border-staff-line bg-white px-3 py-2 text-xs shadow-lg"
-          style={{ left: `${(x(hover) / W) * 100}%` }}
-        >
-          <p className="font-bold">
-            {data[hover].label}
-            {data[hover].partial ? " (ยังไม่ครบเดือน)" : ""}
-          </p>
-          <p className="text-staff-muted">
-            {metric === "total" ? "จำนวนการประเมิน" : "ความเสี่ยงสูง"}: <b className="text-staff-ink">{fmt(vals[hover], unit)}</b>
-          </p>
+    <div>
+      <div className="mb-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-staff-muted">
+        <span className="flex items-center gap-1.5">
+          <span className="h-[3px] w-5 rounded-full" style={{ background: C_GOOD }} />
+          {upIsGood ? "▲ เพิ่มขึ้น" : "▼ ลดลง (ดีขึ้น)"}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="h-[3px] w-5 rounded-full" style={{ background: C_WATCH }} />
+          {upIsGood ? "▼ ลดลง" : "▲ เพิ่มขึ้น (ควรระวัง)"}
+        </span>
+        <span className="flex items-center gap-1.5">
+          <svg width="20" height="4" aria-hidden>
+            <line x1="0" y1="2" x2="20" y2="2" stroke="#557270" strokeWidth="2" strokeDasharray="4 3" />
+          </svg>
+          {hidden ? "เดือนที่ยังไม่ครบ / ข้ามเดือนที่ไม่แสดงค่า" : "เดือนที่ยังไม่ครบ"}
+        </span>
+        {hidden && <span>– = ผู้ใช้น้อยกว่า 5 คน จึงไม่แสดงตัวเลข</span>}
+      </div>
+
+      <div className="overflow-x-auto">
+        <div className="relative min-w-[560px]">
+          <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="กราฟแนวโน้มรายเดือน" onMouseLeave={() => setHover(null)}>
+            {ticks.map((t) => (
+              <g key={t}>
+                <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#e6efed" strokeDasharray={t ? "3 4" : undefined} />
+                <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#557270">
+                  {t}
+                </text>
+              </g>
+            ))}
+
+            {/* พื้นที่ใต้เส้นแต่ละช่วง ใช้สีเดียวกับเส้น */}
+            {segments.map((s) => (
+              <path
+                key={`a${s.i}`}
+                d={`M${x(s.i)},${y(s.a)} L${x(s.j)},${y(s.b)} L${x(s.j)},${y(0)} L${x(s.i)},${y(0)} Z`}
+                fill={s.color}
+                opacity={s.partial || s.gap ? 0.07 : 0.13}
+              />
+            ))}
+
+            {/* เส้นแต่ละช่วง */}
+            {segments.map((s) => (
+              <line
+                key={`l${s.i}`}
+                x1={x(s.i)}
+                y1={y(s.a)}
+                x2={x(s.j)}
+                y2={y(s.b)}
+                stroke={s.color}
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeDasharray={s.partial || s.gap ? "6 5" : undefined}
+              />
+            ))}
+
+            {/* ป้ายส่วนต่างกลางช่วง (ตัวอักษรสีเข้ม จุดสีบอกทิศ) */}
+            {segments
+              .filter((s) => s.diff !== 0)
+              .map((s) => {
+                const mx = (x(s.i) + x(s.j)) / 2;
+                const my = (y(s.a) + y(s.b)) / 2 - 12;
+                const label = fmtDiff(s.diff);
+                const w = label.length * 6.4 + 18;
+                return (
+                  <g key={`d${s.i}`}>
+                    <rect x={mx - w / 2} y={my - 11} width={w} height={20} rx={10} fill="white" stroke={s.color} strokeWidth="1.5" />
+                    <circle cx={mx - w / 2 + 10} cy={my - 1} r={3.5} fill={s.color} />
+                    <text x={mx + 5} y={my + 3} textAnchor="middle" fontSize="11" fontWeight="700" fill="#102b29">
+                      {label}
+                    </text>
+                  </g>
+                );
+              })}
+
+            {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={pad.t - 10} y2={y(0)} stroke="#98eee0" strokeWidth="1.5" />}
+
+            {/* จุดและค่าของแต่ละเดือน (เดือนที่ไม่แสดงค่า แสดง "–" ที่ฐาน) */}
+            {vals.map((v, i) =>
+              v === null ? (
+                <text key={`n${i}`} x={x(i)} y={y(0) - 8} textAnchor="middle" fontSize="13" fontWeight="700" fill="#9fb5b2">
+                  –
+                </text>
+              ) : (
+                <g key={`p${i}`}>
+                  <circle
+                    cx={x(i)}
+                    cy={y(v)}
+                    r={hover === i ? 6.5 : 5}
+                    fill="white"
+                    stroke="#102b29"
+                    strokeWidth="2"
+                    strokeDasharray={data[i].partial ? "2 2" : undefined}
+                  />
+                  <text x={x(i)} y={y(v) - 11} textAnchor="middle" fontSize="11" fontWeight="600" fill="#557270">
+                    {v.toLocaleString("th-TH")}
+                  </text>
+                </g>
+              )
+            )}
+
+            {data.map((d, i) => (
+              <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#557270">
+                {d.label}
+                {d.partial ? "*" : ""}
+              </text>
+            ))}
+
+            {/* พื้นที่รับการชี้ (กว้างกว่าจุด) */}
+            {data.map((_, i) => (
+              <rect
+                key={i}
+                x={x(i) - (W - pad.l - pad.r) / Math.max(1, data.length - 1) / 2}
+                y={0}
+                width={(W - pad.l - pad.r) / Math.max(1, data.length - 1)}
+                height={H}
+                fill="transparent"
+                onMouseEnter={() => setHover(i)}
+              />
+            ))}
+          </svg>
+
+          {hover !== null && (
+            <div
+              className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-xl border border-staff-line bg-white px-3 py-2 text-xs shadow-lg"
+              style={{ left: `${Math.min(88, Math.max(12, (x(hover) / W) * 100))}%` }}
+            >
+              <p className="font-bold">
+                {data[hover].label}
+                {data[hover].partial ? " (ยังไม่ครบเดือน)" : ""}
+              </p>
+              <p className="text-staff-muted">
+                {metric === "total" ? "จำนวนการประเมิน" : "ความเสี่ยงสูง"}: <b className="text-staff-ink">{fmt(vals[hover], unit)}</b>
+              </p>
+              {(() => {
+                const s = segments.find((g) => g.j === hover);
+                return s ? (
+                  <p className="mt-0.5 flex items-center gap-1.5 text-staff-muted">
+                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
+                    เทียบ{s.gap ? `เดือน ${data[s.i].label}` : "เดือนก่อน"}: <b className="text-staff-ink">{fmtDiff(s.diff)}</b>
+                  </p>
+                ) : null;
+              })()}
+            </div>
+          )}
         </div>
-      )}
       </div>
     </div>
   );
