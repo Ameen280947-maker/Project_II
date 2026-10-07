@@ -337,16 +337,6 @@ const formatDateTime = (date?: string | null) =>
 const formatShortDate = (date: string) =>
   new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
-const daysSince = (date: string) =>
-  Math.max(0, Math.floor((Date.now() - new Date(date).getTime()) / 86_400_000));
-
-const relativeDay = (date: string) => {
-  const d = daysSince(date);
-  if (d === 0) return "วันนี้";
-  if (d === 1) return "เมื่อวาน";
-  return `${d} วันที่แล้ว`;
-};
-
 /* =========================================================
    PAGE
 ========================================================= */
@@ -507,10 +497,6 @@ function DashboardContent({
                 </>
               )}
             </h1>
-            <p className="text-[#5E6470] text-base">
-              สรุปผลการประเมินสุขภาพของคุณ
-              {latest && <> · อัปเดตล่าสุด {formatDateTime(latest.assessed_at)}</>}
-            </p>
           </div>
         </div>
 
@@ -550,7 +536,6 @@ function DashboardContent({
           label="การประเมินทั้งหมด"
           value={summary.totalAssessments}
           unit="ครั้ง"
-          note={`ครอบคลุม ${summary.totalTypes} ประเภทแบบประเมิน`}
           icon={ClipboardList}
           iconWrap="bg-[#FBE9EB] text-[#8E1428]"
         />
@@ -558,7 +543,6 @@ function DashboardContent({
           label="ผลอยู่ในเกณฑ์ปกติ"
           value={okTypes.length}
           unit={`จาก ${latestByType.length} ด้าน`}
-          note={okTypes.map((a) => getConfig(a.assessment_name).thaiName || a.assessment_name).join(", ") || "-"}
           icon={CheckCircle2}
           iconWrap="bg-[#E4F1E8] text-[#1D6436]"
         />
@@ -566,14 +550,12 @@ function DashboardContent({
           label="ผลที่ควรติดตาม"
           value={summary.riskAssessments}
           unit="รายการ"
-          note="จากประวัติการประเมินทั้งหมด"
           icon={AlertTriangle}
           iconWrap="bg-[#FBEFD6] text-[#7A4A00]"
         />
         <KpiCard
           label="ประเมินล่าสุด"
           value={latest?.assessment_name ?? "-"}
-          note={latest ? `${relativeDay(latest.assessed_at)} · ${formatDateTime(latest.assessed_at)}` : "-"}
           icon={CalendarDays}
           iconWrap="bg-[#E8EEF8] text-[#2B5197]"
           small
@@ -595,7 +577,7 @@ function DashboardContent({
 
           {/* ---------- Assessment cards ---------- */}
           <section className="flex flex-col gap-4">
-            <SectionHead eyebrow="HEALTH ASSESSMENTS" title="สรุปผลการประเมิน" aside="ผลล่าสุดของแต่ละแบบประเมิน" />
+            <SectionHead eyebrow="HEALTH ASSESSMENTS" title="สรุปผลการประเมิน" />
             <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
               {latestByType.map((a) => (
                 <AssessmentCard
@@ -614,7 +596,6 @@ function DashboardContent({
                   <Plus size={22} strokeWidth={2.4} />
                 </span>
                 <span className="font-[family-name:var(--font-anuphan)] font-bold text-[17px]">ทำแบบประเมินใหม่</span>
-                <span className="text-[13px] text-[#5E6470]">เลือกจากแบบประเมินทั้งหมด</span>
               </Link>
             </div>
           </section>
@@ -669,7 +650,6 @@ function KpiCard({
   label,
   value,
   unit,
-  note,
   icon: Icon,
   iconWrap,
   small,
@@ -677,7 +657,6 @@ function KpiCard({
   label: string;
   value: string | number;
   unit?: string;
-  note: string;
   icon: LucideIcon;
   iconWrap: string;
   small?: boolean;
@@ -695,7 +674,6 @@ function KpiCard({
       >
         {value} {unit && <span className="text-base font-medium text-[#5E6470]">{unit}</span>}
       </div>
-      <div className="text-[13px] text-[#5E6470] truncate">{note}</div>
     </div>
   );
 }
@@ -771,7 +749,6 @@ function FollowUpSection({
           </Link>
         }
       />
-      <p className="-mt-2 text-[13px] text-[#5E6470]">กำหนดรอบประเมินซ้ำตามเกณฑ์ทางการแพทย์ของแต่ละโรค</p>
 
       {summary && summary.dueCount > 0 && (
         <div className="flex flex-wrap items-center gap-x-6 gap-y-4 p-5 sm:px-6 rounded-[20px] bg-[#FBEFD6] border border-[#F0D9A8]">
@@ -781,9 +758,6 @@ function FollowUpSection({
           <div className="flex-[1_1_320px]">
             <p className="font-[family-name:var(--font-anuphan)] font-bold text-lg text-[#5C3800]">
               มี {summary.dueCount} แบบประเมินที่ครบกำหนดติดตามซ้ำแล้ว
-            </p>
-            <p className="text-[#6B4A12] text-sm">
-              ทำแบบประเมินซ้ำเพื่อเปรียบเทียบผลและเฝ้าระวังความเสี่ยงอย่างต่อเนื่อง
             </p>
           </div>
           <Link
@@ -830,8 +804,6 @@ function FollowUpSection({
                 <p className="text-[13px] text-[#5E6470]">
                   ผลล่าสุด: <span className="font-semibold text-[#16181D]">{item.riskLevel}</span>
                 </p>
-
-                <p className="text-sm text-[#4A4F59] line-clamp-2">{item.message}</p>
               </div>
 
               <div className="pt-3 border-t border-[#F0EEE8] flex items-center justify-between">
@@ -1341,8 +1313,7 @@ function EmptyState({ onStart }: { onStart: () => void }) {
   return (
     <div className="bg-white border border-[#E9E6DE] rounded-[20px] p-12 text-center">
       <ClipboardList size={48} className="text-[#C9C4BA] mx-auto mb-4" />
-      <h3 className="text-lg font-semibold">ยังไม่มีผลการประเมิน</h3>
-      <p className="text-[#5E6470] mt-1 mb-6">เริ่มทำแบบประเมินแรก แล้วผลสรุปจะแสดงที่นี่</p>
+      <h3 className="text-lg font-semibold mb-6">ยังไม่มีผลการประเมิน</h3>
       <button onClick={onStart} className="min-h-11 px-5 rounded-xl text-white font-semibold" style={{ background: ACCENT }}>
         เริ่มทำแบบประเมิน
       </button>

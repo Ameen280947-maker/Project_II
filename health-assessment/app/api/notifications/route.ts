@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { syncUserNotifications } from "@/lib/notificationRules";
 import { requireUser } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    GET /api/notifications?userId=xxx
@@ -42,6 +43,7 @@ export async function GET(request: NextRequest) {
       upcomingNotifications,
     });
   } catch (error) {
+    void logSystemError("GET /api/notifications", error);
     const errMsg = error instanceof Error ? error.message : "Unknown error";
     const errStack = error instanceof Error ? error.stack : undefined;
     console.error("Notifications GET Error:", errMsg);
@@ -108,6 +110,7 @@ export async function PATCH(request: NextRequest) {
       message: "ทำเครื่องหมายอ่านแล้วสำเร็จ",
     });
   } catch (error) {
+    void logSystemError("PATCH /api/notifications", error);
     console.error("Notifications PATCH Error:", error);
     return NextResponse.json(
       {

@@ -8,6 +8,7 @@ import {
     resolveChoiceAnswers,
     userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -349,6 +350,7 @@ export async function GET(request: NextRequest) {
                 Array.from(questionMap.values()),
         });
     } catch (error) {
+      void logSystemError("GET /api/assessments/stress", error);
         console.error(
             "GET STRESS ASSESSMENT ERROR:",
             error,
@@ -596,6 +598,7 @@ export async function POST(
                 recommendationId,
         });
     } catch (error) {
+      void logSystemError("POST /api/assessments/stress", error);
         await client.query("ROLLBACK").catch(() => {});
 
         console.error(

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { requireUser } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    PATCH /api/settings/email
@@ -67,6 +68,7 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ success: true, message: "เปลี่ยนอีเมลเรียบร้อยแล้ว", user: rows[0] });
   } catch (error) {
+    void logSystemError("PATCH /api/settings/email", error);
     // กันกรณีมีคนใช้อีเมลเดียวกันพร้อมกัน (unique constraint)
     if ((error as { code?: string }).code === "23505") {
       return NextResponse.json({ success: false, message: "อีเมลนี้ถูกใช้งานแล้ว" }, { status: 409 });

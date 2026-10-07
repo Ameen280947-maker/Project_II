@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { requireStaff, USER_ROLE_ID } from "@/lib/staff/auth";
 import { EXCLUDED_TYPES, severityOf, riskLabel, typeLabel } from "@/lib/staff/riskLevels";
 import { syncFollowUpCases } from "@/lib/staff/syncFollowUps";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    GET /api/staff/overview?range=week|month|quarter
@@ -203,6 +204,7 @@ export async function GET(request: NextRequest) {
       activity,
     });
   } catch (error) {
+    void logSystemError("GET /api/staff/overview", error);
     console.error("GET /api/staff/overview error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดข้อมูลภาพรวมได้" }, { status: 500 });
   }

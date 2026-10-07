@@ -8,6 +8,7 @@ import {
   toId,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -267,6 +268,7 @@ export async function GET(request: NextRequest) {
       questions,
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/depression", error);
     console.error("Depression GET error:", error);
 
     return fail("ไม่สามารถโหลดแบบประเมินได้", 500);
@@ -607,6 +609,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
+    void logSystemError("POST /api/assessments/depression", error);
     if (inTransaction) {
       await client.query("ROLLBACK").catch(() => {});
     }

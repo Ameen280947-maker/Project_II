@@ -73,7 +73,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  // ชื่อไฟล์ใช้เวลาไทย ให้ตรงกับเวลาที่แสดงในประวัติ
+  const stamp = new Date(Date.now() + 7 * 60 * 60 * 1000)
+    .toISOString()
+    .replace(/[:.]/g, "-")
+    .slice(0, 19);
   const fileName = `health-backup-${stamp}.json`;
   const note = String(body.note ?? "").trim().slice(0, 500) || null;
 

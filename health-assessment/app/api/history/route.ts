@@ -1,6 +1,7 @@
 import pool from "@/lib/db";
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
       history: result.rows,
     });
   } catch (error) {
+    void logSystemError("GET /api/history", error);
     console.error(
       "GET ASSESSMENT HISTORY ERROR:",
       error,

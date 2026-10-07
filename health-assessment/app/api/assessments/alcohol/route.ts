@@ -7,6 +7,7 @@ import {
   toIntInRange,
   userExists,
 } from "../_lib/validate";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -304,6 +305,7 @@ export async function GET(request: NextRequest) {
       questions: QUESTIONS,
     });
   } catch (error) {
+    void logSystemError("GET /api/assessments/alcohol", error);
     console.error("GET ALCOHOL ERROR:", error);
     return NextResponse.json(
       {
@@ -568,6 +570,7 @@ export async function POST(request: NextRequest) {
       recommendation_text: finalRecText,
     });
   } catch (error) {
+    void logSystemError("POST /api/assessments/alcohol", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST ALCOHOL ERROR:", error);
 

@@ -4,6 +4,7 @@ import { requireStaff, USER_ROLE_ID } from "@/lib/staff/auth";
 import { EXCLUDED_TYPES, severityOf, typeLabel } from "@/lib/staff/riskLevels";
 import { loadCustomSeverities } from "@/lib/customAssessments";
 import { getNotificationRule } from "@/lib/notificationRules";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    GET /api/staff/reports?months=3|6|12&type=all|<id>&gender=all|male|female&age=all|18-24|25-39|40-59|60+
@@ -165,6 +166,7 @@ export async function GET(request: NextRequest) {
       summary,
     });
   } catch (error) {
+    void logSystemError("GET /api/staff/reports", error);
     console.error("GET /api/staff/reports error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถสร้างรายงานได้" }, { status: 500 });
   }

@@ -56,6 +56,8 @@ export default function AdminErrorsPage() {
   const [note, setNote] = useState("");
   const [showNew, setShowNew] = useState(false);
   const [form, setForm] = useState({ source: "", message: "", level: "error" });
+  const [formError, setFormError] = useState("");
+  const [triedSubmit, setTriedSubmit] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -86,14 +88,28 @@ export default function AdminErrorsPage() {
     load();
   };
 
+  const openNew = () => {
+    setForm({ source: "", message: "", level: "error" });
+    setFormError("");
+    setTriedSubmit(false);
+    setShowNew(true);
+  };
+
   const createLog = async () => {
-    const res = await adminFetch("/api/admin/errors", { method: "POST", json: form });
-    setNotice({ kind: res.success ? "success" : "error", text: res.message ?? "" });
-    if (res.success) {
-      setShowNew(false);
-      setForm({ source: "", message: "", level: "error" });
-      load();
+    // ตรวจในหน้าก่อน ข้อความผิดพลาดแสดงในหน้าต่างเอง (ไม่ใช่หลังฉากมืด)
+    setTriedSubmit(true);
+    if (!form.source.trim() || !form.message.trim()) {
+      setFormError("กรุณากรอกตำแหน่งที่พบและรายละเอียดปัญหา");
+      return;
     }
+    const res = await adminFetch("/api/admin/errors", { method: "POST", json: form });
+    if (!res.success) {
+      setFormError(res.message ?? "บันทึกไม่สำเร็จ");
+      return;
+    }
+    setNotice({ kind: "success", text: res.message ?? "บันทึกแล้ว" });
+    setShowNew(false);
+    load();
   };
 
   const clearClosed = async () => {
@@ -114,7 +130,7 @@ export default function AdminErrorsPage() {
             <GhostButton onClick={clearClosed}>
               <Trash2 size={16} /> ล้างที่ปิดแล้ว
             </GhostButton>
-            <PrimaryButton onClick={() => setShowNew(true)}>
+            <PrimaryButton onClick={openNew}>
               <Plus size={16} /> บันทึกปัญหา
             </PrimaryButton>
           </div>
@@ -212,6 +228,7 @@ export default function AdminErrorsPage() {
         <Modal title="บันทึกการแก้ไข" onClose={() => setResolving(null)}>
           <p className="mb-3 text-sm text-[#64748b]">{resolving.message}</p>
           <textarea
+            autoFocus
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={4}
@@ -229,19 +246,37 @@ export default function AdminErrorsPage() {
       {showNew && (
         <Modal title="บันทึกปัญหาที่พบ" onClose={() => setShowNew(false)}>
           <div className="space-y-3">
-            <input
-              value={form.source}
-              onChange={(e) => setForm({ ...form, source: e.target.value })}
-              placeholder="ตำแหน่งที่พบ เช่น หน้า Dashboard"
-              className="w-full rounded-2xl border border-[#e3e8f2] px-4 py-3 text-sm outline-none focus:border-[#1e3a8a]"
-            />
-            <textarea
-              value={form.message}
-              onChange={(e) => setForm({ ...form, message: e.target.value })}
-              rows={4}
-              placeholder="รายละเอียดปัญหา"
-              className="w-full rounded-2xl border border-[#e3e8f2] p-3 text-sm outline-none focus:border-[#1e3a8a]"
-            />
+            {formError && (
+              <p role="alert" className="rounded-2xl bg-[#fdecec] px-4 py-3 text-sm font-semibold text-[#b91c1c]">
+                {formError}
+              </p>
+            )}
+            <label className="block text-sm font-semibold text-[#334155]">
+              ตำแหน่งที่พบ <span className="text-[#b91c1c]">*</span>
+              <input
+                autoFocus
+                value={form.source}
+                onChange={(e) => setForm({ ...form, source: e.target.value })}
+                placeholder="ตำแหน่งที่พบ เช่น หน้า Dashboard"
+                aria-invalid={triedSubmit && !form.source.trim()}
+                className={`mt-1.5 w-full rounded-2xl border px-4 py-3 text-sm font-normal outline-none focus:border-[#1e3a8a] ${
+                  triedSubmit && !form.source.trim() ? "border-[#ef4444]" : "border-[#e3e8f2]"
+                }`}
+              />
+            </label>
+            <label className="block text-sm font-semibold text-[#334155]">
+              รายละเอียดปัญหา <span className="text-[#b91c1c]">*</span>
+              <textarea
+                value={form.message}
+                onChange={(e) => setForm({ ...form, message: e.target.value })}
+                rows={4}
+                placeholder="รายละเอียดปัญหา"
+                aria-invalid={triedSubmit && !form.message.trim()}
+                className={`mt-1.5 w-full rounded-2xl border p-3 text-sm font-normal outline-none focus:border-[#1e3a8a] ${
+                  triedSubmit && !form.message.trim() ? "border-[#ef4444]" : "border-[#e3e8f2]"
+                }`}
+              />
+            </label>
             <select
               value={form.level}
               onChange={(e) => setForm({ ...form, level: e.target.value })}
@@ -271,9 +306,24 @@ function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
+  // กด Esc เพื่อปิด
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#0f172a]/50 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-lg font-bold">{title}</h3>
           <button onClick={onClose} aria-label="ปิด" className="rounded-xl p-1.5 text-[#64748b] hover:bg-[#f1f5f9]">

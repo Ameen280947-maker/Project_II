@@ -8,8 +8,10 @@ import AdminSidebar from "./components/AdminSidebar";
 
 /* =========================================================
    LAYOUT ของทุกหน้า /admin/*
-   - ถ้ายังไม่ login หรือ role ไม่ใช่ system_admin → กลับไปหน้า /login
-   - API ฝั่ง server ตรวจสิทธิ์ซ้ำอีกชั้น (lib/adminAuth.ts)
+   - ถามสิทธิ์จาก server (/api/admin/me อ่าน session cookie)
+     ไม่ใช้ค่า role ใน localStorage เพราะแก้เองได้
+   - ยังไม่ login หรือไม่ใช่ system_admin → กลับไปหน้า /login
+   - API ทุกตัวของ admin ตรวจสิทธิ์ซ้ำอีกชั้น (lib/adminAuth.ts)
 ========================================================= */
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
@@ -18,18 +20,26 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const [username, setUsername] = useState("");
 
   useEffect(() => {
-    try {
-      const role = localStorage.getItem("role");
-      const userId = localStorage.getItem("userId");
-      if (!userId || role !== "system_admin") {
-        router.replace("/login");
-        return;
-      }
-      setUsername(localStorage.getItem("username") ?? "");
-      setAllowed(true);
-    } catch {
-      router.replace("/login");
-    }
+    let cancelled = false;
+
+    fetch("/api/admin/me", { cache: "no-store" })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (!res.ok || !data?.success) {
+          router.replace("/login");
+          return;
+        }
+        setUsername(data.admin?.username ?? "");
+        setAllowed(true);
+      })
+      .catch(() => {
+        if (!cancelled) router.replace("/login");
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (!allowed) {

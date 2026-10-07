@@ -6,6 +6,7 @@ import {
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 import { setSessionCookie } from "@/lib/session";
+import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 
@@ -230,6 +231,7 @@ export async function POST(
 
     return response;
   } catch (error) {
+    void logSystemError("POST /api/auth/login", error);
     console.error(
       "LOGIN API ERROR:",
       error,

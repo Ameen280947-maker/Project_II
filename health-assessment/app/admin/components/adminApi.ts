@@ -1,16 +1,10 @@
 /* =========================================================
    ตัวช่วยเรียก API ฝั่ง Admin
-   แนบ header x-user-id จาก localStorage ให้ทุก request
+   ตัวตนผู้ใช้มาจาก session cookie (browser แนบให้อัตโนมัติ)
 ========================================================= */
 
 export function adminHeaders(extra?: HeadersInit): HeadersInit {
-  let userId = "";
-  try {
-    userId = localStorage.getItem("userId") ?? "";
-  } catch {
-    /* ignore */
-  }
-  return { "x-user-id": userId, ...(extra ?? {}) };
+  return { ...(extra ?? {}) };
 }
 
 export async function adminFetch<T = Record<string, unknown>>(

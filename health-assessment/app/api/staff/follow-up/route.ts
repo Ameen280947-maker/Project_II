@@ -5,6 +5,7 @@ import { EXCLUDED_TYPES, severityOf, riskLabel, typeLabel } from "@/lib/staff/ri
 import { loadCustomSeverities } from "@/lib/customAssessments";
 import { countHighRiskWithoutConsent, syncFollowUpCases } from "@/lib/staff/syncFollowUps";
 import { CASE_STATUSES, CASE_STATUS_LABEL, isCaseStatus } from "@/lib/staff/cases";
+import { logSystemError } from "@/lib/errorLogger";
 
 /* =========================================================
    /api/staff/follow-up
@@ -74,6 +75,7 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (error) {
+    void logSystemError("GET /api/staff/follow-up", error);
     console.error("GET /api/staff/follow-up error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดข้อมูลการติดตามได้" }, { status: 500 });
   }
@@ -211,6 +213,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
+    void logSystemError("POST /api/staff/follow-up", error);
     console.error("POST /api/staff/follow-up error:", error);
     return NextResponse.json({ success: false, message: "บันทึกการติดตามไม่สำเร็จ" }, { status: 500 });
   }
