@@ -60,7 +60,7 @@ export async function sendOtpEmail(to: string, otp: string) {
       <p style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #b91c2b; margin: 16px 0;">${otp}</p>
       <p>รหัสนี้ใช้ได้ภายใน <b>${OTP_VALID_MINUTES} นาที</b> และใช้ได้ครั้งเดียว</p>
       <p style="color: #96969e; font-size: 13px;">
-        หากคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องดำเนินการใด ๆ บัญชีของคุณยังปลอดภัย<br />
+        หากคุณไม่ได้ขอตั้งรหัสผ่านใหม่ ไม่ต้องดำเนินการใดๆ บัญชีของคุณยังปลอดภัย<br />
         ห้ามบอกรหัสนี้กับผู้อื่น รวมถึงเจ้าหน้าที่
       </p>
     </div>
