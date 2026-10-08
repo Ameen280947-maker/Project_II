@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NotificationBell from "@/app/components/NotificationBell";
-import type { CalculatedNotification } from "@/lib/notificationRules";
 
 import Sidebar from "@/app/components/Sidebar";
 import { riskLevelOf, type Level } from "@/lib/riskLevel";
@@ -14,7 +13,6 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
-  ChevronRight,
   ClipboardList,
   Footprints,
   HeartPulse,
@@ -24,7 +22,6 @@ import {
   Phone,
   Plus,
   Ruler,
-  ShieldAlert,
   Zap,
   type LucideIcon,
 } from "lucide-react";
@@ -345,7 +342,6 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [data, setData] = useState<DashboardData | null>(null);
-  const [notifs, setNotifs] = useState<CalculatedNotification[]>([]);
   const [notifSummary, setNotifSummary] = useState<NotifSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -393,7 +389,6 @@ export default function DashboardPage() {
         setData(result);
 
         if (notifResult.success) {
-          setNotifs(notifResult.notifications || []);
           setNotifSummary(notifResult.summary || null);
         }
       } catch (err) {
@@ -426,7 +421,6 @@ export default function DashboardPage() {
         <DashboardContent
           data={data}
           userName={userName}
-          notifs={notifs}
           notifSummary={notifSummary}
           openResult={openResult}
         />
@@ -455,13 +449,11 @@ function PageShell({ children }: { children: ReactNode }) {
 function DashboardContent({
   data,
   userName,
-  notifs,
   notifSummary,
   openResult,
 }: {
   data: DashboardData;
   userName: string;
-  notifs: CalculatedNotification[];
   notifSummary: NotifSummary | null;
   openResult: (a: Assessment) => void;
 }) {
@@ -561,9 +553,6 @@ function DashboardContent({
           small
         />
       </section>
-
-      {/* ---------- Follow-up & notifications ---------- */}
-      <FollowUpSection notifs={notifs} summary={notifSummary} />
 
       {latestByType.length === 0 ? (
         <EmptyState onStart={() => router.push(ASSESSMENT_HREF)} />
@@ -721,6 +710,7 @@ function PriorityAlert({ items }: { items: Assessment[] }) {
 }
 
 /* =========================================================
+<<<<<<< HEAD
    FOLLOW-UP & NOTIFICATIONS (จากระบบแจ้งเตือน)
 ========================================================= */
 
@@ -834,6 +824,8 @@ function FollowUpSection({
 }
 
 /* =========================================================
+=======
+>>>>>>> 19b83c1 (แก้)
    TREND CHART (SVG ล้วน ไม่ต้องติดตั้ง library)
 ========================================================= */
 
