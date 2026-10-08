@@ -79,7 +79,7 @@ async function result(assessmentId: number, userId: number) {
             t.assessment_name, r.recommendation_text, r.reassess_days, r.hotline, r.source
        FROM assessment a
        JOIN assessment_types t USING (assessment_type_id)
-       LEFT JOIN recommendation r ON r.rec_id = a.recommendation_id
+       LEFT JOIN LATERAL recommendation_at(a.recommendation_id, a.assessed_at) r ON TRUE
       WHERE a.assessment_id = $1 AND a.user_id = $2`,
     [assessmentId, userId]
   );

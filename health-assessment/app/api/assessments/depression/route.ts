@@ -100,8 +100,9 @@ export async function GET(request: NextRequest) {
         FROM assessment a
         JOIN assessment_types t
           ON t.assessment_type_id = a.assessment_type_id
-        LEFT JOIN recommendation r
-          ON r.rec_id = a.recommendation_id
+        -- คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมิน (staff แก้ภายหลังไม่กระทบผลเก่า)
+        LEFT JOIN LATERAL recommendation_at(a.recommendation_id, a.assessed_at) r
+          ON TRUE
         WHERE a.assessment_id = $1
           AND a.assessment_type_id IN ($2, $3)
           AND a.user_id = $4
@@ -132,16 +133,21 @@ export async function GET(request: NextRequest) {
       if (!recommendationText) {
         const fallbackRec = await client.query(
           `
-          SELECT recommendation_text
-          FROM recommendation
-          WHERE assessment_type_id = $1
-            AND (risk_level = $2 OR rec_id = $3)
+          SELECT v.recommendation_text
+          FROM recommendation r
+          CROSS JOIN LATERAL recommendation_at(
+            r.rec_id,
+            (SELECT assessed_at FROM assessment WHERE assessment_id = $4)
+          ) v
+          WHERE r.assessment_type_id = $1
+            AND (r.risk_level = $2 OR r.rec_id = $3)
           LIMIT 1
           `,
           [
             assessment.assessment_type_id,
             assessment.risk_level,
             assessment.recommendation_id,
+            assessment.assessment_id,
           ]
         );
         if (fallbackRec.rows.length > 0) {
@@ -333,7 +339,7 @@ export async function POST(request: NextRequest) {
     const questions = questionsResult.rows;
 
     if (questions.length === 0) {
-      return fail("ไม่พบคำถามในฐานข้อมูล");
+      return fail("ไม่พบคำถามของแบบประเมิน กรุณาลองใหม่อีกครั้ง");
     }
 
     /* -----------------------------------------------------

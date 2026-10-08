@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import Sidebar from "@/app/components/Sidebar";
+import AnswerReview from "@/app/components/AnswerReview";
 
 /* =========================================================
    TYPES
@@ -689,6 +690,8 @@ function RecommendationDiabetesContent() {
             </aside>
 
           </div>
+
+          <AnswerReview assessmentId={assessmentId} className="mt-8" />
 
           {/* =================================================
               DISCLAIMER

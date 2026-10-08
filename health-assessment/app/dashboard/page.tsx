@@ -326,11 +326,6 @@ const getLevel = (a: Assessment): Level => {
   return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
-const formatDateTime = (date?: string | null) =>
-  date
-    ? new Date(date).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })
-    : "-";
-
 const formatShortDate = (date: string) =>
   new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
@@ -595,9 +590,6 @@ function DashboardContent({
           </section>
         </>
       )}
-
-      {/* ---------- History ---------- */}
-      <HistoryTable assessments={assessments} onOpen={openResult} onSeeAll={() => router.push("/history")} total={summary.totalAssessments} />
 
       <footer className="flex gap-2.5 items-start text-[13px] text-[#5E6470] px-1">
         <Info size={16} className="shrink-0 mt-0.5" />
@@ -1044,114 +1036,6 @@ function Recommendations({ items }: { items: Assessment[] }) {
         ))}
       </div>
     </div>
-  );
-}
-
-/* =========================================================
-   HISTORY TABLE
-========================================================= */
-
-function HistoryTable({
-  assessments,
-  onOpen,
-  onSeeAll,
-  total,
-}: {
-  assessments: Assessment[];
-  onOpen: (a: Assessment) => void;
-  onSeeAll: () => void;
-  total: number;
-}) {
-  const [filter, setFilter] = useState<"all" | Category>("all");
-  const chips: { key: "all" | Category; label: string }[] = [
-    { key: "all", label: "ทั้งหมด" },
-    { key: "mind", label: "สุขภาพจิต" },
-    { key: "body", label: "สุขภาพกาย" },
-  ];
-
-  const rows = assessments
-    .filter((a) => filter === "all" || getConfig(a.assessment_name).category === filter)
-    .slice(0, 8);
-
-  return (
-    <section className="bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <SectionHead eyebrow="RECENT HISTORY" title="ประวัติการประเมินล่าสุด" />
-        <div className="flex flex-wrap items-center gap-2">
-          {chips.map((c) => (
-            <button
-              key={c.key}
-              onClick={() => setFilter(c.key)}
-              aria-pressed={filter === c.key}
-              className={`min-h-10 px-3.5 rounded-full text-sm border ${
-                filter === c.key
-                  ? "bg-[#16181D] text-white border-[#16181D]"
-                  : "bg-white text-[#4A4F59] border-[#E7E4DC] hover:bg-[#F6F5F1]"
-              }`}
-            >
-              {c.label}
-            </button>
-          ))}
-          <button onClick={onSeeAll} className="ml-2 px-1 py-2 font-semibold hover:underline" style={{ color: ACCENT }}>
-            ดูทั้งหมด {total} รายการ
-          </button>
-        </div>
-      </div>
-
-      {rows.length === 0 ? (
-        <p className="py-10 text-center text-[#5E6470]">ยังไม่มีประวัติการประเมินในหมวดนี้</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
-            <thead>
-              <tr className="text-left text-[13px] text-[#5E6470]">
-                <th className="px-3 py-2.5 font-medium border-b border-[#E9E6DE]">แบบประเมิน</th>
-                <th className="px-3 py-2.5 font-medium border-b border-[#E9E6DE]">วันที่</th>
-                <th className="px-3 py-2.5 font-medium border-b border-[#E9E6DE] text-right">คะแนน</th>
-                <th className="px-3 py-2.5 font-medium border-b border-[#E9E6DE]">ผลการประเมิน</th>
-                <th className="px-3 py-2.5 border-b border-[#E9E6DE]">
-                  <span className="sr-only">ดูผล</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((a) => {
-                const cfg = getConfig(a.assessment_name);
-                const s = LEVEL_STYLE[getLevel(a)];
-                return (
-                  <tr key={a.assessment_id} className="hover:bg-[#FBFAF8]">
-                    <td className="px-3 py-3.5 border-b border-[#F0EEE8]">
-                      <p className="font-semibold">{a.assessment_name}</p>
-                      {cfg.thaiName && <p className="text-xs text-[#5E6470]">{cfg.thaiName}</p>}
-                    </td>
-                    <td className="px-3 py-3.5 border-b border-[#F0EEE8] text-[#4A4F59] whitespace-nowrap">
-                      {formatDateTime(a.assessed_at)}
-                    </td>
-                    <td className="px-3 py-3.5 border-b border-[#F0EEE8] text-right font-[family-name:var(--font-anuphan)] font-bold text-base whitespace-nowrap">
-                      {displayScore(a)}
-                    </td>
-                    <td className="px-3 py-3.5 border-b border-[#F0EEE8]">
-                      <span className={`inline-block px-3 py-1 rounded-full text-[13px] font-semibold ${s.pill}`}>
-                        {a.risk_level || "-"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-3.5 border-b border-[#F0EEE8] text-right">
-                      <button
-                        onClick={() => onOpen(a)}
-                        aria-label={`ดูผล ${a.assessment_name}`}
-                        className="inline-flex w-10 h-10 rounded-[10px] border border-[#E7E4DC] items-center justify-center hover:bg-[#F6F5F1]"
-                      >
-                        <ArrowRight size={18} className="text-[#4A4F59]" />
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
   );
 }
 

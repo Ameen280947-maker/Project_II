@@ -1005,7 +1005,7 @@ export default function AssessmentPage() {
           !heightQuestion
         ) {
           throw new Error(
-            "คำถาม Thai CVD ในฐานข้อมูลไม่ครบ 7 ข้อ",
+            "ไม่สามารถโหลดคำถามได้ครบ กรุณาลองใหม่อีกครั้ง",
           );
         }
 
@@ -1050,7 +1050,7 @@ export default function AssessmentPage() {
             null
         ) {
           throw new Error(
-            "ไม่พบตัวเลือกเพศ บุหรี่ หรือเบาหวานในฐานข้อมูล",
+            "ไม่สามารถโหลดตัวเลือกคำตอบได้ครบ กรุณาลองใหม่อีกครั้ง",
           );
         }
 
@@ -1299,7 +1299,7 @@ export default function AssessmentPage() {
 
           {loading && (
             <div className="mt-6 rounded-2xl bg-white p-4 text-sm text-[#767780] shadow-sm">
-              กำลังโหลดข้อมูลสุขภาพจากฐานข้อมูล...
+              กำลังโหลดข้อมูลสุขภาพ...
             </div>
           )}
 

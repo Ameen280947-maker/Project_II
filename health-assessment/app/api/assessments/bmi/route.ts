@@ -67,8 +67,9 @@ export async function GET(request: Request) {
       FROM assessment a
       INNER JOIN assessment_types t
         ON t.assessment_type_id = a.assessment_type_id
-      LEFT JOIN recommendation r
-        ON r.rec_id = a.recommendation_id
+      -- คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมิน (staff แก้ภายหลังไม่กระทบผลเก่า)
+      LEFT JOIN LATERAL recommendation_at(a.recommendation_id, a.assessed_at) r
+        ON TRUE
       WHERE a.assessment_id = $1
         AND a.user_id = $2
         AND t.assessment_name = 'BMI'
@@ -106,12 +107,13 @@ export async function GET(request: Request) {
     let weightKg: number | null = null;
     let heightCm: number | null = null;
 
+    // จับคู่จากข้อความคำถาม (ลำดับคำถามในฐานข้อมูลคือ ส่วนสูง=1 น้ำหนัก=2)
     for (const answer of answersResult.rows) {
-      if (answer.display_order === 1) {
+      if (answer.question_text.includes("น้ำหนัก")) {
         weightKg = Number(answer.answer_value);
       }
 
-      if (answer.display_order === 2) {
+      if (answer.question_text.includes("ส่วนสูง")) {
         heightCm = Number(answer.answer_value);
       }
     }
@@ -199,7 +201,7 @@ export async function POST(request: Request) {
 
     const assessmentTypeId = typeResult.rows[0].assessment_type_id;
 
-    /* ดึงคำถาม (คาดว่ามี 2 คำถาม: น้ำหนัก=1 ส่วนสูง=2) */
+    /* ดึงคำถาม (มี 2 คำถาม: ส่วนสูง และ น้ำหนัก) */
     const questionResult = await client.query<QuestionRow>(
       `
       SELECT
@@ -218,8 +220,9 @@ export async function POST(request: Request) {
       throw new Error("คำถาม BMI ในฐานข้อมูลไม่ครบ");
     }
 
-    const weightQuestion = questionResult.rows.find((q) => q.display_order === 1);
-    const heightQuestion = questionResult.rows.find((q) => q.display_order === 2);
+    // จับคู่จากข้อความคำถาม ไม่อิง display_order
+    const weightQuestion = questionResult.rows.find((q) => q.question_text.includes("น้ำหนัก"));
+    const heightQuestion = questionResult.rows.find((q) => q.question_text.includes("ส่วนสูง"));
 
     if (!weightQuestion || !heightQuestion) {
       throw new Error("ไม่พบคำถามน้ำหนักหรือส่วนสูง");

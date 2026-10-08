@@ -237,8 +237,9 @@ async function getAssessmentResult(assessmentId: number, userId: number) {
     FROM assessment a
     JOIN assessment_types t
       ON t.assessment_type_id = a.assessment_type_id
-    LEFT JOIN recommendation r
-      ON r.rec_id = a.recommendation_id
+    -- คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมิน (staff แก้ภายหลังไม่กระทบผลเก่า)
+    LEFT JOIN LATERAL recommendation_at(a.recommendation_id, a.assessed_at) r
+      ON TRUE
     WHERE a.assessment_id = $1
       AND t.assessment_name = $2
       AND a.user_id = $3

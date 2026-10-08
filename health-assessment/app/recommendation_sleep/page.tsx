@@ -12,6 +12,7 @@ import {
     Loader2,
     CalendarDays,
 } from "lucide-react";
+import AnswerReview from "@/app/components/AnswerReview";
 
 type Recommendation = {
     id: number;
@@ -57,7 +58,8 @@ export default function RecommendationSleepPage() {
             window.location.search
         );
 
-        const id = params.get("recordId");
+        // หน้าประวัติส่ง assessmentId หน้าทำแบบประเมินส่ง recordId (ค่าเดียวกัน)
+        const id = params.get("recordId") || params.get("assessmentId");
 
         setRecordId(id);
     }, []);
@@ -201,42 +203,6 @@ export default function RecommendationSleepPage() {
 
     const score = result.score;
 
-    // =====================================================
-    // Icon ตามคะแนน
-    // =====================================================
-
-    function ResultIcon() {
-        if (score === 3) {
-            return (
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#EDF8E9]">
-                    <CheckCircle2
-                        size={46}
-                        className="text-[#65A85B]"
-                    />
-                </div>
-            );
-        }
-
-        if (score === 2) {
-            return (
-                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFFDE5]">
-                    <AlertTriangle
-                        size={46}
-                        className="text-[#D1BD00]"
-                    />
-                </div>
-            );
-        }
-
-        return (
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFF0ED]">
-                <ShieldAlert
-                    size={46}
-                    className="text-[#FF321A]"
-                />
-            </div>
-        );
-    }
 
     // =====================================================
     // วันที่
@@ -302,7 +268,7 @@ export default function RecommendationSleepPage() {
 
                         <div className="flex flex-col items-center text-center">
 
-                            <ResultIcon />
+                            <ResultIcon score={score} />
 
                             <p className="mt-6 text-sm font-semibold text-[#99999F]">
                                 คะแนนของคุณ
@@ -418,6 +384,8 @@ export default function RecommendationSleepPage() {
                         </div>
 
 
+                        <AnswerReview assessmentId={recordId} className="mt-6" />
+
                         {/* =================================================
                 Important Note
             ================================================= */}
@@ -476,5 +444,42 @@ export default function RecommendationSleepPage() {
             </div>
 
         </main>
+    );
+}
+
+// =====================================================
+// Icon ตามคะแนน
+// =====================================================
+
+function ResultIcon({ score }: { score: number }) {
+    if (score === 3) {
+        return (
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#EDF8E9]">
+                <CheckCircle2
+                    size={46}
+                    className="text-[#65A85B]"
+                />
+            </div>
+        );
+    }
+
+    if (score === 2) {
+        return (
+            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFFDE5]">
+                <AlertTriangle
+                    size={46}
+                    className="text-[#D1BD00]"
+                />
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFF0ED]">
+            <ShieldAlert
+                size={46}
+                className="text-[#FF321A]"
+            />
+        </div>
     );
 }

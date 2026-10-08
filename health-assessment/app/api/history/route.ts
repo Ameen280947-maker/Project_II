@@ -53,9 +53,9 @@ export async function GET(request: Request) {
         ON t.assessment_type_id =
            a.assessment_type_id
 
-      LEFT JOIN recommendation r
-        ON r.rec_id =
-           a.recommendation_id
+      -- คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมิน (staff แก้ภายหลังไม่กระทบผลเก่า)
+      LEFT JOIN LATERAL recommendation_at(a.recommendation_id, a.assessed_at) r
+        ON TRUE
 
       WHERE a.user_id = $1
 

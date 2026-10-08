@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ClipboardList, Phone, RotateCcw } from "lucide-react";
 import Sidebar from "@/app/components/Sidebar";
+import AnswerReview from "@/app/components/AnswerReview";
 
 /* =========================================================
    หน้ากลางสำหรับแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
@@ -266,6 +267,8 @@ function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: nu
         {r.reassessDays && <p className="mt-3 text-sm text-[#858991]">แนะนำให้ประเมินซ้ำในอีก {r.reassessDays} วัน</p>}
         {r.source && <p className="mt-3 text-xs text-[#9a9ba2]">อ้างอิง: {r.source}</p>}
       </div>
+
+      <AnswerReview assessmentId={assessmentId} className="mt-5" />
 
       <p className="mt-4 text-xs leading-6 text-[#9a9ba2]">ผลนี้เป็นการคัดกรองเบื้องต้น ไม่ใช่การวินิจฉัยทางการแพทย์</p>
 

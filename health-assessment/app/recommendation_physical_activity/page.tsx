@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import AnswerReview from "@/app/components/AnswerReview";
 
 type Answer = {
   answer_id: number;
@@ -746,7 +747,7 @@ function PhysicalActivityResultContent() {
 
                   <p className="text-[15px] md:text-[16px] leading-7 text-[#55565b] whitespace-pre-line">
                     {result.recommendation_text ||
-                      "ไม่พบคำแนะนำในฐานข้อมูล"}
+                      "ยังไม่มีคำแนะนำสำหรับผลนี้"}
                   </p>
 
                 </div>
@@ -793,11 +794,13 @@ function PhysicalActivityResultContent() {
                   }}
                 >
                   {sedentary.recommendation_text ||
-                    "ไม่พบคำแนะนำในฐานข้อมูล"}
+                    "ยังไม่มีคำแนะนำสำหรับผลนี้"}
                 </p>
 
               </div>
             )}
+
+            <AnswerReview assessmentId={assessmentId} className="mt-7" />
 
             {/* =================================================
                 NOTE

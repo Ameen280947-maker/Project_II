@@ -34,7 +34,9 @@ const SEDENTARY_LEVEL: Record<number, string> = {
 
 async function getSedentaryResult(
   client: { query: Pool["query"] },
-  score: number | null
+  score: number | null,
+  // ดูผลย้อนหลัง: ใช้คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมินครั้งนั้น
+  assessmentId: number | null = null
 ) {
   if (score === null || !SEDENTARY_LEVEL[score]) {
     return null;
@@ -44,13 +46,17 @@ async function getSedentaryResult(
 
   const rec = await client.query(
     `
-    SELECT recommendation_text
-    FROM recommendation
-    WHERE assessment_type_id = $1
-      AND risk_level = $2
+    SELECT v.recommendation_text
+    FROM recommendation r
+    CROSS JOIN LATERAL recommendation_at(
+      r.rec_id,
+      (SELECT assessed_at FROM assessment WHERE assessment_id = $3)
+    ) v
+    WHERE r.assessment_type_id = $1
+      AND r.risk_level = $2
     LIMIT 1
     `,
-    [ASSESSMENT_TYPE_ID, `พฤติกรรมเนือยนิ่ง-${level}`]
+    [ASSESSMENT_TYPE_ID, `พฤติกรรมเนือยนิ่ง-${level}`, assessmentId]
   );
 
   return {
@@ -318,7 +324,8 @@ export async function GET(request: NextRequest) {
       client,
       sedentaryAnswer.rows[0]
         ? Number(sedentaryAnswer.rows[0].score)
-        : null
+        : null,
+      assessmentId
     );
 
     return NextResponse.json(

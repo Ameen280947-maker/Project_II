@@ -240,7 +240,7 @@ export async function GET(request: NextRequest) {
         a.assessed_at
       FROM assessment a
       LEFT JOIN users u ON u.user_id = a.user_id
-      LEFT JOIN recommendation r ON r.rec_id = a.recommendation_id
+      LEFT JOIN LATERAL recommendation_at(a.recommendation_id, a.assessed_at) r ON TRUE
       WHERE a.assessment_id = $1
         AND a.user_id = $2
         AND a.assessment_type_id = $3
