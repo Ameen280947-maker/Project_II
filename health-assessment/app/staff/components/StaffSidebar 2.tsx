@@ -15,7 +15,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { clearStaffSession, staffFetch, FOLLOW_UP_UPDATED_EVENT } from "@/lib/staff/client";
+import { staffFetch, FOLLOW_UP_UPDATED_EVENT } from "@/lib/staff/client";
 
 /* =========================================================
    SIDEBAR ฝั่ง Staff (โทนเทอร์ควอยซ์)
@@ -39,7 +39,7 @@ export default function StaffSidebar() {
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    setName(localStorage.getItem("staffUsername") || "เจ้าหน้าที่");
+    setName(localStorage.getItem("username") || "เจ้าหน้าที่");
   }, []);
 
   // จำนวนเคสรอติดตาม (ตัวเลขแดงข้างเมนู)
@@ -56,21 +56,21 @@ export default function StaffSidebar() {
   const isActive = (href: string) =>
     href === "/staff" ? pathname === "/staff" : pathname === href || pathname.startsWith(href + "/");
 
-  // ออกเฉพาะ session ของ staff แท็บที่เปิดเป็นผู้ใช้หรือ admin ยังใช้งานต่อได้
-  const logout = async () => {
-    await fetch("/api/auth/logout?role=staff", { method: "POST" }).catch(() => {});
-    clearStaffSession();
+  const logout = () => {
+    ["userId", "username", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"].forEach((k) =>
+      localStorage.removeItem(k)
+    );
     router.replace("/login");
   };
 
   const brand = (
     <Link href="/staff" className="flex items-center gap-3 px-2">
-      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-linear-to-br from-[#3a3936] to-black text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
+      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-linear-to-br from-staff-400 to-staff-600 text-white shadow-[0_12px_28px_rgba(10,168,152,0.3)]">
         <ShieldPlus size={24} />
       </div>
       <div className="min-w-0">
         <p className="truncate font-bold text-staff-ink">Health Risk</p>
-        <p className="text-xs font-semibold tracking-[0.2em] text-staff-500">STAFF PORTAL</p>
+        <p className="text-xs font-semibold tracking-wider text-staff-600">STAFF PORTAL</p>
       </div>
     </Link>
   );
@@ -87,11 +87,11 @@ export default function StaffSidebar() {
             onClick={() => setOpen(false)}
             className={`flex min-h-12 items-center gap-3.5 rounded-2xl px-4 font-medium transition ${
               active
-                ? "bg-staff-900 font-semibold text-white shadow-[0_8px_18px_rgba(0,0,0,0.16)]"
+                ? "bg-staff-100 font-semibold text-staff-800"
                 : "text-staff-muted hover:bg-staff-bg hover:text-staff-ink"
             }`}
           >
-            <span className={`shrink-0 ${active ? "text-white" : ""}`}>{m.icon}</span>
+            <span className={`shrink-0 ${active ? "text-staff-600" : ""}`}>{m.icon}</span>
             <span className="min-w-0 flex-1 truncate">{m.label}</span>
             {m.badge && waiting > 0 && (
               <span className="rounded-full bg-risk-high px-2 py-0.5 text-xs font-bold text-white" aria-label={`รอติดตาม ${waiting} ราย`}>

@@ -63,32 +63,34 @@ input[type="range"] {
 }
 
 /* =========================================================
-   โทนสีฝั่ง Staff (เทอร์ควอยซ์สดใส)
+   โทนสีฝั่ง Staff (เทา · ดำ · ขาว แบบเรียบหรู)
    เปลี่ยนโทนทั้ง Staff Portal ได้ที่นี่ที่เดียว → ใช้เป็น bg-staff-600, text-staff-700 ฯลฯ
+   600–900 = ดำ (ปุ่มหลัก/เมนูที่เลือก) · 50–300 = เทาอ่อนอมอุ่น · bg = ขาวงาช้าง
 ========================================================= */
 @theme {
-  --color-staff-50: #effdfb;
-  --color-staff-100: #ccf7ef;
-  --color-staff-200: #98eee0;
-  --color-staff-300: #5cdccb;
-  --color-staff-400: #22c4b1;
-  --color-staff-500: #0aa898;
-  --color-staff-600: #05827a;
-  --color-staff-700: #0a6a64;
-  --color-staff-800: #0e5551;
-  --color-staff-900: #0f4643;
+  --color-staff-50: #f7f6f3;
+  --color-staff-100: #efeeea;
+  --color-staff-200: #e3e1dc;
+  --color-staff-300: #cfccc5;
+  --color-staff-400: #a8a59e;
+  --color-staff-500: #77746d;
+  --color-staff-600: #1d1d1b;
+  --color-staff-700: #000000;
+  --color-staff-800: #1d1d1b;
+  --color-staff-900: #121211;
 
-  --color-staff-bg: #f1f8f7;
-  --color-staff-line: #dcebe8;
-  --color-staff-soft: #f6fbfa;
-  --color-staff-ink: #102b29;
-  --color-staff-muted: #557270;
+  --color-staff-bg: #f5f4f0;
+  --color-staff-line: #e6e4df;
+  --color-staff-soft: #fafaf8;
+  --color-staff-ink: #141413;
+  --color-staff-muted: #6f6d67;
 
   /* ระดับความเสี่ยง (ใช้ความหมายเดียวกันทุกหน้า) */
-  --color-risk-ok: #4fbf72;
-  --color-risk-mid: #f4a62a;
-  --color-risk-high: #e5484d;
-  --color-risk-crit: #b4232f;
+  /* โทนหม่นลงให้เข้ากับธีมเทา-ดำ แต่ยังคงความหมาย เขียว/เหลือง/แดง */
+  --color-risk-ok: #6aa37c;
+  --color-risk-mid: #d9a441;
+  --color-risk-high: #c8473f;
+  --color-risk-crit: #962a2f;
 }
 
 @media print {

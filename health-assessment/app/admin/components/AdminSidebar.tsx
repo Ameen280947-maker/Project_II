@@ -29,11 +29,9 @@ export default function AdminSidebar({ username }: { username: string }) {
   const router = useRouter();
 
   const logout = async () => {
-    // ลบ session cookie ฝั่ง server ด้วย ไม่งั้น cookie ยังใช้เรียก API ต่อได้
-    await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
-    ["userId", "username", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"].forEach(
-      (key) => localStorage.removeItem(key),
-    );
+    // ลบเฉพาะ cookie ของ admin (session_admin) แท็บที่เปิดเป็นผู้ใช้หรือ staff ยังใช้งานต่อได้
+    // admin ไม่ได้เก็บค่าใน localStorage จึงไม่ต้องลบ
+    await fetch("/api/auth/logout?role=admin", { method: "POST" }).catch(() => {});
     router.replace("/login");
   };
 

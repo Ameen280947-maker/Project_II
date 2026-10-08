@@ -10,9 +10,31 @@ import { NextResponse } from "next/server";
      ไม่งั้นตอบ 403 (กันการเปลี่ยน userId เพื่อดูข้อมูลคนอื่น)
 
    ต้องตั้ง SESSION_SECRET ใน .env.local (สุ่มยาวอย่างน้อย 32 ตัวอักษร)
+
+   แยก cookie ตาม role เพื่อให้เปิดคนละ role ได้ในคนละแท็บของเบราว์เซอร์เดียวกัน
+   (ล็อกอิน role หนึ่งจะไม่ทับ session ของอีก role)
+     ผู้ใช้ทั่วไป → "session"  ·  staff → "session_staff"  ·  system admin → "session_admin"
 ========================================================= */
 
 export const SESSION_COOKIE = "session";
+
+export const SESSION_COOKIES = {
+  user: SESSION_COOKIE,
+  staff: "session_staff",
+  admin: "session_admin",
+} as const;
+
+export type SessionRole = keyof typeof SESSION_COOKIES;
+
+// role_id ในตาราง roles: 1 = system_admin, 2 = user, 3 = staff
+export const roleOf = (roleId: number | null): SessionRole =>
+  roleId === 1 ? "admin" : roleId === 3 ? "staff" : "user";
+
+// อ่าน ?role= จากคำขอ (ค่าเริ่มต้น user) ใช้กับ /api/auth/logout และ /api/auth/session
+export const roleFromRequest = (request: Request): SessionRole => {
+  const role = new URL(request.url).searchParams.get("role");
+  return role === "staff" || role === "admin" ? role : "user";
+};
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 วัน
 
 export type Session = {
@@ -63,7 +85,7 @@ export function setSessionCookie(
   };
   const data = Buffer.from(JSON.stringify(payload)).toString("base64url");
 
-  response.cookies.set(SESSION_COOKIE, `${data}.${sign(data)}`, {
+  response.cookies.set(SESSION_COOKIES[roleOf(user.roleId)], `${data}.${sign(data)}`, {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -72,8 +94,8 @@ export function setSessionCookie(
   });
 }
 
-export function clearSessionCookie(response: NextResponse) {
-  response.cookies.set(SESSION_COOKIE, "", {
+export function clearSessionCookie(response: NextResponse, role: SessionRole = "user") {
+  response.cookies.set(SESSION_COOKIES[role], "", {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -84,8 +106,8 @@ export function clearSessionCookie(response: NextResponse) {
 
 /* ---------- อ่าน session ---------- */
 
-export function getSession(request: Request): Session | null {
-  const token = readCookie(request, SESSION_COOKIE);
+export function getSession(request: Request, role: SessionRole = "user"): Session | null {
+  const token = readCookie(request, SESSION_COOKIES[role]);
   if (!token) return null;
 
   const [data, signature] = token.split(".");

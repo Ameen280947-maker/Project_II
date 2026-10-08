@@ -136,7 +136,6 @@ export default function StaffAssessmentsPage() {
             <Editor
               key={selected}
               typeId={selected}
-              isActive={types.find((t) => t.id === selected)?.isActive}
               onPublished={loadTypes}
               onDeleted={() => {
                 writeDraft(selected, null);
@@ -166,17 +165,7 @@ export default function StaffAssessmentsPage() {
    EDITOR
 ========================================================= */
 
-function Editor({
-  typeId,
-  isActive: listActive,
-  onPublished,
-  onDeleted,
-}: {
-  typeId: number;
-  isActive?: boolean;
-  onPublished: () => void;
-  onDeleted: () => void;
-}) {
+function Editor({ typeId, onPublished, onDeleted }: { typeId: number; onPublished: () => void; onDeleted: () => void }) {
   const [deleting, setDeleting] = useState(false);
   const [detail, setDetail] = useState<Detail | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -282,9 +271,8 @@ function Editor({
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold">{detail.label}</h2>
-            {/* ใช้สถานะจากสวิตช์ในรายการด้านซ้าย ป้ายจะเปลี่ยนตามทันทีเมื่อกดเปิด/ปิด */}
-            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${(listActive ?? detail.isActive) ? "bg-staff-900 text-white" : "bg-staff-100 text-staff-muted"}`}>
-              {(listActive ?? detail.isActive) ? "เปิดใช้งาน" : "ปิดใช้งาน"}
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${detail.isActive ? "bg-staff-100 text-staff-800" : "bg-gray-100 text-gray-600"}`}>
+              {detail.isActive ? "เปิดใช้งาน" : "ปิดใช้งาน"}
             </span>
             {(dirty || hasDraft) && <span className="rounded-full bg-[#fff3dc] px-2.5 py-0.5 text-xs font-semibold text-[#8a5a00]">มีการแก้ไขที่ยังไม่เผยแพร่</span>}
           </div>

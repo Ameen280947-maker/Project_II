@@ -53,7 +53,7 @@ export default function StaffOverviewPage() {
   const [name, setName] = useState("");
 
   useEffect(() => {
-    setName(localStorage.getItem("username") || "");
+    setName(localStorage.getItem("staffUsername") || "");
   }, []);
 
   useEffect(() => {

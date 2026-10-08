@@ -158,53 +158,75 @@ export default function LoginPage() {
       );
 
       /* =====================================================
-         SAVE USER
-      ===================================================== */
-
-      localStorage.setItem(
-        "userId",
-        String(
-          user.user_id,
-        ),
-      );
-
-      localStorage.setItem(
-        "username",
-        user.username,
-      );
-
-      localStorage.setItem(
-        "email",
-        user.email ?? "",
-      );
-
-      localStorage.setItem(
-        "roleId",
-        user.role_id !== null
-          ? String(
-              user.role_id,
-            )
-          : "",
-      );
-
-      localStorage.setItem(
-        "role",
-        user.role_name ?? "",
-      );
-
-      localStorage.setItem(
-        "user",
-        JSON.stringify(
-          user,
-        ),
-      );
-
-      /* =====================================================
          ROLE
       ===================================================== */
 
       const roleName =
         user.role_name;
+
+      /* =====================================================
+         SAVE USER
+         เก็บแยกตาม role เพื่อให้เปิดคนละ role ได้ในคนละแท็บ
+         - admin: ไม่เก็บอะไร (ตรวจสิทธิ์จาก cookie session_admin)
+         - staff: เก็บใน staffUserId / staffUsername ไม่ทับค่าของผู้ใช้
+         - user : เก็บชื่อเดิม (userId, username, ...) ที่หน้าผู้ใช้ทุกหน้าใช้อยู่
+      ===================================================== */
+
+      if (
+        roleName === "staff"
+      ) {
+        localStorage.setItem(
+          "staffUserId",
+          String(
+            user.user_id,
+          ),
+        );
+
+        localStorage.setItem(
+          "staffUsername",
+          user.username,
+        );
+      } else if (
+        roleName !== "system_admin"
+      ) {
+        localStorage.setItem(
+          "userId",
+          String(
+            user.user_id,
+          ),
+        );
+
+        localStorage.setItem(
+          "username",
+          user.username,
+        );
+
+        localStorage.setItem(
+          "email",
+          user.email ?? "",
+        );
+
+        localStorage.setItem(
+          "roleId",
+          user.role_id !== null
+            ? String(
+                user.role_id,
+              )
+            : "",
+        );
+
+        localStorage.setItem(
+          "role",
+          user.role_name ?? "",
+        );
+
+        localStorage.setItem(
+          "user",
+          JSON.stringify(
+            user,
+          ),
+        );
+      }
 
       /* ADMIN */
 

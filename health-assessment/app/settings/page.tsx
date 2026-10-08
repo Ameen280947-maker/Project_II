@@ -359,7 +359,10 @@ export default function SettingsPage() {
       if (!res.ok) return json.message || "ดำเนินการไม่สำเร็จ";
 
       if (dialog === "delete") {
-        localStorage.clear();
+        // ลบเฉพาะค่าของผู้ใช้คนนี้ ไม่ลบของ staff ที่อาจเปิดอยู่ในแท็บอื่น
+        for (const key of ["userId", "username", "userName", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"]) {
+          localStorage.removeItem(key);
+        }
         router.push("/login");
         return null;
       }

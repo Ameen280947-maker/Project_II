@@ -26,7 +26,7 @@ export function PageHeader({
         <p className="text-sm font-bold uppercase tracking-[0.22em] text-staff-600">{eyebrow}</p>
         <h1 className="mt-2 text-3xl font-extrabold sm:text-4xl">
           {title}
-          <span className="bg-linear-to-r from-staff-500 to-staff-400 bg-clip-text text-transparent">{highlight}</span>
+          <span className="text-staff-400">{highlight}</span>
         </h1>
         {desc && <p className="mt-1 text-staff-muted">{desc}</p>}
       </div>
@@ -37,7 +37,7 @@ export function PageHeader({
 
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`min-w-0 rounded-[22px] border border-staff-line bg-white p-6 shadow-[0_1px_2px_rgba(16,43,41,0.04)] ${className}`}>
+    <div className={`min-w-0 rounded-[22px] border border-staff-line bg-white p-6 shadow-[0_1px_2px_rgba(20,20,19,0.04)] ${className}`}>
       {children}
     </div>
   );
@@ -54,8 +54,8 @@ export function StatCard({
   note?: ReactNode;
   tone?: "brand" | "danger" | "warn" | "ok";
 }) {
-  const dot = { brand: "bg-staff-400", danger: "bg-risk-high", warn: "bg-risk-mid", ok: "bg-risk-ok" }[tone];
-  const num = { brand: "text-staff-ink", danger: "text-risk-high", warn: "text-staff-ink", ok: "text-staff-600" }[tone];
+  const dot = { brand: "bg-staff-ink", danger: "bg-risk-high", warn: "bg-risk-mid", ok: "bg-risk-ok" }[tone];
+  const num = { brand: "text-staff-ink", danger: "text-risk-high", warn: "text-staff-ink", ok: "text-staff-ink" }[tone];
   return (
     <div className="flex flex-col gap-1.5 rounded-[22px] border border-staff-line bg-white px-6 py-5">
       <div className="flex items-center justify-between gap-2">
@@ -121,7 +121,7 @@ export function Chips<T extends string>({
             onClick={() => onChange(it.key)}
             className={`inline-flex h-10 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition ${
               on
-                ? "border-staff-600 bg-staff-600 text-white shadow-[0_6px_16px_rgba(5,130,122,0.25)]"
+                ? "border-staff-600 bg-staff-600 text-white shadow-[0_6px_16px_rgba(0,0,0,0.18)]"
                 : "border-staff-line bg-white text-staff-muted hover:border-staff-300 hover:text-staff-ink"
             }`}
           >
@@ -191,10 +191,10 @@ export function Legend({ color, label }: { color: string; label: string }) {
 }
 
 export const inputCls =
-  "w-full rounded-xl border border-staff-line bg-staff-soft px-3.5 py-2.5 text-sm text-staff-ink outline-none transition placeholder:text-[#93aaa7] focus:border-staff-400 focus:bg-white focus:ring-4 focus:ring-staff-100";
+  "w-full rounded-xl border border-staff-line bg-staff-soft px-3.5 py-2.5 text-sm text-staff-ink outline-none transition placeholder:text-[#a8a59e] focus:border-staff-400 focus:bg-white focus:ring-4 focus:ring-staff-100";
 
 export const btnPrimary =
-  "inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-staff-600 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(5,130,122,0.22)] transition hover:bg-staff-700 disabled:cursor-not-allowed disabled:opacity-50";
+  "inline-flex h-11 items-center justify-center gap-2 rounded-2xl bg-staff-600 px-5 text-sm font-semibold text-white shadow-[0_8px_20px_rgba(0,0,0,0.16)] transition hover:bg-staff-700 disabled:cursor-not-allowed disabled:opacity-50";
 
 export const btnGhost =
   "inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-staff-line bg-white px-4 text-sm font-semibold text-staff-ink transition hover:border-staff-300 hover:bg-staff-soft disabled:opacity-50";
@@ -217,7 +217,7 @@ export function Switch({ checked, onChange, label }: { checked: boolean; onChang
       aria-checked={checked}
       aria-label={label}
       onClick={onChange}
-      className={`relative h-7 w-12 shrink-0 rounded-full transition ${checked ? "bg-staff-500" : "bg-[#cfd9d7]"}`}
+      className={`relative h-7 w-12 shrink-0 rounded-full transition ${checked ? "bg-staff-900" : "bg-[#d6d3cd]"}`}
     >
       <span className={`absolute top-1 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-6" : "left-1"}`} />
     </button>

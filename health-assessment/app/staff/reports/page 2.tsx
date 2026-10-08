@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Download, FileText, Lock } from "lucide-react";
 import { downloadCsv, staffFetch } from "@/lib/staff/client";
-import { Card, Empty, ErrorBox, PageHeader, Segmented, btnGhost, btnPrimary, inputCls } from "../components/ui";
+import { Card, Empty, ErrorBox, Legend, PageHeader, Segmented, btnGhost, btnPrimary, inputCls } from "../components/ui";
 
 /* =========================================================
    TYPES (ตรงกับ /api/staff/reports)
@@ -23,10 +23,8 @@ type Report = {
 type Metric = "total" | "highPct";
 
 // สีชุดข้อมูลกราฟ (ผ่านการตรวจความต่างสี/ตาบอดสีแล้ว)
-// กราฟช่วงอายุ: แยกกาย/จิตด้วยลวดลาย (ทึบ / เส้นทแยง) แทนสี ให้เข้ากับโทนเทา-ดำ
-// และมีตัวเลขกำกับทุกแท่ง จึงไม่ต้องพึ่งสีในการแยก
-const C_BAR = "#2b2a28";
-const BAR_FILL = { physical: C_BAR, mental: `repeating-linear-gradient(135deg, ${C_BAR} 0 2px, #ffffff 2px 6px)` };
+const C_PHYSICAL = "#0a9a8c";
+const C_MENTAL = "#9a7cf0";
 
 const fmt = (v: number | null, suffix = "%") => (v === null ? "–" : `${v.toLocaleString("th-TH")}${suffix}`);
 
@@ -175,8 +173,8 @@ export default function ReportsPage() {
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-bold">สัดส่วนผู้มีความเสี่ยงสูง แยกตามช่วงอายุ</h2>
               <div className="flex gap-4 text-sm text-staff-muted">
-                <BarLegend fill={BAR_FILL.physical} label="สุขภาพกาย" />
-                <BarLegend fill={BAR_FILL.mental} label="สุขภาพจิต" />
+                <Legend color="bg-[#0a9a8c]" label="สุขภาพกาย" />
+                <Legend color="bg-[#9a7cf0]" label="สุขภาพจิต" />
               </div>
             </div>
             {data && <AgeChart data={data.byAge} />}
@@ -262,15 +260,15 @@ function Filter({ label, value, onChange, children }: { label: string; value: st
 
 /* =========================================================
    กราฟเส้นแนวโน้ม
-   - แต่ละช่วงระหว่างเดือนมีสีตามทิศทาง: ดำ = ทิศทางที่ดี, สีดินเผา = ทิศทางที่ควรระวัง
+   - แต่ละช่วงระหว่างเดือนมีสีตามทิศทาง: เทอร์ควอยซ์ = ทิศทางที่ดี, ส้ม = ทิศทางที่ควรระวัง
      (จำนวนการประเมิน: เพิ่ม = ดี / % ความเสี่ยงสูง: ลด = ดี)
    - มีป้าย ▲/▼ และตัวเลขกำกับทุกช่วง ไม่ได้สื่อด้วยสีอย่างเดียว (ผ่านการตรวจสีสำหรับคนตาบอดสีแล้ว)
    - ช่วงที่ไปถึงเดือนที่ยังไม่ครบ หรือข้ามเดือนที่ไม่แสดงค่า (ผู้ใช้ < 5 คน) เป็นเส้นประ
 ========================================================= */
 
-const C_GOOD = "#1d1d1b";
-const C_WATCH = "#b5532f";
-const C_FLAT = "#bdbab3";
+const C_GOOD = "#0a9a8c";
+const C_WATCH = "#d9622b";
+const C_FLAT = "#9fb5b2";
 
 function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric }) {
   const [hover, setHover] = useState<number | null>(null);
@@ -314,7 +312,7 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
         </span>
         <span className="flex items-center gap-1.5">
           <svg width="20" height="4" aria-hidden>
-            <line x1="0" y1="2" x2="20" y2="2" stroke="#6f6d67" strokeWidth="2" strokeDasharray="4 3" />
+            <line x1="0" y1="2" x2="20" y2="2" stroke="#557270" strokeWidth="2" strokeDasharray="4 3" />
           </svg>
           {hidden ? "เดือนที่ยังไม่ครบ / ข้ามเดือนที่ไม่แสดงค่า" : "เดือนที่ยังไม่ครบ"}
         </span>
@@ -326,8 +324,8 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
           <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="กราฟแนวโน้มรายเดือน" onMouseLeave={() => setHover(null)}>
             {ticks.map((t) => (
               <g key={t}>
-                <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#ebe9e4" strokeDasharray={t ? "3 4" : undefined} />
-                <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#6f6d67">
+                <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#e6efed" strokeDasharray={t ? "3 4" : undefined} />
+                <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#557270">
                   {t}
                 </text>
               </g>
@@ -370,14 +368,14 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
                   <g key={`d${s.i}`}>
                     <rect x={mx - w / 2} y={my - 11} width={w} height={20} rx={10} fill="white" stroke={s.color} strokeWidth="1.5" />
                     <circle cx={mx - w / 2 + 10} cy={my - 1} r={3.5} fill={s.color} />
-                    <text x={mx + 5} y={my + 3} textAnchor="middle" fontSize="11" fontWeight="700" fill="#141413">
+                    <text x={mx + 5} y={my + 3} textAnchor="middle" fontSize="11" fontWeight="700" fill="#102b29">
                       {label}
                     </text>
                   </g>
                 );
               })}
 
-            {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={pad.t - 10} y2={y(0)} stroke="#cfccc5" strokeWidth="1.5" />}
+            {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={pad.t - 10} y2={y(0)} stroke="#98eee0" strokeWidth="1.5" />}
 
             {/* จุดและค่าของแต่ละเดือน (เดือนที่ไม่แสดงค่า แสดง "–" ที่ฐาน) */}
             {vals.map((v, i) =>
@@ -392,11 +390,11 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
                     cy={y(v)}
                     r={hover === i ? 6.5 : 5}
                     fill="white"
-                    stroke="#141413"
+                    stroke="#102b29"
                     strokeWidth="2"
                     strokeDasharray={data[i].partial ? "2 2" : undefined}
                   />
-                  <text x={x(i)} y={y(v) - 11} textAnchor="middle" fontSize="11" fontWeight="600" fill="#6f6d67">
+                  <text x={x(i)} y={y(v) - 11} textAnchor="middle" fontSize="11" fontWeight="600" fill="#557270">
                     {v.toLocaleString("th-TH")}
                   </text>
                 </g>
@@ -404,7 +402,7 @@ function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric })
             )}
 
             {data.map((d, i) => (
-              <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#6f6d67">
+              <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#557270">
                 {d.label}
                 {d.partial ? "*" : ""}
               </text>
@@ -466,12 +464,12 @@ function niceStep(max: number) {
 
 function AgeChart({ data }: { data: Report["byAge"] }) {
   const max = Math.max(10, ...data.flatMap((d) => [d.physical.pct ?? 0, d.mental.pct ?? 0]));
-  const bar = (v: { pct: number | null; n: number }, fill: string, kind: string, group: string) => (
+  const bar = (v: { pct: number | null; n: number }, color: string, kind: string, group: string) => (
     <div className="flex h-full w-full max-w-[44px] flex-col items-center justify-end gap-1" title={`${group} · ${kind}: ${fmt(v.pct)} (ผู้ใช้ ${v.n} คน)`}>
       <span className="text-xs font-semibold text-staff-ink">{fmt(v.pct)}</span>
       <div
         className="w-full rounded-t-[4px]"
-        style={{ height: v.pct === null ? 2 : `${Math.max(2, (v.pct / max) * 80)}%`, background: v.pct === null ? "#e6e4df" : fill, boxShadow: v.pct === null ? undefined : `inset 0 0 0 1.5px ${C_BAR}` }}
+        style={{ height: v.pct === null ? 2 : `${Math.max(2, (v.pct / max) * 80)}%`, background: v.pct === null ? "#dcebe8" : color }}
       />
     </div>
   );
@@ -480,8 +478,8 @@ function AgeChart({ data }: { data: Report["byAge"] }) {
       <div className="flex h-52 items-end gap-4 border-b border-staff-line">
         {data.map((d) => (
           <div key={d.label} className="flex h-full flex-1 items-end justify-center gap-[2px]">
-            {bar(d.physical, BAR_FILL.physical, "สุขภาพกาย", d.label)}
-            {bar(d.mental, BAR_FILL.mental, "สุขภาพจิต", d.label)}
+            {bar(d.physical, C_PHYSICAL, "สุขภาพกาย", d.label)}
+            {bar(d.mental, C_MENTAL, "สุขภาพจิต", d.label)}
           </div>
         ))}
       </div>
@@ -493,14 +491,5 @@ function AgeChart({ data }: { data: Report["byAge"] }) {
         ))}
       </div>
     </div>
-  );
-}
-
-function BarLegend({ fill, label }: { fill: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="h-3 w-3 rounded-[3px]" style={{ background: fill, boxShadow: `inset 0 0 0 1.5px ${C_BAR}` }} />
-      {label}
-    </span>
   );
 }

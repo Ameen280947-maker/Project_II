@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
+import { getSession } from "@/lib/session";
 
 /* =========================================================
    ตรวจสิทธิ์ Staff ฝั่งเซิร์ฟเวอร์
    ทุก API ของ Staff ต้องเรียกฟังก์ชันนี้ก่อน
-   - อ่าน id จาก header "x-staff-id" (ส่งมาจาก staffFetch)
-   - เช็ค role ในฐานข้อมูลจริง ไม่เชื่อค่าจากเบราว์เซอร์อย่างเดียว
+   - อ่านตัวตนจาก cookie "session_staff" (ตั้งตอน login, ลงลายเซ็น HMAC)
+   - header "x-staff-id" จาก staffFetch ต้องตรงกับ cookie ถ้าส่งมา
+   - เช็ค role ในฐานข้อมูลจริงอีกชั้น
 ========================================================= */
 
 export const STAFF_ROLE_ID = 3; // ตาราง roles: 1 = system_admin, 2 = user, 3 = staff
@@ -16,9 +18,14 @@ export type StaffUser = { userId: number; username: string };
 export async function requireStaff(
   request: NextRequest
 ): Promise<{ staff: StaffUser; error?: never } | { staff?: never; error: NextResponse }> {
-  const id = Number(request.headers.get("x-staff-id"));
-  if (!Number.isInteger(id) || id <= 0) {
+  const session = getSession(request, "staff");
+  if (!session) {
     return { error: NextResponse.json({ success: false, message: "กรุณาเข้าสู่ระบบ" }, { status: 401 }) };
+  }
+  const id = session.userId;
+  const claimed = request.headers.get("x-staff-id");
+  if (claimed && Number(claimed) !== id) {
+    return { error: NextResponse.json({ success: false, message: "บัญชีในแท็บนี้ไม่ตรงกับที่เข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่" }, { status: 403 }) };
   }
 
   const { rows } = await pool.query(

@@ -1,11 +1,18 @@
 "use client";
 
 /* =========================================================
-   fetch สำหรับหน้า Staff: แนบ x-staff-id ให้อัตโนมัติ
+   fetch สำหรับหน้า Staff
+   - ตัวตนจริงอยู่ที่ cookie session_staff (เบราว์เซอร์แนบให้เอง)
+   - แนบ x-staff-id ไปด้วยให้ server เช็คว่าตรงกับ cookie
+   - ค่าของ staff เก็บใน staffUserId / staffUsername แยกจากของผู้ใช้ทั่วไป
 ========================================================= */
 
+export function clearStaffSession() {
+  ["staffUserId", "staffUsername"].forEach((k) => localStorage.removeItem(k));
+}
+
 export async function staffFetch<T = unknown>(url: string, init: RequestInit = {}): Promise<T> {
-  const staffId = typeof window !== "undefined" ? localStorage.getItem("userId") : null;
+  const staffId = typeof window !== "undefined" ? localStorage.getItem("staffUserId") : null;
   const res = await fetch(url, {
     ...init,
     cache: "no-store",

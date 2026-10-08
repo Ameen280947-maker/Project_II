@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import StaffSidebar from "./components/StaffSidebar";
+import { clearStaffSession } from "@/lib/staff/client";
 
 /* =========================================================
    LAYOUT ฝั่ง Staff
@@ -16,19 +17,26 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);
 
+  // ตรวจจาก cookie session_staff ที่ server (แยกจาก session ของผู้ใช้ทั่วไป
+  // จึงเปิดหน้า staff กับหน้าผู้ใช้คนละแท็บพร้อมกันได้)
   useEffect(() => {
-    const userId = localStorage.getItem("userId");
-    const roleId = localStorage.getItem("roleId");
-    const role = localStorage.getItem("role");
-    if (!userId) {
-      router.replace("/login");
-      return;
-    }
-    if (roleId !== STAFF_ROLE_ID && role !== "staff") {
-      router.replace("/assessment-type");
-      return;
-    }
-    setAllowed(true);
+    let cancelled = false;
+    fetch("/api/auth/session?role=staff", { cache: "no-store" })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (!res.ok || String(data?.user?.role_id) !== STAFF_ROLE_ID) {
+          clearStaffSession();
+          router.replace("/login");
+          return;
+        }
+        localStorage.setItem("staffUserId", String(data.user.user_id));
+        setAllowed(true);
+      })
+      .catch(() => !cancelled && router.replace("/login"));
+    return () => {
+      cancelled = true;
+    };
   }, [router]);
 
   if (!allowed) {

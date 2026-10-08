@@ -25,7 +25,7 @@ type AdminCheck =
   | { ok: false; response: NextResponse };
 
 export async function requireAdmin(request: NextRequest): Promise<AdminCheck> {
-  const session = getSession(request);
+  const session = getSession(request, "admin");
   const userId = session?.userId ?? 0;
 
   if (!session || !Number.isInteger(userId) || userId <= 0) {

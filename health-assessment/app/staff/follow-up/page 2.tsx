@@ -66,7 +66,7 @@ type Filter = "all" | CaseStatus;
 const STATUS_PILL: Record<CaseStatus, string> = {
   waiting: "bg-[#fde6e7] text-[#a61e28]",
   progress: "bg-[#fff3dc] text-[#8a5a00]",
-  referred: "bg-[#ece6da] text-[#5b4a2c]",
+  referred: "bg-[#e3f0ff] text-[#1d5fa8]",
   closed: "bg-staff-100 text-staff-800",
 };
 
