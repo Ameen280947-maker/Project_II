@@ -21,6 +21,7 @@ import {
   useRouter,
   useSearchParams,
 } from "next/navigation";
+import AnswerReview from "@/app/components/AnswerReview";
 
 type AssessmentResult = {
   assessmentId: number;
@@ -298,6 +299,8 @@ function RecommendationContent() {
             </section>
 
           </div>
+
+          <AnswerReview assessmentId={assessmentId} />
 
           {/* Back to assessment */}
 

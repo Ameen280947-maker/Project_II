@@ -179,7 +179,11 @@ function getSodiumRisk(score: number): { key: string; level: string } {
    FETCH RECOMMENDATIONS FROM DATABASE
 ===================================================== */
 
-async function fetchDietRecommendationsFromDB(keys: string[]): Promise<{
+// assessmentId: ดูผลย้อนหลัง ใช้คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมินครั้งนั้น (ไม่ส่ง = ฉบับปัจจุบัน)
+async function fetchDietRecommendationsFromDB(
+  keys: string[],
+  assessmentId: number | null = null
+): Promise<{
   recommendationMap: Map<string, { rec_id: number; text: string }>;
   combinedText: string;
   firstRecId: number | null;
@@ -193,13 +197,17 @@ async function fetchDietRecommendationsFromDB(keys: string[]): Promise<{
       recommendation_text: string;
     }>(
       `
-      SELECT rec_id, risk_level, recommendation_text
-      FROM recommendation
-      WHERE assessment_type_id = $1
-        AND risk_level = ANY($2::text[])
-      ORDER BY rec_id ASC
+      SELECT r.rec_id, r.risk_level, v.recommendation_text
+      FROM recommendation r
+      CROSS JOIN LATERAL recommendation_at(
+        r.rec_id,
+        (SELECT assessed_at FROM assessment WHERE assessment_id = $3)
+      ) v
+      WHERE r.assessment_type_id = $1
+        AND r.risk_level = ANY($2::text[])
+      ORDER BY r.rec_id ASC
       `,
-      [ASSESSMENT_TYPE_ID, keys]
+      [ASSESSMENT_TYPE_ID, keys, assessmentId]
     );
 
     res.rows.forEach((row) => {
@@ -346,13 +354,11 @@ export async function GET(request: NextRequest) {
       const fatRisk = getFatRisk(fatScore);
       const sodiumRisk = getSodiumRisk(sodiumScore);
 
-      // 4) ดึงคำแนะนำสุขภาพจากฐานข้อมูลตาราง recommendation โดยตรง
-      const dbRec = await fetchDietRecommendationsFromDB([
-        vegRisk.key,
-        sugarRisk.key,
-        fatRisk.key,
-        sodiumRisk.key,
-      ]);
+      // 4) ดึงคำแนะนำสุขภาพจากฐานข้อมูล (ฉบับที่ใช้อยู่ตอนทำแบบประเมินครั้งนี้)
+      const dbRec = await fetchDietRecommendationsFromDB(
+        [vegRisk.key, sugarRisk.key, fatRisk.key, sodiumRisk.key],
+        assessmentId
+      );
 
       return NextResponse.json({
         success: true,

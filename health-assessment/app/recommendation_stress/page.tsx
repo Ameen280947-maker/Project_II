@@ -13,6 +13,7 @@ import {
     Phone,
     AlertTriangle,
 } from "lucide-react";
+import AnswerReview from "@/app/components/AnswerReview";
 
 /* =========================================================
    TYPES
@@ -429,6 +430,8 @@ function StressRecommendationContent() {
                             </div>
                         </div>
                     )}
+
+                    <AnswerReview assessmentId={assessmentId} className="mt-6" />
 
                     {/* =================================================
                        DISCLAIMER

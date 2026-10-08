@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 
 import { Suspense, useEffect, useState } from "react";
+import AnswerReview from "@/app/components/AnswerReview";
 
 /* =====================================================
    TYPES
@@ -411,6 +412,8 @@ function DietRecommendationContent() {
               </div>
 
             </section>
+
+            <AnswerReview assessmentId={assessmentId} className="mt-7" />
 
             {/* =================================================
                 NOTE

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import AnswerReview from "@/app/components/AnswerReview";
 
 type AssessmentResult = {
     assessmentId: number;
@@ -211,7 +212,7 @@ function BmiResultContent() {
                 <section className="infoCard">
                     <div className="infoIcon">i</div>
                     <div>
-                        <h3>ผลและคำแนะนำจากฐานข้อมูล</h3>
+                        <h3>ผลและคำแนะนำ</h3>
                         <p>
                             ผลประเมินของคุณอยู่ในระดับ{" "}
                             <strong style={{ color: colors.text }}>
@@ -246,6 +247,8 @@ function BmiResultContent() {
                         ))}
                     </div>
                 </section>
+
+                <AnswerReview assessmentId={assessmentId} className="mt-6" />
 
                 <div className="actions">
                     <Link href="/assessment_BMI" className="secondaryButton">

@@ -306,7 +306,7 @@ export default function SleepAssessmentPage() {
                     </h2>
 
                     <p className="mt-2 text-[#8A8A93]">
-                        กรุณาตรวจสอบข้อมูลใน Database
+                        กรุณาลองใหม่อีกครั้ง หรือติดต่อเจ้าหน้าที่
                     </p>
 
                     <button

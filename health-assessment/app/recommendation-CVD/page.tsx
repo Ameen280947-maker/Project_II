@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import AnswerReview from "@/app/components/AnswerReview";
 
 type AssessmentResult = {
   assessmentId: number;
@@ -190,7 +191,7 @@ function RecommendationContent() {
 
             <div>
               <h3 className="text-2xl font-bold">
-                ผลและคำแนะนำจากฐานข้อมูล
+                ผลและคำแนะนำ
               </h3>
 
               <p className="mt-4 leading-8 text-[#666872]">
@@ -239,6 +240,8 @@ function RecommendationContent() {
             />
           </div>
         </section>
+
+        <AnswerReview assessmentId={assessmentId} className="mt-8" />
 
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <Link

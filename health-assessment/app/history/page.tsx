@@ -1348,7 +1348,7 @@ function getDetailHref(
     ================================================== */
 
     case "BMI":
-      return `/recommendation-bmi?assessmentId=${item.assessment_id}`;
+      return `/recommendation_BMI?assessmentId=${item.assessment_id}`;
 
     /* =================================================
        SMOKING

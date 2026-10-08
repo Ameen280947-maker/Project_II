@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import Sidebar from "@/app/components/Sidebar";
+import AnswerReview from "@/app/components/AnswerReview";
 
 /* =========================================================
    TYPES
@@ -281,6 +282,8 @@ function Depression2QRecommendationContent() {
                 </div>
               </div>
             )}
+
+            <AnswerReview assessmentId={assessmentId} className="mt-6" />
 
             {/* Navigation Buttons */}
             <div className="mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-[#eee5e6] pt-6">
