@@ -9,6 +9,7 @@ import {
   userExists,
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
+import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -303,6 +304,10 @@ export async function POST(request: NextRequest) {
   if (stage !== "2q" && stage !== "9q") {
     return fail("Stage ไม่ถูกต้อง (ต้องเป็น 2q หรือ 9q)");
   }
+
+  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
+  const closed = await rejectIfAssessmentClosed(stage === "2q" ? TYPE_2Q : TYPE_9Q);
+  if (closed) return closed;
 
   if (!Array.isArray(answers) || answers.length === 0) {
     return fail("กรุณาระบุคำตอบให้ครบถ้วน");

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/session";
 import { badRequest, readJsonObject, toNumberInRange, userExists } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
+import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -162,6 +163,10 @@ export async function POST(request: Request) {
   // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
   const auth = requireUser(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
+
+  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
+  const closed = await rejectIfAssessmentClosed(1);
+  if (closed) return closed;
   const userId = auth.userId;
 
   const weightKg = toNumberInRange(body.weightKg, 10, 400);

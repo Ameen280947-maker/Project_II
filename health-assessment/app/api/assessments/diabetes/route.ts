@@ -8,6 +8,7 @@ import {
   userExists,
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
+import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -815,6 +816,10 @@ export async function POST(
   );
 
   if (!auth.ok) return auth.response;
+
+  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
+  const closed = await rejectIfAssessmentClosed(4);
+  if (closed) return closed;
 
   const userId = auth.userId;
 
