@@ -387,7 +387,6 @@ export default function SettingsPage() {
             <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-3">
               ตั้ง<span className="text-[#b91c2b]">ค่า</span>
             </h1>
-            <p className="text-gray-500 mt-3 text-lg">จัดการบัญชี การแสดงผล และความเป็นส่วนตัวของข้อมูลสุขภาพ</p>
           </div>
 
           {loading ? (
@@ -429,7 +428,7 @@ export default function SettingsPage() {
               {/* PANELS */}
               <div className="flex-1 min-w-0 flex flex-col gap-5 w-full">
                 {/* 1. ACCOUNT */}
-                <Card id="account" title="บัญชีผู้ใช้" desc="ข้อมูลที่ใช้เข้าสู่ระบบและติดต่อคุณ">
+                <Card id="account" title="บัญชีผู้ใช้">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-red-50 text-[#b91c2b] text-2xl font-bold flex items-center justify-center shrink-0">
                       {(profile?.username || "U").trim().charAt(0).toUpperCase()}
@@ -560,9 +559,6 @@ export default function SettingsPage() {
                       <ChevronRight size={16} />
                     </Link>
                   </div>
-                  <p className="text-sm text-gray-400 mt-4">
-                    ข้อมูลสุขภาพ เช่น น้ำหนัก ส่วนสูง แก้ไขได้ที่เมนู “ข้อมูลสุขภาพของคุณ”
-                  </p>
                 </Card>
 
                 {/* 2. SECURITY */}
@@ -603,10 +599,6 @@ export default function SettingsPage() {
                       }}
                     />
                   </Row>
-                  <div className="mt-1 rounded-2xl bg-[#faf9f7] border border-dashed border-gray-200 px-4 py-3">
-                    <p className="text-xs font-bold text-gray-400 mb-1">ตัวอย่าง</p>
-                    <p className="font-semibold text-gray-800">ผลการประเมินความดันโลหิตของคุณอยู่ในระดับปกติ</p>
-                  </div>
                 </Card>
 
                 {/* 5. EMERGENCY CONTACT */}

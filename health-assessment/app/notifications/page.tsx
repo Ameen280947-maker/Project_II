@@ -6,19 +6,14 @@ import { useRouter } from "next/navigation";
 import {
   Bell,
   AlertTriangle,
-  Clock,
   Calendar,
   ArrowRight,
   CheckCircle2,
+  ChevronDown,
   Filter,
   RefreshCw,
-  Info,
   HeartPulse,
-  Activity,
-  Brain,
-  ChevronRight,
   ShieldCheck,
-  CheckCheck,
 } from "lucide-react";
 import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
@@ -128,9 +123,6 @@ export default function NotificationsPage() {
                 <h1 className="text-3xl sm:text-4xl font-black text-gray-800 mt-1">
                   การแจ้งเตือนและติดตามสุขภาพ
                 </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                  ระบบแจ้งเตือนรอบการประเมินซ้ำตามเกณฑ์ทางการแพทย์ของแต่ละโรค
-                </p>
               </div>
 
               <div className="flex items-center gap-3">
@@ -149,7 +141,7 @@ export default function NotificationsPage() {
             {/* Quick Stats Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {/* Due / Overdue */}
-              <div className="bg-white border border-red-100 rounded-3xl p-5 shadow-sm">
+              <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold text-gray-400">ครบกำหนดประเมินซ้ำ</p>
@@ -165,7 +157,7 @@ export default function NotificationsPage() {
               </div>
 
               {/* Upcoming */}
-              <div className="bg-white border border-amber-100 rounded-3xl p-5 shadow-sm">
+              <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold text-gray-400">ใกล้ถึงกำหนด (ใน 7 วัน)</p>
@@ -179,7 +171,7 @@ export default function NotificationsPage() {
               </div>
 
               {/* Total Active Assessments */}
-              <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm">
+              <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold text-gray-400">โรคที่อยู่ในระบบติดตาม</p>
@@ -195,7 +187,7 @@ export default function NotificationsPage() {
               </div>
 
               {/* Unread */}
-              <div className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm">
+              <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs font-semibold text-gray-400">การแจ้งเตือนใหม่</p>
@@ -220,125 +212,59 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {/* Guideline Banner Toggle */}
-            <div className="mb-6 bg-gradient-to-r from-[#edf5ff] to-[#f4f8ff] border border-blue-100 rounded-3xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-blue-500 text-white flex items-center justify-center shrink-0">
-                  <Info size={22} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-800 text-sm md:text-base">
-                    เกณฑ์กำหนดระยะเวลาการแจ้งเตือนของแต่ละโรค (Clinical Follow-up Protocol)
-                  </h3>
-                  <p className="text-xs text-gray-600 mt-0.5">
-                    ระบบคำนวณระยะการประเมินซ้ำตามความเสี่ยงของแต่ละโรคโดยอัตโนมัติ (เช่น
-                    กลุ่มเสี่ยงสูง 14-30 วัน, เสี่ยงปานกลาง 2-6 เดือน, เสี่ยงต่ำ 6 เดือน - 1 ปี)
-                  </p>
-                </div>
-              </div>
-
+            {/* เกณฑ์ติดตามแต่ละโรค (พับไว้ กดดูได้) */}
+            <section className="mb-6 bg-gradient-to-r from-[#edf5ff] to-[#f4f8ff] border border-blue-100 rounded-3xl p-5">
               <button
                 type="button"
                 onClick={() => setShowGuidelines(!showGuidelines)}
-                className="px-4 py-2 rounded-xl bg-white border border-blue-200 text-blue-700 font-semibold text-xs hover:bg-blue-50 transition shrink-0"
+                aria-expanded={showGuidelines}
+                aria-controls="follow-up-guidelines"
+                className="w-full flex items-center justify-between gap-4 text-left"
               >
-                {showGuidelines ? "ซ่อนตารางเกณฑ์" : "ดูตารางเกณฑ์แต่ละโรค"}
+                <span className="flex items-center gap-3 min-w-0">
+                  <span className="w-10 h-10 rounded-2xl bg-blue-500 text-white flex items-center justify-center shrink-0">
+                    <ShieldCheck size={22} />
+                  </span>
+                  <span className="font-bold text-gray-800 md:text-base">
+                    เกณฑ์กำหนดระยะเวลาการแจ้งเตือนของแต่ละโรค
+                  </span>
+                </span>
+                <span className="shrink-0 inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-white border border-blue-200 text-blue-700 text-sm font-semibold hover:bg-blue-50 transition">
+                  <span className="hidden sm:inline">{showGuidelines ? "ซ่อนตาราง" : "ดูตารางเกณฑ์แต่ละโรค"}</span>
+                  <ChevronDown size={18} className={`transition-transform ${showGuidelines ? "rotate-180" : ""}`} />
+                </span>
               </button>
-            </div>
 
-            {/* Guideline Table Modal/Drawer */}
-            {showGuidelines && (
-              <div className="mb-8 bg-white border border-gray-200 rounded-3xl p-6 shadow-sm overflow-hidden animate-in fade-in duration-200">
-                <h4 className="text-base font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <ShieldCheck className="text-[#6c9470]" size={20} />
-                  ตารางเกณฑ์การแจ้งเตือนและระยะเวลาติดตามประเมินซ้ำตามมาตรฐานทางการแพทย์
-                </h4>
+              {showGuidelines && (
+                <div id="follow-up-guidelines" className="mt-5 p-5 bg-white rounded-2xl border border-blue-100">
+                  <p className="text-sm text-gray-500">
+                    Clinical Follow-up Protocol — ระบบแจ้งเตือนรอบการประเมินซ้ำตามเกณฑ์ทางการแพทย์ของแต่ละโรค
+                    โดยคำนวณระยะการประเมินซ้ำตามความเสี่ยงอัตโนมัติ (เช่น กลุ่มเสี่ยงสูง 14-30 วัน,
+                    เสี่ยงปานกลาง 2-6 เดือน, เสี่ยงต่ำ 6 เดือน - 1 ปี)
+                  </p>
 
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs sm:text-sm">
-                    <thead>
-                      <tr className="border-b border-gray-200 bg-gray-50 text-gray-600 font-bold">
-                        <th className="py-3 px-4 rounded-l-xl">ประเภทโรค / แบบประเมิน</th>
-                        <th className="py-3 px-4">ระดับความเสี่ยง</th>
-                        <th className="py-3 px-4">ระยะเวลาติดตามประเมินซ้ำ</th>
-                        <th className="py-3 px-4 rounded-r-xl">เป้าหมายและการดูแล</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 text-gray-700">
-                      <tr>
-                        <td className="py-3 px-4 font-semibold text-gray-900" rowSpan={3}>
-                          ความดันโลหิต
-                        </td>
-                        <td className="py-3 px-4 text-red-600 font-medium">สูงอันตราย (Emergency)</td>
-                        <td className="py-3 px-4 font-bold text-red-600">ทันที / ภายใน 24 ชม.</td>
-                        <td className="py-3 px-4 text-gray-500">พบแพทย์ทันที ป้องกันภาวะแทรกซ้อนหลอดเลือดสมอง</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3 px-4 text-orange-600 font-medium">น่าจะเป็น / อาจเป็นโรคความดัน</td>
-                        <td className="py-3 px-4 font-bold">1 - 3 เดือน (30-90 วัน)</td>
-                        <td className="py-3 px-4 text-gray-500">ตรวจติดตามและปรับเปลี่ยนพฤติกรรม ลดเค็ม</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3 px-4 text-green-600 font-medium">เริ่มสูง / ปกติ</td>
-                        <td className="py-3 px-4 font-bold">6 เดือน - 1 ปี (180-365 วัน)</td>
-                        <td className="py-3 px-4 text-gray-500">ตรวจวัดสม่ำเสมอประจำปี</td>
-                      </tr>
-
-                      <tr className="bg-gray-50/50">
-                        <td className="py-3 px-4 font-semibold text-gray-900" rowSpan={2}>
-                          ความเสี่ยงหัวใจ & หลอดเลือด (Thai CVD)
-                        </td>
-                        <td className="py-3 px-4 text-red-600 font-medium">เสี่ยงสูง (≥30%)</td>
-                        <td className="py-3 px-4 font-bold text-red-600">ทุก 2 เดือน (60 วัน)</td>
-                        <td className="py-3 px-4 text-gray-500">พบแพทย์ ควบคุมเบาหวาน ความดัน คอเลสเตอรอล</td>
-                      </tr>
-                      <tr className="bg-gray-50/50">
-                        <td className="py-3 px-4 text-green-600 font-medium">เสี่ยงปานกลาง / น้อย</td>
-                        <td className="py-3 px-4 font-bold">6 เดือน - 1 ปี</td>
-                        <td className="py-3 px-4 text-gray-500">ออกกำลังกาย คุมน้ำหนัก ตรวจสุขภาพประจำปี</td>
-                      </tr>
-
-                      <tr>
-                        <td className="py-3 px-4 font-semibold text-gray-900" rowSpan={2}>
-                          ความเสี่ยงเบาหวาน (TDS / DM Risk)
-                        </td>
-                        <td className="py-3 px-4 text-red-600 font-medium">เสี่ยงสูงมาก / มีปัจจัยเสี่ยง</td>
-                        <td className="py-3 px-4 font-bold text-red-600">3 - 6 เดือน (90-180 วัน)</td>
-                        <td className="py-3 px-4 text-gray-500">ตรวจระดับน้ำตาลในเลือด (FPG/HbA1c)</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3 px-4 text-green-600 font-medium">เสี่ยงปานกลาง / น้อย</td>
-                        <td className="py-3 px-4 font-bold">1 - 2 ปี (365-730 วัน)</td>
-                        <td className="py-3 px-4 text-gray-500">ตรวจคัดกรองตามรอบและควบคุมอาหาร</td>
-                      </tr>
-
-                      <tr className="bg-gray-50/50">
-                        <td className="py-3 px-4 font-semibold text-gray-900" rowSpan={2}>
-                          สุขภาพจิต (ความเครียด ST-5 & ซึมเศร้า 9Q)
-                        </td>
-                        <td className="py-3 px-4 text-red-600 font-medium">เครียดรุนแรง / ซึมเศร้ารุนแรง</td>
-                        <td className="py-3 px-4 font-bold text-red-600">ทุก 7 - 14 วัน (ด่วน)</td>
-                        <td className="py-3 px-4 text-gray-500">พบแพทย์หรือโทร 1323 ติดตามความเสี่ยงทำร้ายตนเอง</td>
-                      </tr>
-                      <tr className="bg-gray-50/50">
-                        <td className="py-3 px-4 text-green-600 font-medium">ปานกลาง / น้อย / ปกติ</td>
-                        <td className="py-3 px-4 font-bold">1 - 3 เดือน (30-90 วัน)</td>
-                        <td className="py-3 px-4 text-gray-500">สังเกตอารมณ์และฝึกคลายเครียดสม่ำเสมอ</td>
-                      </tr>
-
-                      <tr>
-                        <td className="py-3 px-4 font-semibold text-gray-900">
-                          พฤติกรรม (บุหรี่ / แอลกอฮอล์ / นอนหลับ / อาหาร)
-                        </td>
-                        <td className="py-3 px-4 text-orange-600 font-medium">เสี่ยงสูง / ติดนิโคติน / ไม่เพียงพอ</td>
-                        <td className="py-3 px-4 font-bold text-orange-600">ทุก 1 เดือน (30 วัน)</td>
-                        <td className="py-3 px-4 text-gray-500">ติดตามความก้าวหน้าในการปรับเปลี่ยนพฤติกรรม</td>
-                      </tr>
-                    </tbody>
-                  </table>
+                  <div className="mt-5 flex flex-col gap-6">
+                    {GUIDELINES.map((g) => (
+                      <div key={g.disease}>
+                        <h4 className="text-sm font-bold text-gray-900">{g.disease}</h4>
+                        <ul className="mt-2 divide-y divide-gray-100">
+                          {g.rows.map((r) => (
+                            <li key={r.level} className="py-2.5 grid gap-x-4 gap-y-0.5 text-sm sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1.6fr)]">
+                              <span className="flex items-start gap-2 text-gray-700">
+                                <span className={`mt-1.5 w-2 h-2 shrink-0 rounded-full ${RISK_DOT[r.risk]}`} />
+                                {r.level}
+                              </span>
+                              <span className="pl-4 sm:pl-0 font-semibold text-gray-900">{r.interval}</span>
+                              <span className="pl-4 sm:pl-0 text-gray-500">{r.goal}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </section>
 
             {/* Filter Tabs */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -461,87 +387,27 @@ export default function NotificationsPage() {
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {filteredNotifications.map((item) => {
-                  const isDue = item.status === "overdue" || item.status === "due_today";
-                  const isUpcoming = item.status === "upcoming";
-
-                  const cardBorder = isDue
-                    ? "border-red-200 shadow-[0_8px_25px_rgba(238,63,91,0.08)] bg-gradient-to-br from-white to-red-50/20"
-                    : isUpcoming
-                    ? "border-amber-200 bg-gradient-to-br from-white to-amber-50/20"
-                    : "border-gray-100 bg-white";
-
+              <div className="flex flex-col gap-6">
+                {GROUPS.map((g) => {
+                  const items = filteredNotifications.filter((n) => g.statuses.includes(n.status));
+                  if (items.length === 0) return null;
                   return (
-                    <div
-                      key={item.notificationId || `${item.assessmentTypeId}-${item.assessmentId}`}
-                      className={`rounded-3xl p-6 border transition hover:shadow-md flex flex-col justify-between ${cardBorder}`}
-                    >
-                      <div>
-                        {/* Status Header */}
-                        <div className="flex items-center justify-between gap-3 mb-3">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`px-3 py-1 rounded-full text-xs font-extrabold ${
-                                isDue
-                                  ? "bg-red-100 text-[#b91c2b]"
-                                  : isUpcoming
-                                  ? "bg-amber-100 text-amber-800"
-                                  : "bg-gray-100 text-gray-600"
-                              }`}
-                            >
-                              {item.statusText}
-                            </span>
-
-                            <span className="text-xs font-medium text-gray-400">
-                              รอบติดตาม: {item.intervalLabel}
-                            </span>
-                          </div>
-
-                          <span className="text-xs text-gray-400">
-                            ครบกำหนด: {formatDate(item.dueDate)}
-                          </span>
-                        </div>
-
-                        {/* Title & Assessment */}
-                        <h3 className="text-lg font-bold text-gray-900 leading-snug">
-                          {item.assessmentName}
-                        </h3>
-
-                        <div className="mt-2.5 flex items-center gap-2 text-xs">
-                          <span className="text-gray-400">ผลล่าสุด:</span>
-                          <span className="font-bold text-gray-800 bg-gray-100 px-2.5 py-0.5 rounded-lg">
-                            {item.riskLevel}
-                          </span>
-                          <span className="text-gray-400">
-                            (ประเมินเมื่อ {formatDate(item.assessedAt)})
-                          </span>
-                        </div>
-
-                        <p className="mt-3 text-sm text-gray-600 leading-relaxed bg-white/70 p-3 rounded-2xl border border-gray-100">
-                          {item.message}
-                        </p>
-                      </div>
-
-                      {/* Action CTA */}
-                      <div className="mt-5 pt-4 border-t border-gray-100 flex items-center justify-between">
-                        <span className="text-xs font-semibold text-gray-400">
-                          เกณฑ์ประเมินซ้ำ: {item.intervalDays} วัน
-                        </span>
-
-                        <Link
-                          href={item.actionUrl}
-                          className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold text-sm transition shadow-sm active:scale-95 ${
-                            isDue
-                              ? "bg-gradient-to-r from-[#ee3f5b] to-[#b91c2b] text-white hover:opacity-95 shadow-[0_8px_20px_rgba(185,28,43,0.25)]"
-                              : "bg-[#2f3037] text-white hover:bg-black"
-                          }`}
-                        >
-                          <span>{isDue ? "ทำแบบประเมินซ้ำตอนนี้" : "เริ่มทำแบบประเมิน"}</span>
-                          <ArrowRight size={16} />
-                        </Link>
-                      </div>
-                    </div>
+                    <section key={g.key} aria-label={g.title}>
+                      <h2 className="mb-2 px-1 flex items-center gap-2 text-sm font-bold text-gray-700">
+                        <span className={`w-2 h-2 rounded-full ${g.dot}`} />
+                        {g.title}
+                        <span className="text-gray-400 font-medium">({items.length})</span>
+                      </h2>
+                      <ul className="bg-white border border-gray-100 rounded-3xl divide-y divide-gray-100">
+                        {items.map((item) => (
+                          <NotificationRow
+                            key={item.notificationId || `${item.assessmentTypeId}-${item.assessmentId}`}
+                            item={item}
+                            formatDate={formatDate}
+                          />
+                        ))}
+                      </ul>
+                    </section>
                   );
                 })}
               </div>
@@ -552,3 +418,134 @@ export default function NotificationsPage() {
     </main>
   );
 }
+
+// จัดกลุ่มตามความเร่งด่วน: ต้องทำตอนนี้ → ใกล้ถึงกำหนด → ตามรอบปกติ
+const GROUPS: { key: string; title: string; dot: string; statuses: CalculatedNotification["status"][] }[] = [
+  { key: "due", title: "ครบกำหนดประเมินซ้ำ", dot: "bg-[#b91c2b]", statuses: ["overdue", "due_today"] },
+  { key: "upcoming", title: "ใกล้ถึงกำหนด (ใน 7 วัน)", dot: "bg-amber-500", statuses: ["upcoming"] },
+  { key: "scheduled", title: "ตามรอบติดตาม", dot: "bg-gray-300", statuses: ["scheduled"] },
+];
+
+// แถวสรุปของแต่ละแบบประเมิน กด "รายละเอียด" เพื่อดูคำแนะนำและรอบการติดตาม
+function NotificationRow({
+  item,
+  formatDate,
+}: {
+  item: CalculatedNotification;
+  formatDate: (date?: string | null) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const isDue = item.status === "overdue" || item.status === "due_today";
+  const isUpcoming = item.status === "upcoming";
+  const detailId = `notif-detail-${item.assessmentTypeId}-${item.assessmentId}`;
+
+  return (
+    <li className="px-5 py-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <div className="min-w-0 flex-[1_1_280px]">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                isDue ? "bg-red-100 text-[#b91c2b]" : isUpcoming ? "bg-amber-100 text-amber-800" : "bg-gray-100 text-gray-600"
+              }`}
+            >
+              {item.statusText}
+            </span>
+            <h3 className="font-bold text-gray-900 leading-snug">{item.assessmentName}</h3>
+          </div>
+          <p className="mt-1 text-sm text-gray-500">
+            ผลล่าสุด: <span className="font-semibold text-gray-800">{item.riskLevel}</span>
+            <span className="mx-1.5 text-gray-300">·</span>
+            ครบกำหนด {formatDate(item.dueDate)}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 ml-auto">
+          <button
+            type="button"
+            onClick={() => setOpen(!open)}
+            aria-expanded={open}
+            aria-controls={detailId}
+            className="h-10 px-3 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 inline-flex items-center gap-1"
+          >
+            รายละเอียด
+            <ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+          </button>
+          <Link
+            href={item.actionUrl}
+            className={`h-10 inline-flex items-center gap-2 px-4 rounded-xl font-bold text-sm transition active:scale-95 ${
+              isDue ? "bg-[#b91c2b] text-white hover:bg-[#8a1420]" : "bg-[#2f3037] text-white hover:bg-black"
+            }`}
+          >
+            <span>{isDue ? "ทำแบบประเมินซ้ำตอนนี้" : "เริ่มทำแบบประเมิน"}</span>
+            <ArrowRight size={16} />
+          </Link>
+        </div>
+      </div>
+
+      {open && (
+        <div id={detailId} className="mt-3 p-4 rounded-2xl bg-gray-50 text-sm">
+          <p className="text-gray-700 leading-relaxed">{item.message}</p>
+          <dl className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-gray-500">
+            <div>
+              <dt className="inline">รอบติดตาม: </dt>
+              <dd className="inline font-semibold text-gray-700">{item.intervalLabel}</dd>
+            </div>
+            <div>
+              <dt className="inline">เกณฑ์ประเมินซ้ำ: </dt>
+              <dd className="inline font-semibold text-gray-700">{item.intervalDays} วัน</dd>
+            </div>
+            <div>
+              <dt className="inline">ประเมินเมื่อ: </dt>
+              <dd className="inline font-semibold text-gray-700">{formatDate(item.assessedAt)}</dd>
+            </div>
+          </dl>
+        </div>
+      )}
+    </li>
+  );
+}
+
+// ตารางเกณฑ์ระยะเวลาติดตามประเมินซ้ำตามมาตรฐานทางการแพทย์
+const RISK_DOT = { high: "bg-red-500", mid: "bg-orange-400", low: "bg-green-500" } as const;
+
+const GUIDELINES: {
+  disease: string;
+  rows: { risk: keyof typeof RISK_DOT; level: string; interval: string; goal: string }[];
+}[] = [
+  {
+    disease: "ความดันโลหิต",
+    rows: [
+      { risk: "high", level: "สูงอันตราย (Emergency)", interval: "ทันที / ภายใน 24 ชม.", goal: "พบแพทย์ทันที ป้องกันภาวะแทรกซ้อนหลอดเลือดสมอง" },
+      { risk: "mid", level: "น่าจะเป็น / อาจเป็นโรคความดัน", interval: "1 - 3 เดือน (30-90 วัน)", goal: "ตรวจติดตามและปรับเปลี่ยนพฤติกรรม ลดเค็ม" },
+      { risk: "low", level: "เริ่มสูง / ปกติ", interval: "6 เดือน - 1 ปี (180-365 วัน)", goal: "ตรวจวัดสม่ำเสมอประจำปี" },
+    ],
+  },
+  {
+    disease: "ความเสี่ยงหัวใจ & หลอดเลือด (Thai CVD)",
+    rows: [
+      { risk: "high", level: "เสี่ยงสูง (≥30%)", interval: "ทุก 2 เดือน (60 วัน)", goal: "พบแพทย์ ควบคุมเบาหวาน ความดัน คอเลสเตอรอล" },
+      { risk: "low", level: "เสี่ยงปานกลาง / น้อย", interval: "6 เดือน - 1 ปี", goal: "ออกกำลังกาย คุมน้ำหนัก ตรวจสุขภาพประจำปี" },
+    ],
+  },
+  {
+    disease: "ความเสี่ยงเบาหวาน (TDS / DM Risk)",
+    rows: [
+      { risk: "high", level: "เสี่ยงสูงมาก / มีปัจจัยเสี่ยง", interval: "3 - 6 เดือน (90-180 วัน)", goal: "ตรวจระดับน้ำตาลในเลือด (FPG/HbA1c)" },
+      { risk: "low", level: "เสี่ยงปานกลาง / น้อย", interval: "1 - 2 ปี (365-730 วัน)", goal: "ตรวจคัดกรองตามรอบและควบคุมอาหาร" },
+    ],
+  },
+  {
+    disease: "สุขภาพจิต (ความเครียด ST-5 & ซึมเศร้า 9Q)",
+    rows: [
+      { risk: "high", level: "เครียดรุนแรง / ซึมเศร้ารุนแรง", interval: "ทุก 7 - 14 วัน (ด่วน)", goal: "พบแพทย์หรือโทร 1323 ติดตามความเสี่ยงทำร้ายตนเอง" },
+      { risk: "low", level: "ปานกลาง / น้อย / ปกติ", interval: "1 - 3 เดือน (30-90 วัน)", goal: "สังเกตอารมณ์และฝึกคลายเครียดสม่ำเสมอ" },
+    ],
+  },
+  {
+    disease: "พฤติกรรม (บุหรี่ / แอลกอฮอล์ / นอนหลับ / อาหาร)",
+    rows: [
+      { risk: "mid", level: "เสี่ยงสูง / ติดนิโคติน / ไม่เพียงพอ", interval: "ทุก 1 เดือน (30 วัน)", goal: "ติดตามความก้าวหน้าในการปรับเปลี่ยนพฤติกรรม" },
+    ],
+  },
+];

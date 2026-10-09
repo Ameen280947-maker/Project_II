@@ -13,13 +13,13 @@ import {
   ArrowRight,
   CalendarDays,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
   Footprints,
   HeartPulse,
   Info,
   MessageCircle,
   Moon,
-  Phone,
   Plus,
   Ruler,
   Zap,
@@ -457,8 +457,17 @@ function DashboardContent({
   const latest = summary.latestAssessment;
 
   const okTypes = latestByType.filter((a) => getLevel(a) === "ok");
-  const highTypes = latestByType.filter((a) => getLevel(a) === "high");
   const dueCount = notifSummary?.dueCount ?? 0;
+
+  // ส่วนที่ไม่จำเป็นต้องเห็นตลอด ซ่อนไว้ก่อน กดดูได้ (จำสถานะไว้ในเบราว์เซอร์)
+  const [allCardsOpen, toggleAllCards] = useToggle("dashboard.cards", false);
+  const [trendOpen, toggleTrend] = useToggle("dashboard.trend", false);
+  const [tipsOpen, toggleTips] = useToggle("dashboard.tips", false);
+  const urgent = latestByType.some((a) => a.self_harm_flag);
+
+  // แสดงผลที่เสี่ยงก่อน ถ้าย่ออยู่จะเห็นเฉพาะ 4 ใบแรก
+  const sortedTypes = [...latestByType].sort((a, b) => LEVEL_STYLE[getLevel(b)].n - LEVEL_STYLE[getLevel(a)].n);
+  const visibleTypes = allCardsOpen ? sortedTypes : sortedTypes.slice(0, CARD_PREVIEW);
 
   return (
     <main className="max-w-[1200px] mx-auto px-6 pt-10 pb-16 flex flex-col gap-8">
@@ -514,9 +523,6 @@ function DashboardContent({
         </div>
       </section>
 
-      {/* ---------- Priority alert ---------- */}
-      {highTypes.length > 0 && <PriorityAlert items={highTypes} />}
-
       {/* ---------- KPI ---------- */}
       <section className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
         <KpiCard
@@ -553,17 +559,25 @@ function DashboardContent({
         <EmptyState onStart={() => router.push(ASSESSMENT_HREF)} />
       ) : (
         <>
-          {/* ---------- Trend + Risk profile ---------- */}
-          <section className="flex flex-wrap gap-4">
-            <TrendCard assessments={assessments} />
-            <RiskProfile items={latestByType} />
-          </section>
-
           {/* ---------- Assessment cards ---------- */}
           <section className="flex flex-col gap-4">
-            <SectionHead eyebrow="HEALTH ASSESSMENTS" title="สรุปผลการประเมิน" />
-            <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
-              {latestByType.map((a) => (
+            <SectionHead
+              eyebrow="HEALTH ASSESSMENTS"
+              title="สรุปผลการประเมิน"
+              aside={
+                sortedTypes.length > CARD_PREVIEW && (
+                  <ToggleButton
+                    open={allCardsOpen}
+                    onClick={toggleAllCards}
+                    controls="assessment-cards"
+                    showLabel={`ดูทั้งหมด (${sortedTypes.length})`}
+                    hideLabel="ย่อ"
+                  />
+                )
+              }
+            />
+            <div id="assessment-cards" className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(260px,1fr))]">
+              {visibleTypes.map((a) => (
                 <AssessmentCard
                   key={a.assessment_id}
                   assessment={a}
@@ -571,33 +585,47 @@ function DashboardContent({
                   onOpen={() => openResult(a)}
                 />
               ))}
-              <Link
-                href={ASSESSMENT_HREF}
-                className="min-h-[200px] rounded-[20px] border-[1.5px] border-dashed border-[#D9CFC9] p-6 flex flex-col items-center justify-center gap-2.5 text-center hover:bg-white"
-                style={{ color: ACCENT }}
-              >
-                <span className="w-12 h-12 rounded-full bg-[#FBE9EB] flex items-center justify-center">
-                  <Plus size={22} strokeWidth={2.4} />
-                </span>
-                <span className="font-[family-name:var(--font-anuphan)] font-bold text-[17px]">ทำแบบประเมินใหม่</span>
-              </Link>
+              {(allCardsOpen || sortedTypes.length <= CARD_PREVIEW) && (
+                <Link
+                  href={ASSESSMENT_HREF}
+                  className="min-h-[200px] rounded-[20px] border-[1.5px] border-dashed border-[#D9CFC9] p-6 flex flex-col items-center justify-center gap-2.5 text-center hover:bg-white"
+                  style={{ color: ACCENT }}
+                >
+                  <span className="w-12 h-12 rounded-full bg-[#FBE9EB] flex items-center justify-center">
+                    <Plus size={22} strokeWidth={2.4} />
+                  </span>
+                  <span className="font-[family-name:var(--font-anuphan)] font-bold text-[17px]">ทำแบบประเมินใหม่</span>
+                </Link>
+              )}
             </div>
           </section>
 
           {/* ---------- Tips ---------- */}
           <section className="flex flex-wrap gap-4">
-            <Recommendations items={latestByType} />
+            {/* มีผลพบความคิดทำร้ายตนเอง → เปิดคำแนะนำ (สายด่วน 1323) ไว้เสมอ */}
+            <Recommendations
+              items={latestByType}
+              open={tipsOpen || urgent}
+              onToggle={urgent ? undefined : toggleTips}
+            />
+          </section>
+
+          {/* ---------- Trend + Risk profile ---------- */}
+          <section className="flex flex-col gap-4">
+            <SectionHead
+              eyebrow="INSIGHTS"
+              title="แนวโน้มและระดับความเสี่ยง"
+              aside={<ToggleButton open={trendOpen} onClick={toggleTrend} controls="dashboard-insights" />}
+            />
+            {trendOpen && (
+              <div id="dashboard-insights" className="flex flex-wrap gap-4">
+                <TrendCard assessments={assessments} />
+                <RiskProfile items={latestByType} />
+              </div>
+            )}
           </section>
         </>
       )}
-
-      <footer className="flex gap-2.5 items-start text-[13px] text-[#5E6470] px-1">
-        <Info size={16} className="shrink-0 mt-0.5" />
-        <span>
-          ผลการประเมินนี้เป็นการคัดกรองเบื้องต้นเพื่อการดูแลสุขภาพตนเอง ไม่ใช่การวินิจฉัยทางการแพทย์
-          หากมีอาการหรือข้อกังวล ควรปรึกษาแพทย์หรือบุคลากรทางการแพทย์
-        </span>
-      </footer>
     </main>
   );
 }
@@ -624,6 +652,54 @@ function SectionHead({ eyebrow, title, aside }: { eyebrow: string; title: string
       </div>
       {aside && <div className="text-sm text-[#5E6470]">{aside}</div>}
     </div>
+  );
+}
+
+const CARD_PREVIEW = 4;
+
+// สถานะเปิด/ปิดของแต่ละส่วน จำไว้ใน localStorage (ใช้ไม่ได้ก็ใช้ค่าเริ่มต้น)
+function useToggle(key: string, initial: boolean) {
+  const [open, setOpenState] = useState(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved === null ? initial : saved === "1";
+    } catch {
+      return initial;
+    }
+  });
+  const setOpen = (value: boolean) => {
+    setOpenState(value);
+    try {
+      localStorage.setItem(key, value ? "1" : "0");
+    } catch {}
+  };
+  return [open, () => setOpen(!open)] as const;
+}
+
+function ToggleButton({
+  open,
+  onClick,
+  controls,
+  showLabel = "แสดง",
+  hideLabel = "ซ่อน",
+}: {
+  open: boolean;
+  onClick: () => void;
+  controls: string;
+  showLabel?: string;
+  hideLabel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      aria-controls={controls}
+      className="inline-flex items-center gap-1.5 min-h-10 px-3.5 rounded-xl bg-white border border-[#E7E4DC] font-semibold text-[#16181D] hover:bg-[#F6F5F1]"
+    >
+      {open ? hideLabel : showLabel}
+      <ChevronDown size={16} className={`transition-transform ${open ? "rotate-180" : ""}`} />
+    </button>
   );
 }
 
@@ -656,48 +732,6 @@ function KpiCard({
         {value} {unit && <span className="text-base font-medium text-[#5E6470]">{unit}</span>}
       </div>
     </div>
-  );
-}
-
-function PriorityAlert({ items }: { items: Assessment[] }) {
-  const first = items[0];
-  // สายด่วน 1323 เป็นสายด่วนสุขภาพจิต จึงแสดงเฉพาะเมื่อมีผลด้านสุขภาพจิตที่สูง
-  const hasMindRisk = items.some((a) => getConfig(a.assessment_name).category === "mind");
-
-  return (
-    <section
-      aria-label="ผลที่ควรได้รับความสนใจ"
-      className="flex flex-wrap items-center gap-x-6 gap-y-4 p-5 sm:px-6 rounded-[20px] bg-[#FBE9EB] border border-[#F1C9CF]"
-    >
-      <span className="w-12 h-12 shrink-0 rounded-[14px] bg-white flex items-center justify-center">
-        <AlertTriangle size={24} className="text-[#8E1428]" />
-      </span>
-      <div className="flex-[1_1_360px]">
-        <p className="font-[family-name:var(--font-anuphan)] font-bold text-lg text-[#6E0F1F]">
-          ผล {first.assessment_name} ล่าสุด: {first.risk_level} ({displayScore(first)} {getConfig(first.assessment_name).unit ?? "คะแนน"})
-          {items.length > 1 && ` และอีก ${items.length - 1} รายการ`}
-        </p>
-        <p className="text-[#5A2A31]">
-          {hasMindRisk
-            ? "แนะนำให้พูดคุยกับผู้เชี่ยวชาญ หากรู้สึกไม่ไหว สามารถโทรสายด่วนสุขภาพจิต 1323 ได้ตลอด 24 ชั่วโมง"
-            : "แนะนำให้ปรึกษาแพทย์หรือบุคลากรทางการแพทย์เพื่อตรวจเพิ่มเติม"}
-        </p>
-      </div>
-      <div className="flex flex-wrap gap-2.5">
-        <a
-          href="#recommendations"
-          className="min-h-11 px-4 inline-flex items-center rounded-xl bg-white text-[#8E1428] font-semibold border border-[#F1C9CF]"
-        >
-          ดูคำแนะนำ
-        </a>
-        {hasMindRisk && (
-          <a href="tel:1323" className="min-h-11 px-4 inline-flex items-center gap-2 rounded-xl bg-[#8E1428] text-white font-semibold">
-            <Phone size={16} />
-            โทร 1323
-          </a>
-        )}
-      </div>
-    </section>
   );
 }
 
@@ -973,7 +1007,7 @@ function AssessmentCard({
    RECOMMENDATIONS
 ========================================================= */
 
-function Recommendations({ items }: { items: Assessment[] }) {
+function Recommendations({ items, open, onToggle }: { items: Assessment[]; open: boolean; onToggle?: () => void }) {
   const needAttention = items
     .filter((a) => getLevel(a) === "high" || getLevel(a) === "mid")
     // ข้อคิดทำร้ายตนเองขึ้นก่อนเสมอ
@@ -1022,19 +1056,29 @@ function Recommendations({ items }: { items: Assessment[] }) {
       id="recommendations"
       className="flex-[2_1_560px] min-w-0 bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-4 scroll-mt-6"
     >
-      <SectionHead eyebrow="FOR YOU" title="คำแนะนำจากผลประเมินของคุณ" />
-      <div className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
-        {tips.map((t) => (
-          <div key={t.key} className="p-[18px] rounded-2xl bg-[#FBF8F4] flex flex-col gap-2">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${LEVEL_STYLE[t.level].seg}`} />
-              <span className={`text-xs font-semibold ${LEVEL_STYLE[t.level].text}`}>{t.source}</span>
+      <SectionHead
+        eyebrow="FOR YOU"
+        title="คำแนะนำจากผลประเมินของคุณ"
+        aside={
+          onToggle && (
+            <ToggleButton open={open} onClick={onToggle} controls="recommendation-list" showLabel={`แสดง (${tips.length})`} />
+          )
+        }
+      />
+      {open && (
+        <div id="recommendation-list" className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
+          {tips.map((t) => (
+            <div key={t.key} className="p-[18px] rounded-2xl bg-[#FBF8F4] flex flex-col gap-2">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${LEVEL_STYLE[t.level].seg}`} />
+                <span className={`text-xs font-semibold ${LEVEL_STYLE[t.level].text}`}>{t.source}</span>
+              </div>
+              <p className="font-semibold">{t.title}</p>
+              <p className="text-sm text-[#4A4F59] whitespace-pre-line">{t.text}</p>
             </div>
-            <p className="font-semibold">{t.title}</p>
-            <p className="text-sm text-[#4A4F59] whitespace-pre-line">{t.text}</p>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
