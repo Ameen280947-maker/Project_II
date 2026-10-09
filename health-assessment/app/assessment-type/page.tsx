@@ -94,10 +94,6 @@ export default function AssessmentTypePage() {
                 เข้าสู่แบบประเมิน
               </h2>
 
-              <p className="mt-3 max-w-[760px] text-sm leading-7 text-[#7c7d85]">
-                กรุณาเลือกประเภทแบบประเมินที่คุณต้องการ
-                เพื่อให้ระบบวิเคราะห์ข้อมูลสุขภาพเบื้องต้นของคุณอย่างเหมาะสม
-              </p>
             </div>
 
             <div className="mt-2 shrink-0">
@@ -129,7 +125,6 @@ export default function AssessmentTypePage() {
           {extra.length > 0 && (
             <div className="mt-10">
               <h2 className="text-xl font-bold">แบบประเมินเพิ่มเติม</h2>
-              <p className="mt-1 text-sm text-[#7c7d85]">แบบประเมินที่เจ้าหน้าที่เพิ่มเข้ามาในระบบ</p>
               <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {extra.map((a) => (
                   <Link

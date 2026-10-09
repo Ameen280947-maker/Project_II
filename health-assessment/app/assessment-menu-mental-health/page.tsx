@@ -2,11 +2,10 @@
 
 import Link from "next/link";
 import Sidebar from "@/app/components/Sidebar";
-import NotificationBell from "@/app/components/NotificationBell";
+import AssessmentMenuCard, { type CardTone } from "@/app/components/AssessmentMenuCard";
 
 import {
     ArrowLeft,
-    ArrowRight,
     Brain,
     HeartPulse,
 } from "lucide-react";
@@ -17,15 +16,13 @@ import {
 
 type MentalHealthAssessment = {
     title: string;
-    description: string;
     href: string;
 
     icon:
     | typeof Brain
     | typeof HeartPulse;
 
-    iconClass: string;
-    buttonClass: string;
+    tone: CardTone;
 };
 
 /* =========================================================
@@ -36,35 +33,23 @@ const mentalHealthAssessments: MentalHealthAssessment[] = [
     {
         title: "ความเครียดสะสม",
 
-        description:
-            "ประเมินระดับความเครียดที่เกิดขึ้นในชีวิตประจำวัน เพื่อเฝ้าระวังความเครียดสะสมที่อาจส่งผลกระทบต่อสุขภาพกายและสุขภาพจิต",
 
         href: "/assessment_stress",
 
         icon: Brain,
 
-        iconClass:
-            "bg-[#eef5ff] text-[#6394cf]",
-
-        buttonClass:
-            "bg-gradient-to-r from-[#78a9dc] to-[#6092cb] shadow-[0_12px_26px_rgba(96,146,203,0.22)]",
+        tone: "blue",
     },
 
     {
         title: "ภาวะซึมเศร้า",
 
-        description:
-            "ประเมินอาการและความรู้สึกที่เกี่ยวข้องกับภาวะซึมเศร้า เพื่อช่วยคัดกรองความเสี่ยงและส่งเสริมการดูแลสุขภาพจิต",
 
         href: "/assessment_depression_2q",
 
         icon: HeartPulse,
 
-        iconClass:
-            "bg-[#f1edff] text-[#8061c5]",
-
-        buttonClass:
-            "bg-gradient-to-r from-[#9273d0] to-[#7958bb] shadow-[0_12px_26px_rgba(121,88,187,0.22)]",
+        tone: "violet",
     },
 ];
 
@@ -93,137 +78,34 @@ export default function MentalHealthMenuPage() {
               HEADER
           ================================================= */}
 
-                    <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <div>
-                            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
-                                Health Assessment
-                            </p>
+                    <header>
+                        <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
+                            Health Assessment
+                        </p>
 
-                            <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-[44px]">
-                                Assessment-
-                                <span className="text-[#57965c]">
-                                    ความเสี่ยงด้านสุขภาพจิต
-                                </span>
-                            </h1>
+                        <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-[44px]">
+                            Assessment-
+                            <span className="text-[#57965c]">
+                                ความเสี่ยงด้านสุขภาพจิต
+                            </span>
+                        </h1>
 
-                            <h2 className="mt-3 text-lg font-semibold text-[#4f535b]">
-                                แบบประเมินสุขภาพเบื้องต้น
-                            </h2>
-
-                            <p className="mt-2 max-w-[900px] leading-7 text-[#8b8f98]">
-                                ประเมินสุขภาพจิตและอารมณ์ในชีวิตประจำวัน
-                                เพื่อค้นหาปัจจัยเสี่ยงที่อาจส่งผลกระทบต่อสุขภาพจิตของคุณ
-                            </p>
-                        </div>
-
-                        <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
-                            <NotificationBell />
-                        </div>
                     </header>
 
                     {/* =================================================
               ASSESSMENT CARDS
           ================================================= */}
 
-                    <div className="mt-8 grid gap-6 xl:grid-cols-2">
-
-                        {mentalHealthAssessments.map(
-                            (assessment) => {
-                                const Icon = assessment.icon;
-
-                                return (
-                                    <article
-                                        key={assessment.title}
-                                        className="
-                      flex
-                      min-h-[300px]
-                      flex-col
-                      rounded-[28px]
-                      border
-                      border-[#eee8e9]
-                      bg-white
-                      p-6
-                      shadow-[0_15px_40px_rgba(35,25,30,0.045)]
-                      transition
-                      duration-300
-                      hover:-translate-y-1
-                      hover:shadow-[0_20px_45px_rgba(35,25,30,0.07)]
-                      sm:p-7
-                    "
-                                    >
-
-                                        {/* =================================================
-                        ICON
-                    ================================================= */}
-
-                                        <div
-                                            className={`
-                        grid
-                        h-14
-                        w-14
-                        place-items-center
-                        rounded-2xl
-                        ${assessment.iconClass}
-                      `}
-                                        >
-                                            <Icon
-                                                size={29}
-                                                strokeWidth={1.8}
-                                            />
-                                        </div>
-
-                                        {/* =================================================
-                        TITLE
-                    ================================================= */}
-
-                                        <h2 className="mt-5 text-xl font-bold leading-8">
-                                            {assessment.title}
-                                        </h2>
-
-                                        {/* =================================================
-                        DESCRIPTION
-                    ================================================= */}
-
-                                        <p className="mt-3 max-w-[600px] text-sm leading-7 text-[#858991]">
-                                            {assessment.description}
-                                        </p>
-
-                                        {/* =================================================
-                        BUTTON
-                    ================================================= */}
-
-                                        <Link
-                                            href={assessment.href}
-                                            className={`
-                        mt-auto
-                        flex
-                        h-14
-                        w-full
-                        items-center
-                        justify-center
-                        gap-3
-                        rounded-2xl
-                        font-bold
-                        text-white
-                        transition
-                        duration-200
-                        hover:-translate-y-0.5
-                        hover:brightness-[1.03]
-                        ${assessment.buttonClass}
-                      `}
-                                        >
-                                            เริ่มทำแบบประเมิน
-
-                                            <ArrowRight
-                                                size={21}
-                                            />
-                                        </Link>
-
-                                    </article>
-                                );
-                            },
-                        )}
-
+                    <div className="mt-8 grid gap-6 lg:grid-cols-2">
+                      {mentalHealthAssessments.map((assessment) => (
+                        <AssessmentMenuCard
+                          key={assessment.href}
+                          title={assessment.title}
+                          href={assessment.href}
+                          icon={assessment.icon}
+                          tone={assessment.tone}
+                        />
+                      ))}
                     </div>
 
                     {/* =================================================
