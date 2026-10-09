@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   Activity,
   ArrowRight,
-  Heart,
   Lock,
   Save,
   Stethoscope,
@@ -1574,17 +1573,6 @@ export default function AssessmentPage() {
 
                     </div>
 
-                    {!isEditingProfile && (
-                      <div className="mt-1 flex items-center gap-1 text-[11px] text-[#9a9aa1]">
-
-                        <Lock
-                          size={11}
-                        />
-
-                        จากข้อมูลสุขภาพ
-
-                      </div>
-                    )}
 
                   </div>
 
@@ -1672,7 +1660,7 @@ export default function AssessmentPage() {
                     description={
                       isEditingProfile
                         ? "สามารถแก้ไขข้อมูลได้"
-                        : "ข้อมูลจากโปรไฟล์สุขภาพ"
+                        : ""
                     }
                     checked={
                       smoking
@@ -1705,7 +1693,7 @@ export default function AssessmentPage() {
                     description={
                       isEditingProfile
                         ? "สามารถแก้ไขข้อมูลได้"
-                        : "ข้อมูลจากโปรไฟล์สุขภาพ"
+                        : ""
                     }
                     checked={
                       diabetes
@@ -1823,93 +1811,6 @@ export default function AssessmentPage() {
 
             <aside className="flex flex-col justify-end gap-5">
 
-              {/* =================================================
-                  SUMMARY
-              ================================================= */}
-
-              <div className="rounded-[25px] border border-[#f0dfe1] bg-gradient-to-br from-white to-[#fff1f2] p-6">
-
-                <Heart
-                  className="text-[#b91c2b]"
-                  size={29}
-                />
-
-                <h3 className="mt-4 font-bold">
-                  เตรียมข้อมูลให้ครบถ้วน
-                </h3>
-
-                <p className="mt-2 text-sm leading-6 text-[#85858d]">
-                  ข้อมูลทั่วไปถูกดึงมาจากโปรไฟล์สุขภาพ
-                  และเมื่อกดเริ่มประเมินระบบจะคำนวณและบันทึกผลภายใต้บัญชีผู้ใช้งานของคุณ
-                </p>
-
-                {/* =================================================
-                    SUMMARY BOX
-                ================================================= */}
-
-                <div className="mt-5 rounded-2xl bg-white/80 p-4 text-sm">
-
-                  <SummaryRow
-                    label="อายุ"
-                    value={`${age} ปี`}
-                  />
-
-                  <SummaryRow
-                    label="เพศ"
-                    value={
-                      gender ===
-                      "female"
-                        ? "หญิง"
-                        : "ชาย"
-                    }
-                  />
-
-                  <SummaryRow
-                    label="น้ำหนัก"
-                    value={
-                      weight >
-                      0
-                        ? `${weight} kg`
-                        : "-"
-                    }
-                  />
-
-                  <SummaryRow
-                    label="ความดัน"
-                    value={`${systolic} mmHg`}
-                  />
-
-                  <SummaryRow
-                    label="รอบเอว"
-                    value={`${waist} cm`}
-                  />
-
-                  <SummaryRow
-                    label="ส่วนสูง"
-                    value={`${height} cm`}
-                  />
-
-                  <SummaryRow
-                    label="สูบบุหรี่"
-                    value={
-                      smoking
-                        ? "ใช่"
-                        : "ไม่"
-                    }
-                  />
-
-                  <SummaryRow
-                    label="เบาหวาน"
-                    value={
-                      diabetes
-                        ? "ใช่"
-                        : "ไม่"
-                    }
-                  />
-
-                </div>
-
-              </div>
 
               {/* =================================================
                   START ASSESSMENT
@@ -1956,32 +1857,6 @@ export default function AssessmentPage() {
   );
 }
 
-/* =========================================================
-   SUMMARY ROW
-========================================================= */
-
-function SummaryRow({
-  label,
-  value,
-}: {
-  label: string;
-
-  value: string;
-}) {
-  return (
-    <div className="mt-2 flex items-center justify-between first:mt-0">
-
-      <span className="text-[#777780]">
-        {label}
-      </span>
-
-      <strong>
-        {value}
-      </strong>
-
-    </div>
-  );
-}
 
 /* =========================================================
    RANGE FIELD
@@ -2043,17 +1918,7 @@ function RangeField({
             {label}
           </p>
 
-          {readOnly ? (
-            <div className="mt-1 flex items-center gap-1 text-[11px] text-[#9a9aa1]">
-
-              <Lock
-                size={11}
-              />
-
-              จากข้อมูลสุขภาพ
-
-            </div>
-          ) : (
+          {!readOnly && (
             <div className="mt-1 text-[11px] text-[#b91c2b]">
               สามารถแก้ไขได้
             </div>
@@ -2192,9 +2057,11 @@ function ToggleCard({
             {title}
           </p>
 
-          <p className="mt-1 text-xs text-[#92929a]">
-            {description}
-          </p>
+          {description && (
+            <p className="mt-1 text-xs text-[#92929a]">
+              {description}
+            </p>
+          )}
 
         </div>
 
