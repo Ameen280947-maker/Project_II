@@ -16,7 +16,6 @@ import {
   ClipboardList,
   Footprints,
   HeartPulse,
-  Info,
   MessageCircle,
   Moon,
   Phone,
@@ -368,10 +367,10 @@ const PILLARS = [
 ];
 
 const HOTLINES = [
-  { number: "1669", label: "การแพทย์ฉุกเฉิน", style: "bg-[#b91c2b] text-white hover:bg-[#991b1b]" },
-  { number: "1323", label: "สายด่วนสุขภาพจิต", style: "bg-red-50 text-[#991b1b] hover:bg-red-100" },
-  { number: "1600", label: "สายด่วนเลิกบุหรี่", style: "bg-gray-50 text-gray-800 hover:bg-gray-100" },
-  { number: "1413", label: "สายด่วนเลิกเหล้า", style: "bg-gray-50 text-gray-800 hover:bg-gray-100" },
+  { number: "1669", label: "การแพทย์ฉุกเฉิน", style: "bg-red-50 text-[#b91c2b] hover:bg-red-100" },
+  { number: "1323", label: "สุขภาพจิต", style: "bg-gray-50 text-gray-900 hover:bg-gray-100" },
+  { number: "1600", label: "เลิกบุหรี่", style: "bg-gray-50 text-gray-900 hover:bg-gray-100" },
+  { number: "1413", label: "เลิกเหล้า", style: "bg-gray-50 text-gray-900 hover:bg-gray-100" },
 ];
 
 const RED_FLAGS = [
@@ -611,11 +610,10 @@ export default function RecommendationHealthPage() {
                   <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-3">
                     คำแนะนำ<span className="text-[#b91c2b]">สุขภาพ</span>
                   </h1>
-                  <p className="text-gray-500 mt-3 text-lg">แผนดูแลสุขภาพที่จัดทำจากผลการประเมินล่าสุดของคุณ</p>
                 </div>
                 <button
                   onClick={() => window.print()}
-                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition shadow-sm self-start sm:self-auto print:hidden"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white border border-gray-200 text-gray-700 font-semibold hover:bg-gray-50 transition self-start sm:self-auto print:hidden"
                 >
                   <Printer size={18} />
                   พิมพ์ / บันทึกเป็น PDF
@@ -640,7 +638,7 @@ export default function RecommendationHealthPage() {
                   value={goods.length}
                   unit="ด้าน"
                 />
-                <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm flex items-center gap-4">
+                <div className="bg-white border border-gray-100 rounded-3xl p-6 flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
                     <Target size={26} />
                   </div>
@@ -659,23 +657,19 @@ export default function RecommendationHealthPage() {
               {/* =================================================
                   URGENT HELP
               ================================================= */}
-              <section className="bg-white border border-red-100 rounded-3xl p-6 shadow-sm mb-8">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-11 h-11 rounded-2xl bg-red-50 text-[#b91c2b] flex items-center justify-center">
-                      <Phone size={20} />
-                    </div>
-                    <div>
-                      <h2 className="font-bold text-gray-800 text-lg">ต้องการความช่วยเหลือเร่งด่วน?</h2>
-                      <p className="text-sm text-gray-500">โทรได้ฟรี ตลอด 24 ชั่วโมง</p>
-                    </div>
-                  </div>
+              <section className="bg-white border border-gray-100 rounded-3xl p-5 sm:p-6 mb-8">
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
+                  <h2 className="flex items-center gap-2 font-bold text-gray-800">
+                    <Phone size={18} className="text-[#b91c2b]" />
+                    สายด่วนช่วยเหลือ (โทรฟรี 24 ชม.)
+                  </h2>
                   <button
                     onClick={() => setShowFlags((v) => !v)}
                     aria-expanded={showFlags}
-                    className="px-4 py-2 rounded-xl border border-red-100 text-[#b91c2b] text-sm font-semibold hover:bg-red-50 transition self-start"
+                    className="inline-flex items-center gap-1 text-sm font-semibold text-[#b91c2b] hover:underline"
                   >
-                    {showFlags ? "ซ่อนสัญญาณอันตราย" : "ดูสัญญาณอันตรายที่ต้องพบแพทย์ทันที"}
+                    สัญญาณอันตราย
+                    <ChevronDown size={16} className={`transition-transform ${showFlags ? "rotate-180" : ""}`} />
                   </button>
                 </div>
 
@@ -684,16 +678,16 @@ export default function RecommendationHealthPage() {
                     <a
                       key={h.number}
                       href={`tel:${h.number}`}
-                      className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition ${h.style}`}
+                      className={`flex items-baseline gap-2 px-4 py-3 rounded-2xl transition ${h.style}`}
                     >
-                      <span className="text-2xl font-bold">{h.number}</span>
-                      <span className="text-sm leading-tight">{h.label}</span>
+                      <span className="text-xl font-bold">{h.number}</span>
+                      <span className="text-sm opacity-80">{h.label}</span>
                     </a>
                   ))}
                 </div>
 
                 {showFlags && (
-                  <div className="mt-5 pt-5 border-t border-red-50">
+                  <div className="mt-4 pt-4 border-t border-gray-100">
                     <p className="font-semibold text-gray-800 mb-3">ควรไปโรงพยาบาลหรือโทร 1669 ทันที หากมีอาการเหล่านี้</p>
                     <ul className="grid grid-cols-1 md:grid-cols-2 gap-2">
                       {RED_FLAGS.map((f) => (
@@ -757,7 +751,7 @@ export default function RecommendationHealthPage() {
                   )}
 
                   {shownGoods.length > 0 && (
-                    <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+                    <div className="bg-white border border-gray-100 rounded-3xl p-6">
                       <div className="flex items-center gap-2 mb-2">
                         <span className="w-2.5 h-2.5 rounded-full bg-green-500" />
                         <h3 className="font-bold text-gray-800 text-lg">รักษาระดับที่ดีไว้</h3>
@@ -785,10 +779,9 @@ export default function RecommendationHealthPage() {
 
                 {/* ---------- Weekly goals + changes ---------- */}
                 <aside className="flex flex-col gap-6">
-                  <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+                  <div className="bg-white border border-gray-100 rounded-3xl p-6">
                     <p className="text-sm font-semibold text-[#b91c2b] uppercase tracking-wider">This Week</p>
                     <h2 className="text-xl font-bold text-gray-800 mt-1">เป้าหมายสัปดาห์นี้</h2>
-                    <p className="text-sm text-gray-400 mt-1">ติ๊กเมื่อทำสำเร็จ เริ่มใหม่ทุกวันจันทร์</p>
 
                     <div className="flex items-center gap-3 mt-4 mb-2">
                       <div className="flex-1 h-2.5 rounded-full bg-gray-100">
@@ -827,7 +820,7 @@ export default function RecommendationHealthPage() {
                     </div>
                   </div>
 
-                  <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm">
+                  <div className="bg-white border border-gray-100 rounded-3xl p-6">
                     <div className="flex items-center gap-2 mb-3">
                       <TrendingUp size={18} className="text-gray-500" />
                       <h2 className="text-lg font-bold text-gray-800">ความเปลี่ยนแปลงจากครั้งก่อน</h2>
@@ -861,11 +854,11 @@ export default function RecommendationHealthPage() {
               <section className="mb-10">
                 <p className="text-sm font-semibold text-[#b91c2b] uppercase tracking-wider">Prevent NCDs</p>
                 <h2 className="text-2xl font-bold text-gray-800 mt-1 mb-5">หลักดูแลตัวเองเพื่อป้องกันโรคไม่ติดต่อเรื้อรัง</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                <div className="bg-white border border-gray-100 rounded-3xl p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-x-8 gap-y-6">
                   {PILLARS.map((p) => (
-                    <div key={p.title} className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm flex gap-4">
-                      <div className="w-11 h-11 rounded-2xl bg-red-50 text-[#b91c2b] flex items-center justify-center shrink-0">
-                        <p.icon size={20} />
+                    <div key={p.title} className="flex gap-3">
+                      <div className="w-9 h-9 rounded-xl bg-red-50 text-[#b91c2b] flex items-center justify-center shrink-0">
+                        <p.icon size={18} />
                       </div>
                       <div>
                         <p className="font-bold text-gray-800">{p.title}</p>
@@ -883,18 +876,16 @@ export default function RecommendationHealthPage() {
                 <section className="mb-10">
                   <p className="text-sm font-semibold text-[#b91c2b] uppercase tracking-wider">Learn More</p>
                   <h2 className="text-2xl font-bold text-gray-800 mt-1 mb-5">อ่านคำแนะนำฉบับเต็ม</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white border border-gray-100 rounded-3xl divide-y divide-gray-100">
                     {relatedArticles.map(({ a, cfg }) => (
                       <Link
                         key={a.assessment_id}
                         href={resultHref(a)}
-                        className="bg-white border border-gray-100 rounded-3xl p-5 shadow-sm hover:shadow-md transition flex flex-col gap-3"
+                        className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition first:rounded-t-3xl last:rounded-b-3xl"
                       >
-                        <div className="w-11 h-11 rounded-2xl bg-gray-50 text-gray-600 flex items-center justify-center">
-                          <BookOpen size={20} />
-                        </div>
-                        <p className="font-bold text-gray-800">คำแนะนำเรื่อง{cfg.thaiName}</p>
-                        <span className="mt-auto text-sm font-semibold text-[#b91c2b] inline-flex items-center gap-1">
+                        <BookOpen size={18} className="text-gray-400 shrink-0" />
+                        <span className="flex-1 font-semibold text-gray-800">คำแนะนำเรื่อง{cfg.thaiName}</span>
+                        <span className="text-sm font-semibold text-[#b91c2b] inline-flex items-center gap-1 shrink-0">
                           อ่านต่อ <ArrowRight size={15} />
                         </span>
                       </Link>
@@ -903,22 +894,6 @@ export default function RecommendationHealthPage() {
                 </section>
               )}
 
-              {/* =================================================
-                  SOURCES & DISCLAIMER
-              ================================================= */}
-              <footer className="bg-gray-100/70 rounded-3xl p-5 text-sm text-gray-500 flex gap-3">
-                <Info size={18} className="shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <p>
-                    <span className="font-semibold text-gray-700">แหล่งอ้างอิงเกณฑ์และคำแนะนำ: </span>
-                    กรมควบคุมโรค · กรมสุขภาพจิต · กรมอนามัย · องค์การอนามัยโลก (WHO)
-                  </p>
-                  <p>
-                    คำแนะนำนี้จัดทำจากผลการคัดกรองเบื้องต้นเพื่อการดูแลสุขภาพตนเอง ไม่ใช่การวินิจฉัยหรือการรักษาทางการแพทย์
-                    หากมีอาการหรือข้อสงสัย ควรปรึกษาแพทย์หรือบุคลากรทางการแพทย์
-                  </p>
-                </div>
-              </footer>
             </>
           )}
         </div>
@@ -945,7 +920,7 @@ function SummaryCard({
   unit: string;
 }) {
   return (
-    <div className="bg-white border border-gray-100 rounded-3xl p-6 shadow-sm flex items-center gap-4">
+    <div className="bg-white border border-gray-100 rounded-3xl p-6 flex items-center gap-4">
       <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${iconWrap}`}>
         <Icon size={26} />
       </div>
@@ -1007,34 +982,34 @@ function PlanCard({
   const reassessHref = notification?.actionUrl || "/assessment-type";
 
   return (
-    <article className="bg-white border border-gray-100 rounded-3xl shadow-sm overflow-hidden">
+    <article className="bg-white border border-gray-100 rounded-3xl overflow-hidden">
       <button onClick={onToggle} aria-expanded={open} className="w-full text-left p-5 sm:p-6 flex items-center gap-4 hover:bg-gray-50/60 transition">
-        <span className="w-8 h-8 rounded-full bg-gray-900 text-white text-sm font-bold flex items-center justify-center shrink-0">
+        <span className="w-7 h-7 rounded-full bg-gray-100 text-gray-600 text-sm font-bold flex items-center justify-center shrink-0">
           {rank}
         </span>
-        <span className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${s.iconWrap}`}>
-          <Icon size={22} />
+        <span className={`w-11 h-11 rounded-2xl flex items-center justify-center shrink-0 ${s.iconWrap}`}>
+          <Icon size={20} />
         </span>
         <span className="flex-1 min-w-0">
           <span className="flex flex-wrap items-center gap-2">
             <span className="text-lg font-bold text-gray-800">{cfg.thaiName || a.assessment_name}</span>
             <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${s.pill}`}>{s.label}</span>
           </span>
-          <span className="block text-sm text-gray-400 mt-0.5 truncate">
+          <span className="block text-sm text-gray-500 mt-1">
             ผล {displayScore(a)}
             {cfg.max ? `/${cfg.max}` : cfg.unit ? ` ${cfg.unit}` : ""} · {a.risk_level} · ประเมินเมื่อ {formatDate(a.assessed_at)}
           </span>
+          {((delta !== null && delta !== 0) || isDue) && (
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs font-semibold">
+              {delta !== null && delta !== 0 && (
+                <span className={delta > 0 ? "text-[#b91c2b]" : "text-green-700"}>
+                  {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} จากครั้งก่อน
+                </span>
+              )}
+              {isDue && <span className="text-yellow-700">● ถึงรอบประเมินซ้ำ</span>}
+            </span>
+          )}
         </span>
-        {delta !== null && delta !== 0 && (
-          <span className={`hidden sm:inline text-sm font-semibold shrink-0 ${delta > 0 ? "text-[#b91c2b]" : "text-green-700"}`}>
-            {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} จากครั้งก่อน
-          </span>
-        )}
-        {isDue && (
-          <span className="hidden sm:inline px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 shrink-0">
-            ถึงรอบประเมินซ้ำ
-          </span>
-        )}
         <ChevronDown size={20} className={`text-gray-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
@@ -1057,13 +1032,13 @@ function PlanCard({
       )}
 
       {open && (
-        <div className="px-5 sm:px-6 pb-6 flex flex-col gap-5">
-          <div className="rounded-2xl bg-[#faf9f7] px-4 py-3 text-sm text-gray-600">
-            <span className="font-bold text-gray-800">ทำไมเรื่องนี้สำคัญ · </span>
+        <div className="mx-5 sm:mx-6 pt-5 pb-6 border-t border-gray-100 flex flex-col gap-6">
+          <p className="text-sm text-gray-600 leading-relaxed">
+            <span className="font-semibold text-gray-800">ทำไมเรื่องนี้สำคัญ · </span>
             {cfg.why}
-          </div>
+          </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
             <div>
               <p className="font-bold text-gray-800 mb-3">สิ่งที่ทำได้เลย</p>
               <ol className="space-y-2.5">
@@ -1079,14 +1054,14 @@ function PlanCard({
 
               {/* คำแนะนำจากฐานข้อมูล (ถ้ามี) */}
               {a.recommendation_text?.trim() && (
-                <div className="mt-4 rounded-2xl border border-gray-100 p-4">
+                <div className="mt-5 rounded-2xl bg-[#faf9f7] p-4">
                   <p className="text-xs font-bold text-gray-500 mb-1">คำแนะนำสำหรับผลของคุณ</p>
                   <p className="text-sm text-gray-700 whitespace-pre-line">{a.recommendation_text}</p>
                 </div>
               )}
             </div>
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               <InfoBox tone="blue" title="เป้าหมาย" text={cfg.goal} />
               <InfoBox tone="red" title="ควรพบผู้เชี่ยวชาญเมื่อ" text={cfg.seeDoctor} />
               <InfoBox tone="gray" title="ประเมินซ้ำ" text={reassessText} />
@@ -1116,12 +1091,12 @@ function PlanCard({
 
 function InfoBox({ tone, title, text }: { tone: "blue" | "red" | "gray"; title: string; text: string }) {
   const styles = {
-    blue: "bg-blue-50/60 border-blue-100 text-blue-700",
-    red: "bg-red-50/60 border-red-100 text-[#b91c2b]",
-    gray: "bg-gray-50 border-gray-100 text-gray-600",
+    blue: "border-blue-400 text-blue-700",
+    red: "border-[#b91c2b] text-[#b91c2b]",
+    gray: "border-gray-300 text-gray-600",
   }[tone];
   return (
-    <div className={`rounded-2xl border px-4 py-3 ${styles}`}>
+    <div className={`border-l-[3px] pl-4 py-0.5 ${styles}`}>
       <p className="text-xs font-bold tracking-wide">{title}</p>
       <p className="text-sm text-gray-700 mt-0.5">{text}</p>
     </div>
