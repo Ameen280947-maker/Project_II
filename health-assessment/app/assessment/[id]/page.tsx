@@ -6,6 +6,7 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, CheckCircle2, ClipboardList, Phone, RotateCcw } from "lucide-react";
 import Sidebar from "@/app/components/Sidebar";
 import AnswerReview from "@/app/components/AnswerReview";
+import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 
 /* =========================================================
    หน้ากลางสำหรับแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
@@ -76,7 +77,14 @@ function Content() {
   if (!Number.isInteger(typeId) || typeId <= 0) {
     return <Message text={NOT_FOUND_TEXT} />;
   }
-  return resultId ? <ResultView key={resultId} assessmentId={resultId} typeId={typeId} /> : <Form key={typeId} typeId={typeId} />;
+  if (resultId) return <ResultView key={resultId} assessmentId={resultId} typeId={typeId} />;
+  // ดูผลเก่าได้เสมอ แต่ถ้า staff ปิดแบบประเมินนี้อยู่ จะแจ้งเตือนทับหน้าทำแบบประเมิน
+  return (
+    <>
+      <Form key={typeId} typeId={typeId} />
+      <AssessmentClosedNotice typeId={typeId} />
+    </>
+  );
 }
 
 /* =========================================================
