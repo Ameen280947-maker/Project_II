@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import NotificationBell from "@/app/components/NotificationBell";
@@ -319,6 +319,23 @@ const getLevel = (a: Assessment): Level => {
   return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
+// หน้าผลและคำแนะนำของแต่ละแบบประเมิน (key = assessment_name ตัวพิมพ์เล็ก)
+const RESULT_PAGE: Record<string, string> = {
+  "thai cvd": "/recommendation-CVD",
+  "diabetes tds": "/recommendation_diabetes",
+  "blood pressure": "/recommendation_DB",
+  bmi: "/recommendation_BMI",
+  "phq-2": "/recommendation_depression_2q",
+  "9q": "/recommendation_depression_9q",
+  stress: "/recommendation_stress",
+  sleep: "/recommendation_sleep",
+  diet: "/recommendation_diet",
+  alcohol: "/recommendation_alcohol",
+  smoking: "/recommendation_smoking",
+  "physical activity": "/recommendation_physical_activity",
+  กิจกรรมทางกาย: "/recommendation_physical_activity",
+};
+
 const formatShortDate = (date: string) =>
   new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
@@ -378,13 +395,10 @@ export default function DashboardPage() {
     loadDashboard();
   }, [router]);
 
+  // ไปหน้าผลและคำแนะนำของแบบประเมินนั้น (ไม่มีหน้าเฉพาะ → หน้าประวัติ)
   const openResult = (assessment: Assessment) => {
-    const type = assessment.assessment_name?.toLowerCase().trim();
-    if (type === "physical activity" || type === "กิจกรรมทางกาย") {
-      router.push(`/recommendation_physical_activity?assessmentId=${assessment.assessment_id}`);
-      return;
-    }
-    router.push(`/history?assessmentId=${assessment.assessment_id}`);
+    const page = RESULT_PAGE[assessment.assessment_name?.toLowerCase().trim() ?? ""];
+    router.push(`${page ?? "/history"}?assessmentId=${assessment.assessment_id}`);
   };
 
   return (
@@ -574,17 +588,16 @@ function DashboardContent({
             />
           </section>
 
-          {/* ---------- Trend + Risk profile ---------- */}
+          {/* ---------- Trend (กราฟแมงมุม) ---------- */}
           <section className="flex flex-col gap-4">
             <SectionHead
-              eyebrow="INSIGHTS"
-              title="แนวโน้มและระดับความเสี่ยง"
+              eyebrow="TREND"
+              title="แนวโน้มคะแนน"
               aside={<ToggleButton open={trendOpen} onClick={toggleTrend} controls="dashboard-insights" />}
             />
             {trendOpen && (
-              <div id="dashboard-insights" className="flex flex-wrap gap-4">
-                <TrendCard assessments={assessments} />
-                <RiskProfile items={latestByType} />
+              <div id="dashboard-insights">
+                <TrendCard items={latestByType} assessments={assessments} />
               </div>
             )}
           </section>
@@ -700,42 +713,313 @@ function KpiCard({
 }
 
 /* =========================================================
-   TREND CHART (SVG ล้วน ไม่ต้องติดตั้ง library)
+   TREND: กราฟแมงมุม (SVG ล้วน)
+   - แต่ละแกน = แบบประเมิน 1 ด้าน
+   - วงจากในออกนอก = ปกติ → ควรระวัง → ควรพบผู้เชี่ยวชาญ
+   - เส้นทึบ = ผลล่าสุด, เส้นประ = ผลครั้งก่อน
 ========================================================= */
 
-function TrendCard({ assessments }: { assessments: Assessment[] }) {
-  // จัดกลุ่มตามประเภท เรียงจากเก่าไปใหม่ เก็บ 8 ครั้งล่าสุด
-  const groups = useMemo(() => {
-    const map = new Map<number, Assessment[]>();
-    assessments.forEach((a) => {
-      const list = map.get(a.assessment_type_id) ?? [];
-      list.push(a);
-      map.set(a.assessment_type_id, list);
-    });
-    return Array.from(map.values())
-      .map((list) =>
-        list
-          .filter((a) => Number.isFinite(scoreOf(a)))
-          .sort((a, b) => new Date(a.assessed_at).getTime() - new Date(b.assessed_at).getTime())
-          .slice(-8)
-      )
-      .filter((list) => list.length > 0)
-      .sort((a, b) => b.length - a.length);
-  }, [assessments]);
+// แถบเลือก "ทั้งหมด" (กราฟแมงมุม) หรือดูทีละแบบประเมิน (กราฟเส้นตามเวลา)
+function TrendCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
+  const [selected, setSelected] = useState<number | null>(null);
+  const history = (typeId: number) =>
+    assessments
+      .filter((a) => a.assessment_type_id === typeId && Number.isFinite(scoreOf(a)))
+      .sort((a, b) => new Date(a.assessed_at).getTime() - new Date(b.assessed_at).getTime())
+      .slice(-8);
+  const types = items.filter((a) => history(a.assessment_type_id).length > 0);
+  const active = types.find((a) => a.assessment_type_id === selected);
 
-  const [selectedType, setSelectedType] = useState<number | null>(null);
-  const active = groups.find((g) => g[0].assessment_type_id === selectedType) ?? groups[0];
+  const tab = (key: number | null, label: string) => {
+    const isActive = key === (active?.assessment_type_id ?? null);
+    return (
+      <button
+        key={key ?? "all"}
+        role="tab"
+        aria-selected={isActive}
+        onClick={() => setSelected(key)}
+        className={`px-3.5 min-h-9 rounded-[9px] text-sm ${
+          isActive ? "bg-white font-semibold shadow-sm" : "text-[#4A4F59] hover:text-[#16181D]"
+        }`}
+      >
+        {label}
+      </button>
+    );
+  };
 
-  if (!active) return null;
+  return (
+    <div className="bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-5">
+      <div role="tablist" aria-label="เลือกแบบประเมิน" className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-[#F3F1EC] self-start">
+        {tab(null, "ทั้งหมด")}
+        {types.map((a) => tab(a.assessment_type_id, a.assessment_name))}
+      </div>
+      {active ? (
+        <TypeTrend key={active.assessment_type_id} list={history(active.assessment_type_id)} />
+      ) : (
+        <RadarCard items={items} assessments={assessments} />
+      )}
+    </div>
+  );
+}
 
-  const cfg = getConfig(active[0].assessment_name);
-  const scores = active.map((a) => scoreOf(a));
+type AnswerScore = { questionId: number; question: string; answer: string; score: number | null; maxScore: number | null };
+
+// แบบประเมินเดียว: ถ้ามีคะแนนรายข้อตั้งแต่ 3 ข้อ แสดงกราฟแมงมุมรายข้อ ไม่อย่างนั้นใช้กราฟเส้นตามเวลา
+function TypeTrend({ list }: { list: Assessment[] }) {
+  const latest = list[list.length - 1];
+  const previous = list.length > 1 ? list[list.length - 2] : undefined;
+  const [answers, setAnswers] = useState<{ latest: AnswerScore[]; previous: AnswerScore[] } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = (id?: number) =>
+      id
+        ? fetch(`/api/history/answers?assessmentId=${id}`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((d) => (d?.success ? (d.answers as AnswerScore[]) : []))
+        : Promise.resolve([] as AnswerScore[]);
+    Promise.all([load(latest.assessment_id), load(previous?.assessment_id)])
+      .then(([l, p]) => !cancelled && setAnswers({ latest: l, previous: p }))
+      .catch(() => !cancelled && setAnswers({ latest: [], previous: [] }));
+    return () => {
+      cancelled = true;
+    };
+  }, [latest.assessment_id, previous?.assessment_id]);
+
+  if (!answers) {
+    return <p className="py-16 text-center text-sm text-[#5E6470]">กำลังโหลด...</p>;
+  }
+
+  const scored = answers.latest.filter((r) => r.score !== null && r.maxScore !== null && r.maxScore > 0);
+  // ไม่มีคะแนนรายข้อพอ → ใช้แมงมุมตามครั้งที่ประเมิน (ต้องมีอย่างน้อย 3 ครั้ง) ไม่งั้นใช้กราฟเส้น
+  if (scored.length < 3) return list.length >= 3 ? <HistoryRadar list={list} /> : <ScoreTrend list={list} />;
+
+  const prevById = new Map(answers.previous.map((r) => [r.questionId, r]));
+  const cfg = getConfig(latest.assessment_name);
+  const scores = list.map((a) => scoreOf(a));
+  const delta = scores.length > 1 ? Math.round((scores[scores.length - 1] - scores[scores.length - 2]) * 100) / 100 : null;
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(latest)}</span>
+        <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
+        <span className={`px-2.5 py-1 rounded-full text-[13px] font-semibold ${LEVEL_STYLE[getLevel(latest)].pill}`}>
+          {latest.risk_level || LEVEL_STYLE[getLevel(latest)].label}
+        </span>
+        <DeltaPill delta={delta} />
+      </div>
+
+      <QuestionRadar rows={scored} prevById={previous ? prevById : null} />
+
+      <ol className="grid gap-x-8 sm:grid-cols-2 text-sm">
+        {scored.map((r, i) => {
+          const prev = prevById.get(r.questionId);
+          return (
+            <li key={r.questionId} className="flex gap-3 py-2.5 border-b border-[#F0EEE8]">
+              <span className="w-6 shrink-0 font-semibold text-[#5E6470]">{i + 1}</span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[#16181D]">{r.question}</span>
+                <span className="block text-[13px] text-[#5E6470]">{r.answer}</span>
+              </span>
+              <span className="shrink-0 text-right">
+                <span className="block font-semibold">
+                  {r.score}/{r.maxScore}
+                </span>
+                {prev?.score != null && <span className="block text-xs text-[#8B9099]">เดิม {prev.score}</span>}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+// กราฟแมงมุมตามครั้งที่ประเมิน: แต่ละแฉก = 1 ครั้ง (เก่า → ใหม่ ตามเข็มนาฬิกา)
+// วงพื้นหลัง = ช่วงเกณฑ์ของแบบประเมินนั้น ระยะจากกลาง = คะแนน
+function HistoryRadar({ list }: { list: Assessment[] }) {
+  const latest = list[list.length - 1];
+  const cfg = getConfig(latest.assessment_name);
+  const scores = list.map((a) => scoreOf(a));
+  const min = cfg.min ?? 0;
+  const max = cfg.chartMax ?? cfg.max ?? (Math.max(...scores) * 1.25 || 1);
+  const range = max - min || 1;
+  const ratio = (v: number) => Math.min(1, Math.max(0, (v - min) / range));
+  const delta = Math.round((scores[scores.length - 1] - scores[scores.length - 2]) * 100) / 100;
+
+  const n = list.length;
+  const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
+  const ring = (r: number) => list.map((_, i) => point(i, r).join(",")).join(" ");
+  const pts = list.map((a, i) => point(i, ratio(scoreOf(a))));
+  const bands = [...(cfg.bands ?? [])].sort((a, b) => b.to - a.to);
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
+        <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(latest)}</span>
+        <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
+        <span className={`px-2.5 py-1 rounded-full text-[13px] font-semibold ${LEVEL_STYLE[getLevel(latest)].pill}`}>
+          {latest.risk_level || LEVEL_STYLE[getLevel(latest)].label}
+        </span>
+        <DeltaPill delta={delta} />
+      </div>
+
+      <div className="flex flex-col items-center gap-3">
+        <svg
+          viewBox="-170 -140 340 280"
+          className="w-full max-w-[520px] h-auto"
+          role="img"
+          aria-label={`กราฟแมงมุมคะแนน ${latest.assessment_name} ${n} ครั้งล่าสุด: ${list
+            .map((a) => `${formatShortDate(a.assessed_at)} ${displayScore(a)}`)
+            .join(", ")}`}
+        >
+          {bands.length > 0
+            ? bands.map((b) => <polygon key={b.label} points={ring(ratio(b.to))} fill={b.color} stroke="#E4DFD4" strokeWidth={1} />)
+            : [1, 0.75, 0.5, 0.25].map((r, k) => (
+                <polygon key={r} points={ring(r)} fill={k % 2 ? "#FFFFFF" : "#FBF8F4"} stroke="#E4DFD4" strokeWidth={1} />
+              ))}
+          {list.map((_, i) => {
+            const [x, y] = point(i, 1);
+            return <line key={i} x1={0} y1={0} x2={x} y2={y} stroke="#E4DFD4" strokeWidth={1} />;
+          })}
+          <polygon
+            points={pts.map((p) => p.join(",")).join(" ")}
+            fill={ACCENT}
+            fillOpacity={0.12}
+            stroke={ACCENT}
+            strokeWidth={2}
+            strokeLinejoin="round"
+          />
+          {list.map((a, i) => {
+            const isLatest = i === n - 1;
+            return (
+              <circle
+                key={a.assessment_id}
+                cx={pts[i][0]}
+                cy={pts[i][1]}
+                r={isLatest ? 6 : 4}
+                fill={isLatest ? ACCENT : "#fff"}
+                stroke={ACCENT}
+                strokeWidth={2}
+              >
+                <title>{`${formatShortDate(a.assessed_at)}: ${displayScore(a)}`}</title>
+              </circle>
+            );
+          })}
+          {list.map((a, i) => {
+            const [x, y] = point(i, 1.16);
+            const cos = Math.cos(angle(i));
+            const anchor = Math.abs(cos) < 0.2 ? "middle" : cos > 0 ? "start" : "end";
+            const isLatest = i === n - 1;
+            return (
+              <text key={a.assessment_id} x={x} y={y - 4} textAnchor={anchor} fontSize={10}>
+                <tspan x={x} fill="#5E6470">
+                  {formatShortDate(a.assessed_at)}
+                </tspan>
+                <tspan x={x} dy={12} fill={isLatest ? ACCENT : "#16181D"} fontWeight={700}>
+                  {displayScore(a)}
+                </tspan>
+              </text>
+            );
+          })}
+        </svg>
+
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#4A4F59]">
+          {bands
+            .slice()
+            .reverse()
+            .map((b) => (
+              <span key={b.label} className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-[3px] border border-[#DDD8CD]" style={{ background: b.color }} />
+                {b.label}
+              </span>
+            ))}
+          <span>ยิ่งออกไปทางขอบ = ค่ายิ่งสูง · จุดทึบ = ครั้งล่าสุด</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// กราฟแมงมุมรายข้อ: ระยะจากกลาง = คะแนนข้อนั้นเทียบคะแนนเต็มของข้อ
+function QuestionRadar({ rows, prevById }: { rows: AnswerScore[]; prevById: Map<number, AnswerScore> | null }) {
+  const n = rows.length;
+  const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
+  const ring = (r: number) => rows.map((_, i) => point(i, r).join(",")).join(" ");
+  const ratio = (r?: AnswerScore) => (r && r.score !== null && r.maxScore ? Math.min(1, Math.max(0, r.score / r.maxScore)) : 0);
+
+  const current = rows.map((r, i) => point(i, ratio(r)));
+  const hasPrev = !!prevById && rows.some((r) => prevById.get(r.questionId)?.score != null);
+  const prevPoly = rows.map((r, i) => point(i, ratio(prevById?.get(r.questionId) ?? r)).join(",")).join(" ");
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      <svg
+        viewBox="-140 -130 280 260"
+        className="w-full max-w-[440px] h-auto"
+        role="img"
+        aria-label={`กราฟแมงมุมคะแนนรายข้อ: ${rows.map((r, i) => `ข้อ ${i + 1} ${r.score}/${r.maxScore}`).join(", ")}`}
+      >
+        {[1, 0.75, 0.5, 0.25].map((r, k) => (
+          <polygon key={r} points={ring(r)} fill={k % 2 ? "#FFFFFF" : "#FBF8F4"} stroke="#E4DFD4" strokeWidth={1} />
+        ))}
+        {rows.map((_, i) => {
+          const [x, y] = point(i, 1);
+          return <line key={i} x1={0} y1={0} x2={x} y2={y} stroke="#E4DFD4" strokeWidth={1} />;
+        })}
+        {hasPrev && <polygon points={prevPoly} fill="none" stroke="#8B9099" strokeWidth={1.5} strokeDasharray="4 4" />}
+        <polygon
+          points={current.map((p) => p.join(",")).join(" ")}
+          fill={ACCENT}
+          fillOpacity={0.12}
+          stroke={ACCENT}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+        {rows.map((r, i) => (
+          <circle key={r.questionId} cx={current[i][0]} cy={current[i][1]} r={4} fill={ACCENT} stroke="#fff" strokeWidth={1.5}>
+            <title>{`ข้อ ${i + 1}: ${r.score}/${r.maxScore}`}</title>
+          </circle>
+        ))}
+        {rows.map((r, i) => {
+          const [x, y] = point(i, 1.13);
+          return (
+            <text key={r.questionId} x={x} y={y} textAnchor="middle" dominantBaseline="middle" fontSize={11} fontWeight={600} fill="#4A4F59">
+              {i + 1}
+            </text>
+          );
+        })}
+      </svg>
+      <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#4A4F59]">
+        <span>ยิ่งออกไปทางขอบ = คะแนนข้อนั้นยิ่งสูง</span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-5 h-0.5 rounded" style={{ background: ACCENT }} />
+          ผลล่าสุด
+        </span>
+        {hasPrev && (
+          <span className="flex items-center gap-1.5">
+            <span className="w-5 border-t-[1.5px] border-dashed border-[#8B9099]" />
+            ครั้งก่อน
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// กราฟเส้นคะแนนย้อนหลังของแบบประเมินเดียว พร้อมแถบเกณฑ์
+function ScoreTrend({ list }: { list: Assessment[] }) {
+  const cfg = getConfig(list[0].assessment_name);
+  const scores = list.map((a) => scoreOf(a));
   const min = cfg.min ?? 0;
   const max = cfg.chartMax ?? cfg.max ?? (Math.max(...scores) * 1.25 || 1);
   const range = max - min || 1;
 
-  const pts = active.map((a, i) => {
-    const x = active.length === 1 ? 50 : 10 + i * (80 / (active.length - 1));
+  const pts = list.map((a, i) => {
+    const x = list.length === 1 ? 50 : 10 + i * (80 / (list.length - 1));
     const y = ((max - scoreOf(a)) / range) * 100;
     return { x, y: Math.min(100, Math.max(0, y)), a };
   });
@@ -747,38 +1031,14 @@ function TrendCard({ assessments }: { assessments: Assessment[] }) {
   const delta = prev === null ? null : Math.round((last - prev) * 100) / 100;
 
   return (
-    <div className="flex-[2_1_560px] min-w-0 bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <SectionHead eyebrow="TREND" title="แนวโน้มคะแนน" />
-        <div role="tablist" aria-label="เลือกแบบประเมิน" className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-[#F3F1EC]">
-          {groups.map((g) => {
-            const id = g[0].assessment_type_id;
-            const isActive = id === active[0].assessment_type_id;
-            return (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={isActive}
-                onClick={() => setSelectedType(id)}
-                className={`px-3.5 min-h-9 rounded-[9px] text-sm ${
-                  isActive ? "bg-white font-semibold shadow-sm" : "text-[#4A4F59] hover:text-[#16181D]"
-                }`}
-              >
-                {g[0].assessment_name}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
+    <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
-        <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(active[active.length - 1])}</span>
+        <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(list[list.length - 1])}</span>
         <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
         <DeltaPill delta={delta} />
       </div>
 
       <div className="relative h-60 mt-9 mb-7">
-        {/* แถบเกณฑ์ */}
         {(cfg.bands ?? []).map((b) => (
           <div
             key={b.label}
@@ -798,7 +1058,7 @@ function TrendCard({ assessments }: { assessments: Assessment[] }) {
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           className="absolute inset-0 w-full h-full overflow-visible"
-          aria-label={`กราฟคะแนน ${active[0].assessment_name}`}
+          aria-label={`กราฟคะแนน ${list[0].assessment_name}`}
           role="img"
         >
           <path d={linePath} fill="none" stroke={ACCENT} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
@@ -814,17 +1074,14 @@ function TrendCard({ assessments }: { assessments: Assessment[] }) {
             >
               {displayScore(p.a)}
             </div>
-            <div
-              className="absolute -bottom-7 -translate-x-1/2 text-xs text-[#5E6470] whitespace-nowrap"
-              style={{ left: `${p.x}%` }}
-            >
+            <div className="absolute -bottom-7 -translate-x-1/2 text-xs text-[#5E6470] whitespace-nowrap" style={{ left: `${p.x}%` }}>
               {formatShortDate(p.a.assessed_at)}
             </div>
           </div>
         ))}
       </div>
 
-      {active.length < 2 && (
+      {list.length < 2 && (
         <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-[#4A4F59] text-sm">
           <Info size={18} />
           มีข้อมูลเพียง 1 ครั้ง ทำแบบประเมินนี้อีกครั้งเพื่อดูแนวโน้ม
@@ -839,7 +1096,7 @@ function DeltaPill({ delta }: { delta: number | null }) {
     return <span className="px-2.5 py-1 rounded-full text-[13px] font-semibold bg-[#F3F1EC] text-[#4A4F59]">ข้อมูล 1 ครั้ง</span>;
   if (delta === 0)
     return <span className="px-2.5 py-1 rounded-full text-[13px] font-semibold bg-[#F3F1EC] text-[#4A4F59]">คงที่จากครั้งก่อน</span>;
-  // หมายเหตุ: ใช้สีแดงเมื่อคะแนนเพิ่ม เพราะแบบประเมินส่วนใหญ่ คะแนนสูง = เสี่ยงมาก
+  // ใช้สีแดงเมื่อคะแนนเพิ่ม เพราะแบบประเมินส่วนใหญ่ คะแนนสูง = เสี่ยงมาก
   const up = delta > 0;
   return (
     <span
@@ -852,50 +1109,120 @@ function DeltaPill({ delta }: { delta: number | null }) {
   );
 }
 
-/* =========================================================
-   RISK PROFILE
-========================================================= */
+const RADAR_R = 100;
+const LEVEL_COLOR: Record<Level, string> = { ok: "#2F8A4F", mid: "#D08A14", high: "#B4233A", unknown: "#9AA0A8" };
+const ZONES: { level: Level; color: string }[] = [
+  { level: "high", color: BAND.red },
+  { level: "mid", color: BAND.amber },
+  { level: "ok", color: BAND.green },
+];
 
-function RiskProfile({ items }: { items: Assessment[] }) {
-  const sorted = [...items].sort((a, b) => LEVEL_STYLE[getLevel(b)].n - LEVEL_STYLE[getLevel(a)].n);
+// วางจุดไว้กลางช่วงของระดับนั้น (ปกติ 0–⅓, ควรระวัง ⅓–⅔, ควรพบผู้เชี่ยวชาญ ⅔–1)
+const radiusOf = (level: Level) => (LEVEL_STYLE[level].n * 2 - 1) / 6;
+
+function RadarCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
+  const axes = items.filter((a) => getLevel(a) !== "unknown");
+  const unrated = items.filter((a) => getLevel(a) === "unknown");
+
+  if (axes.length < 3) {
+    return (
+      <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-sm text-[#4A4F59]">
+        <Info size={18} />
+        ต้องมีผลประเมินอย่างน้อย 3 ด้านจึงจะแสดงกราฟรวมได้ เลือกดูทีละแบบประเมินจากแถบด้านบนแทน
+      </div>
+    );
+  }
+
+  const n = axes.length;
+  const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
+  const ring = (r: number) => axes.map((_, i) => point(i, r).join(",")).join(" ");
+
+  const current = axes.map((a, i) => ({ a, level: getLevel(a), xy: point(i, radiusOf(getLevel(a))) }));
+  const prevs = axes.map((a) => findPrevious(assessments, a));
+  const hasPrev = prevs.some(Boolean);
+  // ด้านที่ไม่มีผลครั้งก่อน ใช้ผลล่าสุดแทน เพื่อให้เส้นประยังต่อกันครบ
+  const prevPoly = prevs
+    .map((p, i) => point(i, radiusOf(p ? getLevel(p) : current[i].level)).join(","))
+    .join(" ");
 
   return (
-    <div className="flex-[1_1_340px] min-w-0 bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-4">
-      <SectionHead eyebrow="RISK PROFILE" title="ระดับความเสี่ยงรายด้าน" />
-      <ul className="flex flex-col">
-        {sorted.map((a) => {
-          const cfg = getConfig(a.assessment_name);
-          const level = getLevel(a);
-          const s = LEVEL_STYLE[level];
+    <div className="flex flex-col items-center gap-4">
+      <svg
+        viewBox="-230 -150 460 300"
+        className="w-full max-w-[640px] h-auto"
+        role="img"
+        aria-label={`กราฟแมงมุมระดับความเสี่ยง: ${current.map((c) => `${c.a.assessment_name} ${LEVEL_STYLE[c.level].label}`).join(", ")}`}
+      >
+        {/* พื้นหลังแต่ละช่วง */}
+        {ZONES.map((z) => (
+          <polygon key={z.level} points={ring(LEVEL_STYLE[z.level].n / 3)} fill={z.color} stroke="#E4DFD4" strokeWidth={1} />
+        ))}
+        {axes.map((_, i) => {
+          const [x, y] = point(i, 1);
+          return <line key={i} x1={0} y1={0} x2={x} y2={y} stroke="#E4DFD4" strokeWidth={1} />;
+        })}
+
+        {hasPrev && (
+          <polygon points={prevPoly} fill="none" stroke="#8B9099" strokeWidth={1.5} strokeDasharray="4 4" />
+        )}
+        <polygon
+          points={current.map((c) => c.xy.join(",")).join(" ")}
+          fill={ACCENT}
+          fillOpacity={0.12}
+          stroke={ACCENT}
+          strokeWidth={2}
+          strokeLinejoin="round"
+        />
+        {current.map((c) => (
+          <circle key={c.a.assessment_id} cx={c.xy[0]} cy={c.xy[1]} r={4.5} fill={LEVEL_COLOR[c.level]} stroke="#fff" strokeWidth={1.5}>
+            <title>{`${c.a.assessment_name}: ${c.a.risk_level || "-"} (${displayScore(c.a)})`}</title>
+          </circle>
+        ))}
+
+        {/* ชื่อแกน + ระดับปัจจุบัน */}
+        {current.map((c, i) => {
+          const [x, y] = point(i, 1.14);
+          const cos = Math.cos(angle(i));
+          const anchor = Math.abs(cos) < 0.2 ? "middle" : cos > 0 ? "start" : "end";
+          const dy = Math.sin(angle(i)) < -0.5 ? -8 : Math.sin(angle(i)) > 0.5 ? 6 : 0;
           return (
-            <li key={a.assessment_id} className="flex items-center gap-3 py-3 border-b border-[#F0EEE8] last:border-0">
-              <div className="flex-auto min-w-0">
-                <p className="font-semibold text-sm">
-                  {cfg.thaiName || a.assessment_name}{" "}
-                  <span className="font-normal text-[#5E6470]">({a.assessment_name})</span>
-                </p>
-                <p className="text-[13px] text-[#5E6470] truncate">
-                  {a.risk_level || "-"}
-                  {cfg.max ? ` · ${displayScore(a)}/${cfg.max}` : ""}
-                </p>
-              </div>
-              <div className="flex gap-1" aria-label={s.label}>
-                {[0, 1, 2].map((i) => (
-                  <span key={i} className={`w-[22px] h-2 rounded ${i < s.n ? s.seg : "bg-[#ECEAE4]"}`} />
-                ))}
-              </div>
-            </li>
+            <text key={c.a.assessment_id} x={x} y={y + dy} textAnchor={anchor} fontSize={11}>
+              <tspan x={x} fill="#16181D" fontWeight={600}>
+                {c.a.assessment_name}
+              </tspan>
+              <tspan x={x} dy={13} fill={LEVEL_COLOR[c.level]} fontSize={10}>
+                {c.a.risk_level || LEVEL_STYLE[c.level].label}
+              </tspan>
+            </text>
           );
         })}
-      </ul>
-      <div className="flex flex-wrap gap-3 text-xs text-[#4A4F59]">
+      </svg>
+
+      <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#4A4F59]">
         {(["ok", "mid", "high"] as Level[]).map((l) => (
           <span key={l} className="flex items-center gap-1.5">
-            <span className={`w-2.5 h-2.5 rounded-[3px] ${LEVEL_STYLE[l].seg}`} />
+            <span className="w-2.5 h-2.5 rounded-full" style={{ background: LEVEL_COLOR[l] }} />
             {LEVEL_STYLE[l].label}
           </span>
         ))}
+        <span className="flex items-center gap-1.5">
+          <span className="w-5 h-0.5 rounded" style={{ background: ACCENT }} />
+          ผลล่าสุด
+        </span>
+        {hasPrev && (
+          <span className="flex items-center gap-1.5">
+            <span className="w-5 border-t-[1.5px] border-dashed border-[#8B9099]" />
+            ครั้งก่อน
+          </span>
+        )}
       </div>
+
+      {unrated.length > 0 && (
+        <p className="text-xs text-[#5E6470]">
+          ไม่แสดงในกราฟ (ยังไม่มีเกณฑ์แบ่งระดับ): {unrated.map((a) => a.assessment_name).join(", ")}
+        </p>
+      )}
     </div>
   );
 }
