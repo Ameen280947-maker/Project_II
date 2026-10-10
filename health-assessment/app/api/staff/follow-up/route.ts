@@ -93,7 +93,7 @@ async function caseDetail(caseId: number, staffId: number) {
        JOIN users u ON u.user_id = c.user_id
        JOIN assessment a ON a.assessment_id = c.assessment_id
        JOIN assessment_types t ON t.assessment_type_id = c.assessment_type_id
-       LEFT JOIN health_profile hp ON hp.user_id = c.user_id
+       LEFT JOIN LATERAL (SELECT * FROM health_profile WHERE user_id = c.user_id ORDER BY profile_id DESC LIMIT 1) hp ON TRUE
        LEFT JOIN users o ON o.user_id = c.owner_id
       WHERE c.case_id = $1`,
     [caseId]

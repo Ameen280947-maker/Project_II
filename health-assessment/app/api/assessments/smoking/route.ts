@@ -3,6 +3,7 @@ import pool from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import {
   badRequest,
+  type ChoiceRow,
   loadActiveChoices,
   readJsonObject,
   resolveChoiceAnswers,
@@ -10,6 +11,7 @@ import {
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
+import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -193,6 +195,33 @@ export async function GET(request: NextRequest) {
 }
 
 /* =========================================================
+   ข้อที่ต้องข้าม
+   ข้อ 2 (ลำดับที่ 2) ถามว่าเคยสูบบุหรี่ตลอดชีวิตหรือไม่
+   ถ้าตอบตัวเลือก 0 คะแนน ("ไม่สูบ") ข้อหลังจากนั้น (จำนวนมวน, มวนแรกหลังตื่นนอน) ไม่ต้องถาม
+========================================================= */
+
+const LIFETIME_QUESTION_ORDER = 2;
+
+function getSkippedQuestionIds(
+  choices: ChoiceRow[],
+  answers: Record<string, unknown>,
+): Set<number> {
+  const orderOf = new Map(choices.map((c) => [c.question_id, c.display_order]));
+  const gateId = [...orderOf].find(([, order]) => order === LIFETIME_QUESTION_ORDER)?.[0];
+  if (gateId === undefined) return new Set();
+
+  const answer = answers[String(gateId)];
+  const gateChoice = choices.find(
+    (c) => c.question_id === gateId && typeof answer === "string" && c.choice_text.trim() === answer.trim(),
+  );
+  if (!gateChoice || gateChoice.score !== 0) return new Set();
+
+  return new Set(
+    [...orderOf].filter(([, order]) => order > LIFETIME_QUESTION_ORDER).map(([id]) => id),
+  );
+}
+
+/* =========================================================
    POST
    บันทึกผลการประเมินการสูบบุหรี่
 ========================================================= */
@@ -208,6 +237,9 @@ export async function POST(request: NextRequest) {
   // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(6);
   if (closed) return closed;
+  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
+  const noConsent = await rejectIfNoHealthConsent(auth.userId);
+  if (noConsent) return noConsent;
   const userId = auth.userId;
 
   // รูปแบบเดิม: { [question_id]: ข้อความตัวเลือก }
@@ -230,15 +262,22 @@ export async function POST(request: NextRequest) {
     /*
       เอกสารอ้างอิงคิดคะแนนรวมจากข้อ 1-4 จึงต้องตอบครบทุกข้อ
       ด้วยข้อความตัวเลือกที่มีอยู่จริง (คะแนนดึงจากฐานข้อมูล)
+      ยกเว้นตอบข้อ 2 ว่า "ไม่สูบ" (ไม่เคยสูบตลอดชีวิต) → ข้ามข้อถัดไป และนับเป็น 0 คะแนน
     */
+    const skippedIds = getSkippedQuestionIds(
+      choicesRows,
+      answers as Record<string, unknown>,
+    );
+
     const resolved = resolveChoiceAnswers(
       choicesRows,
-      Object.entries(answers as Record<string, unknown>).map(
-        ([questionId, choiceText]) => ({
+      Object.entries(answers as Record<string, unknown>)
+        .filter(([questionId]) => !skippedIds.has(Number(questionId)))
+        .map(([questionId, choiceText]) => ({
           questionId,
           choiceText: typeof choiceText === "string" ? choiceText : null,
-        }),
-      ),
+        })),
+      skippedIds,
     );
 
     if (!resolved.ok) {

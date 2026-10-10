@@ -48,23 +48,44 @@ export function StatCard({
   value,
   note,
   tone = "brand",
+  onClick,
 }: {
   label: string;
   value?: ReactNode;
   note?: ReactNode;
   tone?: "brand" | "danger" | "warn" | "ok";
+  // ส่งมา = กดดูรายละเอียดได้
+  onClick?: () => void;
 }) {
   const dot = { brand: "bg-staff-ink", danger: "bg-risk-high", warn: "bg-risk-mid", ok: "bg-risk-ok" }[tone];
   const num = { brand: "text-staff-ink", danger: "text-risk-high", warn: "text-staff-ink", ok: "text-staff-ink" }[tone];
-  return (
-    <div className="flex flex-col gap-1.5 rounded-[22px] border border-staff-line bg-white px-6 py-5">
+  const content = (
+    <>
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium text-staff-muted">{label}</span>
         <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} />
       </div>
       <p className={`text-4xl font-extrabold leading-tight ${num}`}>{value ?? "–"}</p>
       {note && <p className={`text-[13px] ${tone === "danger" ? "font-semibold text-risk-crit" : "text-staff-muted"}`}>{note}</p>}
-    </div>
+      {onClick && (
+        <span className="mt-auto pt-1 text-xs font-semibold text-staff-600 opacity-70 transition group-hover:opacity-100">
+          ดูรายละเอียด →
+        </span>
+      )}
+    </>
+  );
+  const base = "flex flex-col gap-1.5 rounded-[22px] border border-staff-line bg-white px-6 py-5";
+
+  if (!onClick) return <div className={base}>{content}</div>;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`group ${base} text-left transition hover:-translate-y-0.5 hover:border-staff-300 hover:shadow-[0_12px_28px_rgba(0,0,0,0.08)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-staff-600 focus-visible:ring-offset-2`}
+    >
+      {content}
+    </button>
   );
 }
 

@@ -11,6 +11,7 @@ import {
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
+import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -195,9 +196,8 @@ async function getAssessmentQuestions(userId: number | null) {
         has_diabetes
       FROM health_profile
       WHERE user_id = $1
-      ORDER BY
-        updated_at DESC NULLS LAST,
-        created_at DESC
+      -- เก็บทุกเวอร์ชัน แถวล่าสุดคือข้อมูลปัจจุบัน
+      ORDER BY profile_id DESC
       LIMIT 1
       `,
       [userId],
@@ -291,6 +291,9 @@ export async function POST(request: Request) {
   // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(3);
   if (closed) return closed;
+  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
+  const noConsent = await rejectIfNoHealthConsent(auth.userId);
+  if (noConsent) return noConsent;
   const userId = auth.userId;
 
   if (!Array.isArray(body.answers)) {

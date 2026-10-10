@@ -11,6 +11,8 @@ import {
   Leaf,
   Utensils,
 } from "lucide-react";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 type Choice = {
   choice_id: number;
@@ -326,7 +328,7 @@ export default function DietAssessmentPage() {
 
           <section className="flex flex-1 items-center justify-center px-6">
             <div className="text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#f4d6df] border-t-[#ed3564]" />
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#efc1d3] border-t-[#b4235a]" />
 
               <p className="mt-5 font-semibold text-[#777780]">
                 กำลังโหลดแบบประเมิน...
@@ -358,8 +360,7 @@ export default function DietAssessmentPage() {
               </h1>
 
               <p className="mt-3 text-[#85858d]">
-                กรุณาตรวจสอบข้อมูล Diet
-                ใน Supabase
+                กรุณาลองใหม่อีกครั้ง หรือติดต่อเจ้าหน้าที่
               </p>
 
               {error && (
@@ -388,22 +389,23 @@ export default function DietAssessmentPage() {
 
             {/* HEADER */}
 
-            <header>
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#ed3564]">
+            <header className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b4235a]">
                 Health Assessment
               </p>
 
               <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
                 แบบประเมิน
-                <span className="text-[#ed3564]">
+                <span className="text-[#b4235a]">
                   การรับประทานอาหาร
                 </span>
               </h1>
+              </div>
 
-              <p className="mt-3 text-base leading-7 text-[#85858d] sm:text-lg">
-                ประเมินพฤติกรรมการรับประทานอาหาร
-                ด้านผัก น้ำตาล ไขมัน และโซเดียม
-              </p>
+              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+              <HealthConsentNotice />
+              <AssessmentBackLink href="/assessment-menu-behavior" />
             </header>
 
             {/* PROGRESS */}
@@ -414,7 +416,7 @@ export default function DietAssessmentPage() {
                   ความคืบหน้า
                 </p>
 
-                <p className="text-sm font-bold text-[#ed3564]">
+                <p className="text-sm font-bold text-[#b4235a]">
                   {answeredCount} /{" "}
                   {questions.length}
                 </p>
@@ -422,7 +424,7 @@ export default function DietAssessmentPage() {
 
               <div className="mt-3 h-3 overflow-hidden rounded-full bg-[#f4edef]">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-[#f15a7c] to-[#ed3564] transition-all duration-300"
+                  className="h-full rounded-full bg-gradient-to-r from-[#d4487a] to-[#b4235a] transition-all duration-300"
                   style={{
                     width: `${progress}%`,
                   }}
@@ -452,7 +454,7 @@ export default function DietAssessmentPage() {
                       {questions.length}
                     </p>
 
-                    <p className="mt-1 font-bold text-[#ed3564]">
+                    <p className="mt-1 font-bold text-[#b4235a]">
                       {category.title}
                     </p>
                   </div>
@@ -487,14 +489,14 @@ export default function DietAssessmentPage() {
                           }
                           className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${
                             selected
-                              ? "border-[#ed3564] bg-[#fff0f5] shadow-[0_8px_20px_rgba(237,53,100,0.08)]"
-                              : "border-[#eee5e6] bg-white hover:border-[#f3b5c5] hover:bg-[#fffafa]"
+                              ? "border-[#b4235a] bg-[#fce9f0] shadow-[0_8px_20px_rgba(180,35,90,0.08)]"
+                              : "border-[#eee5e6] bg-white hover:border-[#efc1d3] hover:bg-[#fdf4f7]"
                           }`}
                         >
                           <span
                             className={`grid h-7 w-7 shrink-0 place-items-center rounded-full border-2 ${
                               selected
-                                ? "border-[#ed3564] bg-[#ed3564]"
+                                ? "border-[#b4235a] bg-[#b4235a]"
                                 : "border-[#d7d5d7]"
                             }`}
                           >
@@ -506,7 +508,7 @@ export default function DietAssessmentPage() {
                           <span
                             className={`flex-1 text-base leading-7 ${
                               selected
-                                ? "font-bold text-[#b91c2b]"
+                                ? "font-bold text-[#b4235a]"
                                 : "text-[#55565f]"
                             }`}
                           >
@@ -516,7 +518,7 @@ export default function DietAssessmentPage() {
                           {selected && (
                             <CheckCircle2
                               size={22}
-                              className="shrink-0 text-[#ed3564]"
+                              className="shrink-0 text-[#b4235a]"
                             />
                           )}
                         </button>
@@ -535,28 +537,28 @@ export default function DietAssessmentPage() {
 
                 {/* BUTTONS */}
 
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-between">
-                  <button
-                    type="button"
-                    onClick={
-                      previousQuestion
-                    }
-                    disabled={
-                      currentIndex === 0 ||
-                      submitting
-                    }
-                    className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#eee5e6] bg-white px-6 font-bold text-[#777780] transition hover:bg-[#faf7f7] disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    <ArrowLeft size={19} />
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
+                  {/* ย้อนกลับเฉพาะข้อคำถาม (ข้อ 1 ไม่มีปุ่มนี้) */}
+                  {currentIndex > 0 && (
+                    <button
+                      type="button"
+                      onClick={
+                        previousQuestion
+                      }
+                      disabled={submitting}
+                      className="flex h-12 items-center justify-center gap-2 rounded-2xl border border-[#eee5e6] bg-white px-6 font-bold text-[#777780] transition hover:bg-[#faf7f7] disabled:cursor-not-allowed disabled:opacity-40 sm:mr-auto"
+                    >
+                      <ArrowLeft size={19} />
 
-                    ย้อนกลับ
-                  </button>
+                      ย้อนกลับ
+                    </button>
+                  )}
 
                   {!isLastQuestion ? (
                     <button
                       type="button"
                       onClick={nextQuestion}
-                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#ed3564] px-7 font-bold text-white shadow-[0_10px_24px_rgba(237,53,100,0.22)] transition hover:bg-[#d92d59]"
+                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#b4235a] px-7 font-bold text-white shadow-[0_10px_24px_rgba(180,35,90,0.22)] transition hover:bg-[#951c4a]"
                     >
                       ถัดไป
 
@@ -573,7 +575,7 @@ export default function DietAssessmentPage() {
                         answeredCount !==
                           questions.length
                       }
-                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#ed3564] px-7 font-bold text-white shadow-[0_10px_24px_rgba(237,53,100,0.22)] transition hover:bg-[#d92d59] disabled:cursor-not-allowed disabled:opacity-50"
+                      className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#b4235a] px-7 font-bold text-white shadow-[0_10px_24px_rgba(180,35,90,0.22)] transition hover:bg-[#951c4a] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {submitting
                         ? "กำลังบันทึก..."

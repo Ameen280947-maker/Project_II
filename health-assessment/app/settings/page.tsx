@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
+import { CONSENT_TEXT } from "@/lib/consents";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -57,13 +58,11 @@ type Profile = {
   createdAt: string | null;
 };
 
-type Assessment = {
-  assessment_id: number;
-  assessment_type_id: number;
-  assessment_name: string;
-  total_score: number | string | null;
-  risk_level: string;
-  assessed_at: string;
+// ข้อมูลจาก /api/settings/export (แต่ละแถวเป็น object ตามคอลัมน์)
+type ExportData = {
+  profiles: Record<string, unknown>[];
+  assessments: Record<string, unknown>[];
+  answers: Record<string, unknown>[];
 };
 
 /* =========================================================
@@ -124,10 +123,58 @@ const readProfile = (raw: any): Profile => {
   };
 };
 
-const toCsv = (rows: Assessment[]) => {
-  const header = ["assessment_id", "assessment_name", "total_score", "risk_level", "assessed_at"];
+// ไฟล์ CSV เดียว แบ่ง 3 ส่วน (โปรไฟล์สุขภาพ / ประวัติการประเมิน / คำตอบรายข้อ) คั่นด้วยบรรทัดว่าง
+const CSV_SECTIONS: { title: string; key: keyof ExportData; columns: [string, string][] }[] = [
+  {
+    title: "โปรไฟล์สุขภาพ (แถวบนสุดคือข้อมูลปัจจุบัน)",
+    key: "profiles",
+    columns: [
+      ["created_at", "วันที่บันทึก"],
+      ["age", "อายุ"],
+      ["gender", "เพศ"],
+      ["height_cm", "ส่วนสูง (ซม.)"],
+      ["weight_kg", "น้ำหนัก (กก.)"],
+      ["waist_cm", "รอบเอว (ซม.)"],
+      ["smoking", "สูบบุหรี่"],
+      ["has_diabetes", "เป็นเบาหวาน"],
+      ["family_diabetes", "ประวัติเบาหวานในครอบครัว"],
+    ],
+  },
+  {
+    title: "ประวัติการประเมิน",
+    key: "assessments",
+    columns: [
+      ["assessment_id", "รหัสการประเมิน"],
+      ["assessment_name", "แบบประเมิน"],
+      ["total_score", "คะแนนรวม"],
+      ["risk_level", "ระดับ"],
+      ["assessed_at", "วันที่ประเมิน"],
+    ],
+  },
+  {
+    title: "คำตอบรายข้อ",
+    key: "answers",
+    columns: [
+      ["assessment_id", "รหัสการประเมิน"],
+      ["assessment_name", "แบบประเมิน"],
+      ["assessed_at", "วันที่ประเมิน"],
+      ["question_no", "ข้อ"],
+      ["question_text", "คำถาม"],
+      ["answer", "คำตอบ"],
+      ["score", "คะแนน"],
+    ],
+  },
+];
+
+const toCsv = (data: ExportData) => {
   const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  return [header.join(","), ...rows.map((r) => header.map((h) => escape(r[h as keyof Assessment])).join(","))].join("\n");
+  return CSV_SECTIONS.map(({ title, key, columns }) =>
+    [
+      escape(title),
+      columns.map(([, label]) => escape(label)).join(","),
+      ...(data[key] ?? []).map((r) => columns.map(([col]) => escape(r[col])).join(",")),
+    ].join("\n"),
+  ).join("\n\n");
 };
 
 /* =========================================================
@@ -332,14 +379,14 @@ export default function SettingsPage() {
   const downloadData = async () => {
     if (!userId) return;
     try {
-      const res = await fetch(`/api/dashboard?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+      const res = await fetch(`/api/settings/export?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.message);
-      const blob = new Blob(["\uFEFF" + toCsv(json.assessments ?? [])], { type: "text/csv;charset=utf-8" });
+      if (!res.ok || !json.success) throw new Error(json.message);
+      const blob = new Blob(["\uFEFF" + toCsv(json)], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `health-assessments-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `my-health-data-${new Date().toISOString().slice(0, 10)}.csv`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {
@@ -662,8 +709,8 @@ export default function SettingsPage() {
                   desc="ข้อมูลสุขภาพเป็นข้อมูลอ่อนไหวตาม พ.ร.บ.คุ้มครองข้อมูลส่วนบุคคล (PDPA) คุณจัดการความยินยอมและข้อมูลของตัวเองได้ที่นี่"
                 >
                   <Row
-                    title="ยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ"
-                    desc={`จำเป็นสำหรับการประเมินและให้คำแนะนำ · อัปเดตเมื่อ ${formatDate(settings.consent_health_at)}`}
+                    title={CONSENT_TEXT.health.title}
+                    desc={`${CONSENT_TEXT.health.desc} · อัปเดตเมื่อ ${formatDate(settings.consent_health_at)}`}
                   >
                     <Toggle
                       label="ยินยอมให้เก็บข้อมูลสุขภาพ"
@@ -675,11 +722,11 @@ export default function SettingsPage() {
                     />
                   </Row>
                   <Row
-                    title="ยินยอมให้เจ้าหน้าที่เข้าถึงผลประเมินเพื่อติดตามดูแล"
+                    title={CONSENT_TEXT.staff.title}
                     desc={
                       settings.consent_staff
                         ? `เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะติดต่อเพื่อให้คำแนะนำ · ยินยอมเมื่อ ${formatDate(settings.consent_staff_at)}`
-                        : "เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะเห็นผลประเมินและติดต่อคุณเพื่อให้คำแนะนำ"
+                        : CONSENT_TEXT.staff.desc
                     }
                   >
                     <Toggle
@@ -689,8 +736,8 @@ export default function SettingsPage() {
                     />
                   </Row>
                   <Row
-                    title="อนุญาตให้ใช้ข้อมูลแบบไม่ระบุตัวตนเพื่อการศึกษา"
-                    desc="ใช้วิเคราะห์ภาพรวมในงานวิจัยของโปรเจค ไม่มีชื่อหรือข้อมูลติดต่อ"
+                    title={CONSENT_TEXT.research.title}
+                    desc={CONSENT_TEXT.research.desc}
                     last
                   >
                     <Toggle
@@ -708,7 +755,7 @@ export default function SettingsPage() {
                       <Download size={20} className="text-gray-500 mt-0.5" />
                       <span>
                         <span className="block font-semibold text-gray-800">ดาวน์โหลดข้อมูลของฉัน</span>
-                        <span className="block text-sm text-gray-500">ประวัติการประเมินเป็นไฟล์ CSV เปิดด้วย Excel ได้</span>
+                        <span className="block text-sm text-gray-500">โปรไฟล์สุขภาพ ประวัติการประเมิน และคำตอบรายข้อ เป็นไฟล์ CSV เปิดด้วย Excel ได้</span>
                       </span>
                     </button>
                     <Link

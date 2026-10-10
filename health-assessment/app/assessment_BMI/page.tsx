@@ -2,806 +2,321 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { ArrowRight, Weight } from "lucide-react";
 import Sidebar from "@/app/components/Sidebar";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
-interface NumberStepperProps {
-    id: string;
-    label: string;
-    unit: string;
-    // เก็บเป็นข้อความ เพื่อให้ลบช่องจนว่างได้ (ไม่ขึ้น "0" นำหน้า เช่น "065")
-    value: string;
-    placeholder?: string;
-    step?: number;
-    onChange: (next: string) => void;
-}
-
-function NumberStepper({
-    id,
-    label,
-    unit,
-    value,
-    placeholder,
-    step = 1,
-    onChange,
-}: NumberStepperProps) {
-    const current = Number(value) || 0;
-
-    return (
-        <div className="field">
-            <label htmlFor={id}>
-                {label}
-            </label>
-            <div className="stepper">
-                <input
-                    id={id}
-                    type="number"
-                    inputMode="decimal"
-                    min={0}
-                    value={value}
-                    placeholder={placeholder}
-                    onChange={(e) => onChange(e.target.value)}
-                />
-                <div className="unitControls">
-                    <span className="unitLabel">{unit}</span>
-                    <div className="arrows">
-                        <button
-                            type="button"
-                            aria-label={`เพิ่ม${label}`}
-                            onClick={() => onChange(String(current + step))}
-                        >
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 8l6 6H6z" />
-                            </svg>
-                        </button>
-                        <button
-                            type="button"
-                            aria-label={`ลด${label}`}
-                            onClick={() => onChange(String(Math.max(0, current - step)))}
-                        >
-                            <svg viewBox="0 0 24 24" fill="currentColor">
-                                <path d="M12 16l-6-6h12z" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
+/* =========================================================
+   แบบประเมินภาวะน้ำหนักเกิน (BMI)
+   หน้าตาเดียวกับแบบประเมินความดันโลหิต
+========================================================= */
 
 type SubmitResponse = {
-    success: boolean;
-    assessmentId?: number;
-    weightKg?: number;
-    heightCm?: number;
-    bmi?: number;
-    riskLevel?: string;
-    recommendation?: string;
-    message?: string;
+  success: boolean;
+  assessmentId?: number;
+  weightKg?: number;
+  heightCm?: number;
+  bmi?: number;
+  riskLevel?: string;
+  recommendation?: string;
+  message?: string;
 };
 
-const TIPS = [
-    {
-        icon: (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M20.8 4.6c-1.6-1.6-4.2-1.6-5.8 0L12 7.5 9 4.6c-1.6-1.6-4.2-1.6-5.8 0-1.6 1.6-1.6 4.2 0 5.8L12 19l8.8-8.6c1.6-1.6 1.6-4.2 0-5.8z" />
-                <path d="M4 12h3l2-3 2 5 2-4 1.5 2H20" />
-            </svg>
-        ),
-        title: "ช่วยประเมินความเสี่ยง",
-        description: "ต่อโรคไม่ติดต่อเรื้อรัง (NCDs)",
-    },
-    {
-        icon: (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 21c-4-2.6-8-6-8-10.5A5.5 5.5 0 0 1 9.5 5c1.1 0 2.1.4 3 1.1V4" />
-                <path d="M16 3c-1.7 0-3 1.3-3 3" />
-                <path d="M12 21c4-2.6 8-6 8-10.5A5.5 5.5 0 0 0 14.5 5" />
-            </svg>
-        ),
-        title: "วางแผนดูแลสุขภาพ",
-        description: "ด้านอาหารและการออกกำลังกาย",
-    },
-    {
-        icon: (
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="12" cy="12" r="9" />
-                <path d="M8.5 14s1.3 2 3.5 2 3.5-2 3.5-2" />
-                <path d="M9 9h.01M15 9h.01" />
-            </svg>
-        ),
-        title: "เพื่อคุณภาพชีวิตที่ดีขึ้น",
-        description: "แข็งแรง มั่นใจ ในทุกวัน",
-    },
-];
-
 export default function WeightAssessmentPage() {
-    const router = useRouter();
+  const router = useRouter();
 
-    // เริ่มว่าง แล้วเติมจากข้อมูลสุขภาพในโปรไฟล์ (ถ้ามี)
-    const [weight, setWeight] = useState("");
-    const [height, setHeight] = useState("");
+  // เก็บเป็นข้อความ เพื่อให้ลบช่องจนว่างได้ แล้วเติมจากข้อมูลสุขภาพในโปรไฟล์ (ถ้ามี)
+  const [weight, setWeight] = useState("");
+  const [height, setHeight] = useState("");
 
-    const [submitting, setSubmitting] = useState(false);
-    const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
 
-    /* =========================================================
-       โหลดน้ำหนัก/ส่วนสูงจากโปรไฟล์ (รูปแบบเดียวกับหน้าเบาหวาน)
-    ========================================================= */
+  /* =========================================================
+     โหลดน้ำหนัก/ส่วนสูงจากโปรไฟล์
+  ========================================================= */
 
-    useEffect(() => {
-        const id = localStorage.getItem("userId");
-        if (!id) return;
+  useEffect(() => {
+    const id = localStorage.getItem("userId");
+    if (!id) return;
 
-        const loadProfile = async () => {
-            try {
-                const response = await fetch(`/api/profile?userId=${id}`, {
-                    method: "GET",
-                    cache: "no-store",
-                });
+    const loadProfile = async () => {
+      try {
+        const response = await fetch(`/api/profile?userId=${id}`, {
+          method: "GET",
+          cache: "no-store",
+        });
 
-                // session หมดอายุ → กลับไปหน้า login
-                if (response.status === 401) {
-                    localStorage.removeItem("userId");
-                    router.replace("/login");
-                    return;
-                }
-
-                const data = await response.json();
-                if (!response.ok || !data.success) return;
-
-                const source = data.profile ?? data.healthProfile ?? data.data ?? data;
-                const w = Number(source.weight_kg ?? source.weight ?? 0);
-                const h = Number(source.height_cm ?? source.height ?? 0);
-
-                // ไม่ทับค่าที่ผู้ใช้พิมพ์ไปแล้ว
-                if (w > 0) setWeight((prev) => prev || String(w));
-                if (h > 0) setHeight((prev) => prev || String(h));
-            } catch (loadError) {
-                // โหลดไม่ได้ก็ให้กรอกเองได้ตามปกติ
-                console.error("BMI profile load error:", loadError);
-            }
-        };
-
-        void loadProfile();
-    }, [router]);
-
-    /* =========================================================
-       บันทึกลง Database
-    ========================================================= */
-
-    const handleStartAssessment = async () => {
-        try {
-            setSubmitting(true);
-            setError("");
-
-            const storedUserId = localStorage.getItem("userId");
-
-            if (!storedUserId) {
-                router.push("/login");
-                return;
-            }
-
-            const userId = Number(storedUserId);
-
-            if (!Number.isInteger(userId) || userId <= 0) {
-                localStorage.removeItem("userId");
-                router.push("/login");
-                return;
-            }
-
-            if (!weight.trim() || !height.trim()) {
-                throw new Error("กรุณากรอกน้ำหนักและส่วนสูง");
-            }
-
-            const weightKg = Number(weight);
-            const heightCm = Number(height);
-
-            if (!Number.isFinite(weightKg) || weightKg < 10 || weightKg > 400) {
-                throw new Error("ค่าน้ำหนักไม่ถูกต้อง");
-            }
-
-            if (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250) {
-                throw new Error("ค่าส่วนสูงไม่ถูกต้อง");
-            }
-
-            const response = await fetch("/api/assessments/bmi", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    userId,
-                    weightKg,
-                    heightCm,
-                }),
-            });
-
-            // session หมดอายุ → กลับไปหน้า login
-            if (response.status === 401) {
-                localStorage.removeItem("userId");
-                router.push("/login");
-                return;
-            }
-
-            const data = (await response.json()) as SubmitResponse;
-
-            if (!response.ok || !data.success) {
-                throw new Error(data.message ?? "ไม่สามารถบันทึกผลประเมินได้");
-            }
-
-            if (!data.assessmentId) {
-                throw new Error("ระบบบันทึกข้อมูลแล้ว แต่ไม่ได้รับ assessmentId");
-            }
-
-            router.push(`/recommendation_BMI?assessmentId=${data.assessmentId}`);
-        } catch (submitError) {
-            console.error("BMI submit error:", submitError);
-
-            setError(
-                submitError instanceof Error
-                    ? submitError.message
-                    : "เกิดข้อผิดพลาดในการประเมิน",
-            );
-        } finally {
-            setSubmitting(false);
+        // session หมดอายุ → กลับไปหน้า login
+        if (response.status === 401) {
+          localStorage.removeItem("userId");
+          router.replace("/login");
+          return;
         }
+
+        const data = await response.json();
+        if (!response.ok || !data.success) return;
+
+        const source = data.profile ?? data.healthProfile ?? data.data ?? data;
+        const w = Number(source.weight_kg ?? source.weight ?? 0);
+        const h = Number(source.height_cm ?? source.height ?? 0);
+
+        // ไม่ทับค่าที่ผู้ใช้พิมพ์ไปแล้ว
+        if (w > 0) setWeight((prev) => prev || String(w));
+        if (h > 0) setHeight((prev) => prev || String(h));
+      } catch (loadError) {
+        // โหลดไม่ได้ก็ให้กรอกเองได้ตามปกติ
+        console.error("BMI profile load error:", loadError);
+      }
     };
 
-    return (
-        <div className="page">
-            <Sidebar />
+    void loadProfile();
+  }, [router]);
 
-            <main className="main">
-                <div className="blobTopLeft" />
-                <div className="blobBottomLeft" />
+  /* =========================================================
+     บันทึกผลประเมิน
+  ========================================================= */
 
-                <div className="layout">
-                    {/* ===================== ซ้าย: ฟอร์ม ===================== */}
-                    <div className="formColumn">
-                        <div className="eyebrow">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                <path d="M20.8 4.6c-1.6-1.6-4.2-1.6-5.8 0L12 7.5 9 4.6c-1.6-1.6-4.2-1.6-5.8 0-1.6 1.6-1.6 4.2 0 5.8L12 19l8.8-8.6c1.6-1.6 1.6-4.2 0-5.8z" />
-                            </svg>
-                            แบบประเมินสุขภาพเบื้องต้น
-                        </div>
+  const handleStartAssessment = async () => {
+    try {
+      setSubmitting(true);
+      setError("");
 
-                        <h1 className="heading">
-                            Assessment-
-                            <span className="highlight">
-                                ภาวะน้ำหนักเกิน
-                                <svg
-                                    className="underline"
-                                    viewBox="0 0 320 18"
-                                    preserveAspectRatio="none"
-                                    fill="none"
-                                >
-                                    <path
-                                        d="M2 12c40-10 240-10 316 2"
-                                        stroke="#f3b4c2"
-                                        strokeWidth="5"
-                                        strokeLinecap="round"
-                                    />
-                                </svg>
-                            </span>
-                        </h1>
+      const storedUserId = localStorage.getItem("userId");
 
-                        <p className="lede">
-                            กรอกน้ำหนักและส่วนสูงของคุณ เพื่อประเมินค่าดัชนีมวลกาย (BMI)
-                            และระดับความเสี่ยงภาวะน้ำหนักเกินเบื้องต้น
-                        </p>
+      if (!storedUserId) {
+        router.push("/login");
+        return;
+      }
 
-                        <div className="card">
-                            <div className="cardHead">
-                                <div className="cardIcon">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                        <rect x="4" y="7" width="16" height="13" rx="3" />
-                                        <path d="M9 7V5.5A2.5 2.5 0 0 1 11.5 3h1A2.5 2.5 0 0 1 15 5.5V7" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <div className="cardTitle">น้ำหนักและส่วนสูง</div>
-                                    <div className="cardSub">ใช้คำนวณดัชนีมวลกาย (BMI)</div>
-                                </div>
-                            </div>
+      const userId = Number(storedUserId);
 
-                            <div className="fieldGrid">
-                                <NumberStepper
-                                    id="weight"
-                                    label="น้ำหนัก (กิโลกรัม)"
-                                    unit="KG"
-                                    value={weight}
-                                    placeholder="เช่น 65"
-                                    onChange={setWeight}
-                                />
-                                <NumberStepper
-                                    id="height"
-                                    label="ส่วนสูง (เซนติเมตร)"
-                                    unit="CM"
-                                    value={height}
-                                    placeholder="เช่น 170"
-                                    onChange={setHeight}
-                                />
-                            </div>
+      if (!Number.isInteger(userId) || userId <= 0) {
+        localStorage.removeItem("userId");
+        router.push("/login");
+        return;
+      }
 
-                            {error && <div className="errorBox">{error}</div>}
+      if (!weight.trim() || !height.trim()) {
+        throw new Error("กรุณากรอกน้ำหนักและส่วนสูง");
+      }
 
-                            <button
-                                className="cta"
-                                type="button"
-                                disabled={submitting}
-                                onClick={handleStartAssessment}
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M20.8 4.6c-1.6-1.6-4.2-1.6-5.8 0L12 7.5 9 4.6c-1.6-1.6-4.2-1.6-5.8 0-1.6 1.6-1.6 4.2 0 5.8L12 19l8.8-8.6c1.6-1.6 1.6-4.2 0-5.8z" />
-                                </svg>
-                                {submitting ? "กำลังบันทึก..." : "เริ่มประเมิน"}
-                                {!submitting && (
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M5 12h14M13 6l6 6-6 6" />
-                                    </svg>
-                                )}
-                            </button>
-                        </div>
-                    </div>
+      const weightKg = Number(weight);
+      const heightCm = Number(height);
 
-                    {/* ===================== ขวา: Tips ===================== */}
-                    <div className="sideColumn">
-                        <div className="tipsCard">
-                            <div className="tipsHead">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.4.3.6.8.6 1.3V16h6v-.9c0-.5.2-1 .6-1.3A6 6 0 0 0 12 3z" />
-                                </svg>
-                                <h3>ทำไมต้องรู้ค่า BMI ?</h3>
-                            </div>
+      if (!Number.isFinite(weightKg) || weightKg < 10 || weightKg > 400) {
+        throw new Error("ค่าน้ำหนักไม่ถูกต้อง");
+      }
 
-                            <div className="tipsList">
-                                {TIPS.map((tip) => (
-                                    <div className="tipItem" key={tip.title}>
-                                        <div className="tipIcon">{tip.icon}</div>
-                                        <div>
-                                            <div className="tipTitle">{tip.title}</div>
-                                            <div className="tipDesc">{tip.description}</div>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
+      if (!Number.isFinite(heightCm) || heightCm < 50 || heightCm > 250) {
+        throw new Error("ค่าส่วนสูงไม่ถูกต้อง");
+      }
+
+      const response = await fetch("/api/assessments/bmi", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId,
+          weightKg,
+          heightCm,
+        }),
+      });
+
+      // session หมดอายุ → กลับไปหน้า login
+      if (response.status === 401) {
+        localStorage.removeItem("userId");
+        router.push("/login");
+        return;
+      }
+
+      const data = (await response.json()) as SubmitResponse;
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message ?? "ไม่สามารถบันทึกผลประเมินได้");
+      }
+
+      if (!data.assessmentId) {
+        throw new Error("ระบบบันทึกข้อมูลแล้ว แต่ไม่ได้รับ assessmentId");
+      }
+
+      router.push(`/recommendation_BMI?assessmentId=${data.assessmentId}`);
+    } catch (submitError) {
+      console.error("BMI submit error:", submitError);
+
+      setError(
+        submitError instanceof Error
+          ? submitError.message
+          : "เกิดข้อผิดพลาดในการประเมิน",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
+      <div className="flex min-h-screen">
+
+        <Sidebar />
+
+        {/* Content */}
+
+        <section className="flex min-h-screen min-w-0 flex-1 flex-col px-5 py-7 sm:px-8 lg:px-12">
+
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2c6b45]">
+                Overweight Assessment
+              </p>
+
+              <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl lg:text-[42px]">
+                แบบประเมินความเสี่ยง
+                <span className="text-[#4a8a62]">
+                  ภาวะน้ำหนักเกิน
+                </span>
+              </h1>
+
+            </div>
+
+            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+            <HealthConsentNotice />
+            <AssessmentBackLink href="/assessment-menu" />
+          </header>
+
+          {/* จัดฟอร์มให้อยู่กลางพื้นที่ที่เหลือ (ขยับขึ้นเล็กน้อยให้ดูสมดุล) */}
+          <div className="flex flex-1 items-center py-10 lg:pb-24">
+
+            <div className="mx-auto w-full max-w-2xl space-y-7">
+
+              {/* Input card */}
+
+              <section className="rounded-[28px] border border-[#eee5e6] bg-white p-8 shadow-[0_16px_45px_rgba(35,25,30,0.05)]">
+
+                <div className="flex items-center gap-4">
+
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e5f0e8] text-[#2c6b45]">
+                    <Weight size={26} />
+                  </div>
+
+                  <div>
+                    <h2 className="text-xl font-bold">
+                      น้ำหนักและส่วนสูง
+                    </h2>
+
+                    <p className="text-sm text-[#92939b]">
+                      ใช้คำนวณดัชนีมวลกาย (BMI)
+                    </p>
+                  </div>
+
                 </div>
-            </main>
 
-            <style jsx>{`
-        .page {
-          --maroon: #9c1029;
-          --maroon-dark: #7c0c21;
-          --maroon-soft: #fdeef1;
-          --pink-blob: #fbdce3;
-          --pink-blob-soft: #fce7ec;
-          --ink: #1f2430;
-          --muted: #7a828e;
-          --border: #f1dfe3;
-          --bg: linear-gradient(160deg, #fff6f8 0%, #fdeef1 45%, #fbe4ea 100%);
-          --card: #ffffff;
+                <div className="mt-8 grid gap-5 md:grid-cols-2">
 
-          display: flex;
-          min-height: 100vh;
-          background: var(--bg);
-          color: var(--ink);
-          font-family: "Sarabun", "Prompt", sans-serif;
-        }
+                  <MeasureInput
+                    label="น้ำหนัก (กิโลกรัม)"
+                    unit="KG"
+                    value={weight}
+                    placeholder="เช่น 65"
+                    onChange={setWeight}
+                  />
 
-        .main {
-          position: relative;
-          flex: 1;
-          padding: 52px 64px;
-          overflow: hidden;
-        }
+                  <MeasureInput
+                    label="ส่วนสูง (เซนติเมตร)"
+                    unit="CM"
+                    value={height}
+                    placeholder="เช่น 170"
+                    onChange={setHeight}
+                  />
 
-        .blobTopLeft,
-        .blobBottomLeft {
-          position: absolute;
-          border-radius: 50%;
-          background: var(--pink-blob);
-          filter: blur(2px);
-          opacity: 0.55;
-          pointer-events: none;
-          z-index: 0;
-        }
+                </div>
 
-        .blobTopLeft {
-          width: 260px;
-          height: 260px;
-          top: -80px;
-          left: -100px;
-        }
+              </section>
 
-        .blobBottomLeft {
-          width: 340px;
-          height: 340px;
-          bottom: -140px;
-          left: -140px;
-          background: var(--pink-blob-soft);
-        }
+              {error && (
+                <div className="rounded-2xl border border-[#f2d3d7] bg-[#fff0f2] p-4 text-sm font-medium text-[#b91c2b]">
+                  {error}
+                </div>
+              )}
 
-        .layout {
-          position: relative;
-          z-index: 1;
-          display: grid;
-          grid-template-columns: 1fr;
-          gap: 48px;
-          max-width: 1280px;
-        }
+              {/* Submit */}
 
-        @media (min-width: 1100px) {
-          .layout {
-            grid-template-columns: minmax(0, 620px) 1fr;
-            align-items: start;
-          }
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleStartAssessment}
+                className="group relative flex h-16 w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#4a8a62] to-[#235638] text-lg font-bold text-white shadow-[0_18px_40px_rgba(44,107,69,0.3)] transition-all hover:shadow-[0_22px_48px_rgba(44,107,69,0.4)] active:scale-[0.99] disabled:opacity-60 disabled:shadow-none"
+              >
 
-          /* ให้กล่อง Tips อยู่แถวเดียวกับการ์ดฟอร์ม ขอบบนตรงกัน */
-          .layout {
-            row-gap: 0;
-          }
+                <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
 
-          .formColumn {
-            display: contents;
-          }
+                {submitting ? "กำลังบันทึก..." : "เริ่มประเมิน"}
 
-          .eyebrow,
-          .heading,
-          .lede,
-          .card {
-            grid-column: 1;
-          }
+                {!submitting && (
+                  <ArrowRight
+                    size={22}
+                    className="transition-transform group-hover:translate-x-1"
+                  />
+                )}
 
-          .eyebrow {
-            justify-self: start;
-          }
+              </button>
 
-          .sideColumn {
-            grid-column: 2;
-            grid-row: 4;
-            margin-top: 32px;
-          }
-        }
+            </div>
 
-        .eyebrow {
-          display: inline-flex;
-          align-items: center;
-          gap: 8px;
-          padding: 8px 18px;
-          border-radius: 999px;
-          background: #ffffff;
-          color: var(--maroon);
-          font-weight: 700;
-          font-size: 13px;
-          box-shadow: 0 6px 16px rgba(156, 16, 41, 0.08);
-        }
+          </div>
 
-        .eyebrow :global(svg) {
-          width: 15px;
-          height: 15px;
-        }
+        </section>
 
-        .heading {
-          margin-top: 18px;
-          font-family: "Prompt", sans-serif;
-          font-size: 42px;
-          font-weight: 800;
-          color: var(--ink);
-          line-height: 1.2;
-        }
+      </div>
+    </main>
+  );
+}
 
-        .highlight {
-          position: relative;
-          display: inline-block;
-          color: var(--maroon);
-        }
+/* =========================================================
+   Measure input (รูปแบบเดียวกับช่องกรอกความดันโลหิต)
+========================================================= */
 
-        .underline {
-          position: absolute;
-          left: 0;
-          bottom: -10px;
-          width: 100%;
-          height: 12px;
-        }
+function MeasureInput({
+  label,
+  unit,
+  value,
+  placeholder,
+  onChange,
+}: {
+  label: string;
+  unit: string;
+  value: string;
+  placeholder?: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label>
 
-        .lede {
-          margin-top: 22px;
-          max-width: 520px;
-          color: var(--muted);
-          font-size: 16px;
-          line-height: 1.8;
-        }
+      <span className="text-sm font-semibold">
+        {label}
+      </span>
 
-        .card {
-          margin-top: 32px;
-          background: var(--card);
-          border-radius: 26px;
-          box-shadow: 0 20px 48px rgba(156, 16, 41, 0.08);
-          padding: 34px;
-        }
+      <div className="mt-3 flex h-20 items-center rounded-2xl border border-[#e8dfe0] bg-[#faf8f8] px-5 focus-within:border-[#2c6b45]">
 
-        .cardHead {
-          display: flex;
-          align-items: center;
-          gap: 16px;
-          padding: 16px 20px;
-          border-radius: 18px;
-          background: var(--maroon-soft);
-          margin-bottom: 26px;
-        }
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          value={value}
+          placeholder={placeholder}
+          onChange={(event) => onChange(event.target.value)}
+          className="min-w-0 flex-1 bg-transparent text-2xl font-bold text-[#2c6b45] outline-none placeholder:font-normal placeholder:text-[#c9c3c4]"
+        />
 
-        .cardIcon {
-          width: 48px;
-          height: 48px;
-          border-radius: 14px;
-          background: var(--maroon);
-          color: #fff;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          flex-shrink: 0;
-        }
+        <span className="ml-3 text-xs font-semibold text-[#8b8c94]">
+          {unit}
+        </span>
 
-        .cardIcon :global(svg) {
-          width: 22px;
-          height: 22px;
-        }
+      </div>
 
-        .cardTitle {
-          font-family: "Prompt", sans-serif;
-          font-weight: 700;
-          font-size: 18px;
-        }
-
-        .cardSub {
-          font-size: 13px;
-          color: var(--muted);
-          margin-top: 2px;
-        }
-
-        .fieldGrid {
-          display: grid;
-          grid-template-columns: 1fr 1fr;
-          gap: 20px;
-          margin-bottom: 24px;
-        }
-
-        .field :global(label) {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          font-weight: 600;
-          font-size: 14.5px;
-          margin-bottom: 12px;
-          color: var(--ink);
-        }
-
-        .stepper {
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          border: 1px solid var(--border);
-          background: #fdfafb;
-          border-radius: 16px;
-          padding: 16px 18px;
-        }
-
-        .stepper :global(input) {
-          border: none;
-          background: transparent;
-          outline: none;
-          font-family: "Prompt", sans-serif;
-          font-weight: 700;
-          font-size: 26px;
-          color: var(--ink);
-          width: 100%;
-        }
-
-        .stepper :global(input)::-webkit-outer-spin-button,
-        .stepper :global(input)::-webkit-inner-spin-button {
-          -webkit-appearance: none;
-          margin: 0;
-        }
-
-        .unitControls {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          flex-shrink: 0;
-        }
-
-        .unitLabel {
-          font-size: 13px;
-          color: var(--muted);
-          font-weight: 600;
-          white-space: nowrap;
-        }
-
-        .arrows {
-          display: flex;
-          flex-direction: column;
-          gap: 2px;
-        }
-
-        .arrows :global(button) {
-          width: 20px;
-          height: 16px;
-          border: none;
-          background: transparent;
-          color: #c9c2c4;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 0;
-        }
-
-        .arrows :global(button):hover {
-          color: var(--maroon);
-        }
-
-        .arrows :global(svg) {
-          width: 12px;
-          height: 12px;
-        }
-
-        .errorBox {
-          margin-bottom: 20px;
-          padding: 14px 18px;
-          border-radius: 14px;
-          border: 1px solid #f2d3d7;
-          background: var(--maroon-soft);
-          color: var(--maroon);
-          font-size: 14px;
-          font-weight: 500;
-        }
-
-        .cta {
-          width: 100%;
-          border: none;
-          background: linear-gradient(135deg, var(--maroon), var(--maroon-dark));
-          color: #fff;
-          font-family: "Prompt", sans-serif;
-          font-weight: 600;
-          font-size: 17px;
-          padding: 19px 24px;
-          border-radius: 16px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
-          cursor: pointer;
-          transition: transform 0.12s ease, box-shadow 0.12s ease;
-          box-shadow: 0 14px 30px rgba(156, 16, 41, 0.3);
-        }
-
-        .cta:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-          box-shadow: none;
-        }
-
-        .cta:hover:not(:disabled) {
-          transform: translateY(-1px);
-          box-shadow: 0 18px 36px rgba(156, 16, 41, 0.36);
-        }
-
-        .cta:active:not(:disabled) {
-          transform: translateY(0);
-        }
-
-        .cta :global(svg) {
-          width: 19px;
-          height: 19px;
-        }
-
-        /* ===================== ขวา: tips ===================== */
-
-        .sideColumn {
-          position: relative;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          gap: 28px;
-        }
-
-        .tipsCard {
-          width: 100%;
-          max-width: 360px;
-          background: #ffffff;
-          border-radius: 24px;
-          padding: 26px;
-          box-shadow: 0 20px 44px rgba(156, 16, 41, 0.08);
-        }
-
-        .tipsHead {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-          margin-bottom: 18px;
-        }
-
-        .tipsHead :global(svg) {
-          width: 20px;
-          height: 20px;
-          color: var(--maroon);
-        }
-
-        .tipsHead h3 {
-          font-family: "Prompt", sans-serif;
-          font-weight: 700;
-          font-size: 17px;
-        }
-
-        .tipsList {
-          display: flex;
-          flex-direction: column;
-          gap: 16px;
-        }
-
-        .tipItem {
-          display: flex;
-          align-items: flex-start;
-          gap: 14px;
-          padding-bottom: 16px;
-          border-bottom: 1px solid #f4eaec;
-        }
-
-        .tipItem:last-child {
-          border-bottom: none;
-          padding-bottom: 0;
-        }
-
-        .tipIcon {
-          flex-shrink: 0;
-          width: 38px;
-          height: 38px;
-          border-radius: 12px;
-          background: var(--maroon-soft);
-          color: var(--maroon);
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .tipIcon :global(svg) {
-          width: 18px;
-          height: 18px;
-        }
-
-        .tipTitle {
-          font-weight: 700;
-          font-size: 14.5px;
-          color: var(--ink);
-        }
-
-        .tipDesc {
-          margin-top: 3px;
-          font-size: 13px;
-          color: var(--muted);
-        }
-
-        @media (max-width: 1099px) {
-          .sideColumn {
-            margin-top: 12px;
-          }
-        }
-
-        @media (max-width: 900px) {
-          .main {
-            padding: 32px 22px;
-          }
-          .fieldGrid {
-            grid-template-columns: 1fr;
-          }
-          .heading {
-            font-size: 32px;
-          }
-        }
-      `}</style>
-        </div>
-    );
+    </label>
+  );
 }

@@ -11,6 +11,8 @@ import {
     Brain,
     CheckCircle2,
 } from "lucide-react";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 /* =========================================================
    TYPES
@@ -364,14 +366,15 @@ export default function StressAssessmentPage() {
 
                     {/* HEADER */}
 
-                    <header>
-                        <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
+                    <header className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2f4fa0]">
                             Health Assessment
                         </p>
 
                         <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl lg:text-[42px]">
                             แบบประเมิน
-                            <span className="text-[#6a9f62]">
+                            <span className="text-[#2f4fa0]">
                                 ความเครียด
                             </span>
                         </h1>
@@ -379,19 +382,19 @@ export default function StressAssessmentPage() {
                         <p className="mt-3 text-lg font-semibold text-[#4f535b]">
                             แบบประเมินความเครียด ST-5
                         </p>
+                      </div>
 
-                        <p className="mt-2 max-w-[900px] leading-7 text-[#8b8f98]">
-                            กรุณาเลือกคำตอบที่ตรงกับอาการหรือความรู้สึก
-                            ที่เกิดขึ้นกับคุณในช่วง 2–4 สัปดาห์ที่ผ่านมา
-                        </p>
+                      {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+                      <HealthConsentNotice />
+                      <AssessmentBackLink href="/assessment-menu-mental-health" />
                     </header>
 
                     {/* INFO */}
 
-                    <div className="mt-7 rounded-[24px] border border-[#e4eee1] bg-[#f3f9f0] p-5 sm:p-6">
+                    <div className="mt-7 rounded-[24px] border border-[#c8d3ec] bg-[#f3f6fc] p-5 sm:p-6">
                         <div className="flex items-start gap-4">
 
-                            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#e3f1de] text-[#65a05b]">
+                            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#e8edf8] text-[#2f4fa0]">
                                 <Brain
                                     size={25}
                                     strokeWidth={1.8}
@@ -426,7 +429,7 @@ export default function StressAssessmentPage() {
 
                                     <div className="flex gap-4">
 
-                                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#eef8e9] font-bold text-[#65a05b]">
+                                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#e8edf8] font-bold text-[#2f4fa0]">
                                             {question.questionNo}
                                         </div>
 
@@ -462,7 +465,7 @@ export default function StressAssessmentPage() {
                                   py-4
                                   transition
                                   ${selected
-                                                                        ? "border-[#8abb7e] bg-[#f0f8ed]"
+                                                                        ? "border-[#c8d3ec] bg-[#f3f6fc]"
                                                                         : "border-[#ece9ea] bg-white hover:bg-[#fafafa]"
                                                                     }
                                 `}
@@ -482,12 +485,12 @@ export default function StressAssessmentPage() {
                                                                             option.id,
                                                                         )
                                                                     }
-                                                                    className="h-4 w-4 accent-[#65a05b]"
+                                                                    className="h-4 w-4 accent-[#2f4fa0]"
                                                                 />
 
                                                                 <span
                                                                     className={`text-sm font-medium ${selected
-                                                                        ? "text-[#57965c]"
+                                                                        ? "text-[#2f4fa0]"
                                                                         : "text-[#62656d]"
                                                                         }`}
                                                                 >
@@ -501,7 +504,7 @@ export default function StressAssessmentPage() {
                                                                         size={
                                                                             18
                                                                         }
-                                                                        className="ml-auto text-[#65a05b]"
+                                                                        className="ml-auto text-[#2f4fa0]"
                                                                     />
                                                                 )}
                                                             </label>

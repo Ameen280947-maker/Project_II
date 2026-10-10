@@ -9,6 +9,7 @@ import {
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
+import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -337,6 +338,9 @@ export async function POST(request: NextRequest) {
   // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(7);
   if (closed) return closed;
+  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
+  const noConsent = await rejectIfNoHealthConsent(auth.userId);
+  if (noConsent) return noConsent;
   const userId = auth.userId;
 
   /*

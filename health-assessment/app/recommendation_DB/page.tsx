@@ -3,10 +3,9 @@
 import Link from "next/link";
 
 import {
-  ArrowLeft,
   ArrowRight,
+  Gauge,
   HeartPulse,
-  Info,
   Stethoscope,
   X,
 } from "lucide-react";
@@ -21,7 +20,17 @@ import {
   useRouter,
   useSearchParams,
 } from "next/navigation";
-import AnswerReview from "@/app/components/AnswerReview";
+
+import RecommendationLayout, {
+  RECOMMENDATION_TONES,
+  RecommendationError,
+  RecommendationLoading,
+  RecommendationSection,
+  ScoreCircle,
+  type RiskColor,
+} from "@/app/components/recommendation/RecommendationLayout";
+
+const TONE = "blue";
 
 type AssessmentResult = {
   assessmentId: number;
@@ -40,11 +49,39 @@ type ResultResponse = {
   message?: string;
 };
 
+/* =========================================================
+   เกณฑ์ระดับความดัน (ตรงกับ API, เอกสารอ้างอิง ตารางที่ 4)
+   color = สีตามความหมายของผล
+========================================================= */
+
+const BP_LEVELS: { level: string; range: string; color: RiskColor }[] = [
+  { level: "ความดันต่ำกว่าเกณฑ์", range: "< 90 / < 60", color: "yellow" },
+  { level: "ความดันอยู่ในระดับปกติ", range: "< 130 / < 85", color: "green" },
+  { level: "ความดันโลหิตเริ่มสูง", range: "130–139 / 85–89", color: "yellow" },
+  { level: "อาจเป็นโรคความดันโลหิตสูง", range: "140–159 / 90–99", color: "orange" },
+  { level: "น่าจะเป็นโรคความดันโลหิตสูง", range: "160–179 / 100–109", color: "red" },
+  { level: "ความดันโลหิตสูงอันตราย", range: "≥ 180 / ≥ 110", color: "red" },
+];
+
+const DOT: Record<RiskColor, string> = {
+  green: "bg-[#4f9857]",
+  yellow: "bg-[#d9a400]",
+  orange: "bg-[#e07a1f]",
+  red: "bg-[#c81e3a]",
+  gray: "bg-[#a3a4ab]",
+};
+
+// ระดับที่ควรแนะนำให้ประเมินโรคหัวใจและหลอดเลือดเพิ่ม
+const HIGH_RISK_LEVELS = [
+  "ความดันโลหิตเริ่มสูง",
+  "อาจเป็นโรคความดันโลหิตสูง",
+  "น่าจะเป็นโรคความดันโลหิตสูง",
+  "ความดันโลหิตสูงอันตราย",
+];
+
 export default function BloodPressureRecommendationPage() {
   return (
-    <Suspense
-      fallback={<LoadingPage />}
-    >
+    <Suspense fallback={<RecommendationLoading tone={TONE} />}>
       <RecommendationContent />
     </Suspense>
   );
@@ -148,181 +185,114 @@ function RecommendationContent() {
   }, [assessmentId]);
 
   if (loading) {
-    return <LoadingPage />;
+    return <RecommendationLoading tone={TONE} />;
   }
 
   if (
     error ||
     !result
   ) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#fbf9f9] p-6">
-
-        <div className="w-full max-w-md rounded-[28px] border border-[#eee5e6] bg-white p-8 text-center shadow-lg">
-
-          <Info
-            size={45}
-            className="mx-auto text-[#b91c2b]"
-          />
-
-          <h1 className="mt-5 text-2xl font-bold">
-            ไม่สามารถแสดงผลได้
-          </h1>
-
-          <p className="mt-3 text-[#767780]">
-            {error ||
-              "ไม่พบผลการประเมิน"}
-          </p>
-
-          <Link
-            href="/assessment_DB"
-            className="mt-7 flex h-14 items-center justify-center gap-2 rounded-2xl bg-[#b91c2b] font-bold text-white"
-          >
-            <ArrowLeft size={20} />
-            กลับไปทำแบบประเมิน
-          </Link>
-
-        </div>
-
-      </main>
-    );
+    return <RecommendationError tone={TONE} message={error} editHref="/assessment_DB" />;
   }
 
-  const highRiskLevels = [
-    "ความดันโลหิตเริ่มสูง",
-    "อาจเป็นโรคความดันโลหิตสูง",
-    "น่าจะเป็นโรคความดันโลหิตสูง",
-    "ความดันโลหิตสูงอันตราย",
-  ];
-
   const shouldSuggestMoreAssessment =
-    highRiskLevels.includes(result.riskLevel);
+    HIGH_RISK_LEVELS.includes(result.riskLevel);
 
-  const riskColor =
-    result.riskLevel === "ความดันต่ำกว่าเกณฑ์"
-      ? "text-[#2563eb]"
-      : result.riskLevel === "ความดันอยู่ในระดับปกติ"
-        ? "text-[#16a34a]"
-        : result.riskLevel === "ความดันโลหิตเริ่มสูง"
-          ? "text-[#d97706]"
-          : "text-[#c5162d]";
+  const riskColor: RiskColor =
+    BP_LEVELS.find((b) => b.level === result.riskLevel)?.color ?? "gray";
+
+  const t = RECOMMENDATION_TONES[TONE];
 
   return (
-    <main className="min-h-screen bg-[#fbf9f9] px-5 py-8 text-[#2f3037] sm:px-8 lg:px-12">
+    <>
+      <RecommendationLayout
+        tone={TONE}
+        title={
+          <>
+            ผลการประเมิน<span className={t.accent}>ความดันโลหิต</span>ของคุณ
+          </>
+        }
+        score={
+          <ScoreCircle
+            tone={TONE}
+            // เทียบตัวบนกับเกณฑ์ระดับอันตราย (180 mmHg)
+            progress={result.systolic / 180}
+            value={String(result.systolic)}
+            unit={`/${result.diastolic}`}
+            caption="mmHg"
+          />
+        }
+        riskLevel={result.riskLevel}
+        riskColor={riskColor}
+        summary={
+          <>
+            ผลประเมินของคุณอยู่ในระดับ{" "}
+            <strong className={t.eyebrow}>{result.riskLevel}</strong>{" "}
+            โดยมีความดันโลหิต{" "}
+            <strong className={t.accent}>
+              {result.systolic}/{result.diastolic} mmHg
+            </strong>
+          </>
+        }
+        recommendation={result.recommendation}
+        assessmentId={assessmentId}
+        editHref="/assessment_DB"
+        onMenuClick={() => {
+          if (shouldSuggestMoreAssessment) {
+            setShowPopup(true);
+          } else {
+            router.push("/assessment-menu");
+          }
+        }}
+      >
+        {/* =====================================================
+            ค่าความดันที่วัดได้ + เกณฑ์แต่ละระดับ
+        ====================================================== */}
 
-      <div className="mx-auto max-w-[1250px]">
-
-        {/* Header */}
-
-        <header>
-
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
-            Health Recommendation
-          </p>
-
-          <h1 className="mt-3 text-4xl font-black">
-            คำแนะนำ
-          </h1>
-
-          <div className="mt-4 h-1 w-10 rounded-full bg-[#b91c2b]" />
-
-        </header>
-
-        <div className="mt-8 space-y-7">
-
-          <div className="space-y-7">
-
-            {/* BP numbers */}
-
-            <section className="rounded-[28px] border border-[#eee5e6] bg-white p-8">
-
-              <div className="flex items-center gap-3">
-
-                <HeartPulse
-                  size={28}
-                  className="text-[#b91c2b]"
-                />
-
-                <h3 className="text-xl font-bold">
-                  ผลความดันโลหิต{" "}
-                  <span className={riskColor}>
-                    — {result.riskLevel}
-                  </span>
-                </h3>
-
-              </div>
-
-              <div className="mt-8 grid gap-5 sm:grid-cols-2">
-
-                <PressureResult
-                  title="ตัวบน (SYSTOLIC)"
-                  value={result.systolic}
-                  riskColor={riskColor}
-                />
-
-                <PressureResult
-                  title="ตัวล่าง (DIASTOLIC)"
-                  value={result.diastolic}
-                  riskColor={riskColor}
-                />
-
-              </div>
-
-            </section>
-
-            {/* Recommendation */}
-
-            <section className="rounded-[28px] border border-[#f0dfe1] bg-[#fff7f8] p-8">
-
-              <div className="flex items-start gap-4">
-
-                <div className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-white text-[#b91c2b]">
-                  <Info size={25} />
-                </div>
-
-                <div>
-
-                  <h3 className="text-xl font-bold">
-                    คำแนะนำสุขภาพ
-                  </h3>
-
-                  <p className="mt-4 whitespace-pre-line leading-8 text-[#696a72]">
-                    {
-                      result.recommendation
-                    }
-                  </p>
-
-                </div>
-
-              </div>
-
-            </section>
-
+        <RecommendationSection
+          icon={<HeartPulse size={27} className={t.eyebrow} />}
+          title="ค่าความดันโลหิตของคุณ"
+        >
+          <div className="grid gap-5 sm:grid-cols-2">
+            <PressureResult
+              title="ตัวบน (SYSTOLIC)"
+              value={result.systolic}
+              valueClass={t.eyebrow}
+            />
+            <PressureResult
+              title="ตัวล่าง (DIASTOLIC)"
+              value={result.diastolic}
+              valueClass={t.eyebrow}
+            />
           </div>
+        </RecommendationSection>
 
-          <AnswerReview assessmentId={assessmentId} />
+        <RecommendationSection
+          icon={<Gauge size={27} className={t.eyebrow} />}
+          title="เกณฑ์ระดับความดันโลหิต"
+        >
+          <div className="overflow-hidden rounded-[25px] border border-[#eee8e9] bg-white">
+            {BP_LEVELS.map((band) => {
+              const active = band.level === result.riskLevel;
 
-          {/* Back to assessment */}
-
-          <div className="flex justify-end">
-            <button
-              type="button"
-              onClick={() => {
-                if (shouldSuggestMoreAssessment) {
-                  setShowPopup(true);
-                } else {
-                  router.push("/assessment-menu");
-                }
-              }}
-              className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#c5162d] to-[#9d1426] font-bold text-white shadow-sm transition hover:opacity-95 sm:w-[320px]"
-            >
-              <ArrowLeft size={19} />
-              กลับไปหน้าแบบประเมิน
-            </button>
+              return (
+                <div
+                  key={band.level}
+                  className={`flex items-center justify-between gap-4 border-b border-[#f3eeef] px-6 py-4 last:border-b-0 ${
+                    active ? "bg-[#f5f7fc] font-bold" : "text-[#666872]"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`h-3 w-3 shrink-0 rounded-full ${DOT[band.color]}`} />
+                    <span>{band.level}</span>
+                  </div>
+                  <span className="shrink-0 text-sm">{band.range} mmHg</span>
+                </div>
+              );
+            })}
           </div>
-        </div>
-
-      </div>
+        </RecommendationSection>
+      </RecommendationLayout>
 
       {/* =====================================================
           Popup แนะนำ CVD
@@ -346,12 +316,10 @@ function RecommendationContent() {
                 <X size={20} />
               </button>
 
-              <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#fff0f2] text-[#b91c2b]">
-
+              <div className={`mx-auto grid h-20 w-20 place-items-center rounded-full ${t.iconSoft}`}>
                 <Stethoscope
                   size={38}
                 />
-
               </div>
 
               <h2 className="mt-6 text-2xl font-bold">
@@ -373,23 +341,20 @@ function RecommendationContent() {
                       "/assessment_CVD",
                     )
                   }
-                  className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#c5162d] to-[#9d1426] font-bold text-white"
+                  className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#4f6fc0] to-[#22397a] font-bold text-white"
                 >
-
                   ประเมินโรคหัวใจและหลอดเลือด
-
                   <ArrowRight
                     size={20}
                   />
-
                 </button>
 
-         <Link
-  href="/assessment-type"
-  className="flex h-14 items-center justify-center rounded-2xl border border-[#ead9db] font-semibold text-[#777780]"
->
-  ไว้ภายหลัง
-</Link>
+                <Link
+                  href="/assessment-type"
+                  className="flex h-14 items-center justify-center rounded-2xl border border-[#c8d3ec] font-semibold text-[#777780]"
+                >
+                  ไว้ภายหลัง
+                </Link>
 
               </div>
 
@@ -397,59 +362,37 @@ function RecommendationContent() {
 
           </div>
         )}
-
-    </main>
+    </>
   );
 }
 
-/* ========================================================= */
+/* =========================================================
+   การ์ดค่าความดัน
+========================================================= */
 
 function PressureResult({
   title,
   value,
-  riskColor,
+  valueClass,
 }: {
   title: string;
   value: number;
-  riskColor: string;
+  valueClass: string;
 }) {
   return (
-    <div className="rounded-[24px] bg-[#faf8f8] p-6">
-
+    <div className="rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
       <p className="text-xs font-semibold text-[#8b8c94]">
         {title}
       </p>
 
       <div className="mt-2 flex items-end gap-2">
-
-        <span className={`text-5xl font-black ${riskColor}`}>
+        <span className={`text-5xl font-black ${valueClass}`}>
           {value}
         </span>
-
         <span className="mb-1 text-xs text-[#777780]">
           mmHg
         </span>
-
       </div>
-
     </div>
-  );
-}
-
-function LoadingPage() {
-  return (
-    <main className="grid min-h-screen place-items-center bg-[#fbf9f9]">
-
-      <div className="text-center">
-
-        <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#f1dadd] border-t-[#b91c2b]" />
-
-        <p className="mt-5 font-semibold text-[#767780]">
-          กำลังโหลดผลการประเมิน...
-        </p>
-
-      </div>
-
-    </main>
   );
 }

@@ -13,9 +13,7 @@ import {
   Activity,
   ArrowRight,
   CalendarDays,
-  ChevronLeft,
   HeartPulse,
-  Lock,
   Ruler,
   Save,
   Scale,
@@ -24,6 +22,8 @@ import {
 } from "lucide-react";
 
 import Sidebar from "@/app/components/Sidebar";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 /* =========================================================
    TYPES
@@ -762,7 +762,7 @@ export default function AssessmentDiabetesPage() {
 
           <section className="flex flex-1 items-center justify-center">
             <div className="text-center">
-              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#f3cdd1] border-t-[#b91c2b]" />
+              <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-[#cde0c0] border-t-[#3f7a2e]" />
 
               <p className="mt-5 font-semibold text-[#777982]">
                 กำลังโหลดข้อมูลสุขภาพของคุณ...
@@ -786,7 +786,7 @@ export default function AssessmentDiabetesPage() {
 
           <section className="flex flex-1 items-center justify-center px-5">
             <div className="w-full max-w-lg rounded-[28px] border border-[#eee5e6] bg-white p-8 text-center shadow-sm">
-              <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#fff0f2] text-[#b91c2b]">
+              <div className="mx-auto grid h-20 w-20 place-items-center rounded-full bg-[#ebf3e2] text-[#3f7a2e]">
                 <HeartPulse size={40} />
               </div>
 
@@ -826,30 +826,24 @@ export default function AssessmentDiabetesPage() {
               HEADER
           ================================================= */}
 
-          <header>
-            <Link
-              href="/assessment-type"
-              className="inline-flex items-center gap-2 rounded-full bg-[#fff0f2] px-4 py-2 text-sm font-semibold text-[#b91c2b]"
-            >
-              <ChevronLeft size={18} />
-              ย้อนกลับ
-            </Link>
-
-            <p className="mt-7 text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#3f7a2e]">
               Diabetes Assessment
             </p>
 
             <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl lg:text-[42px]">
               แบบประเมินความเสี่ยง
-              <span className="text-[#ef4962]">
+              <span className="text-[#5a9445]">
                 โรคเบาหวาน
               </span>
             </h1>
 
-            <p className="mt-3 max-w-3xl text-lg leading-8 text-[#777982]">
-              ระบบจะดึงข้อมูลสุขภาพที่มีอยู่แล้วมาใช้
-              และให้กรอกเฉพาะข้อมูลที่จำเป็นเพิ่มเติม
-            </p>
+            </div>
+
+            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+            <HealthConsentNotice />
+            <AssessmentBackLink href="/assessment-menu" />
           </header>
 
           {/* =================================================
@@ -876,7 +870,7 @@ export default function AssessmentDiabetesPage() {
             onSubmit={handleSubmit}
             className="mt-8"
           >
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_310px]">
+            <div>
 
               {/* =================================================
                   LEFT
@@ -892,7 +886,7 @@ export default function AssessmentDiabetesPage() {
 
                   <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#fff0f2] text-[#b91c2b]">
+                      <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#ebf3e2] text-[#3f7a2e]">
                         <HeartPulse size={27} />
                       </div>
 
@@ -900,10 +894,6 @@ export default function AssessmentDiabetesPage() {
                         <h2 className="text-xl font-bold">
                           ข้อมูลสุขภาพ
                         </h2>
-
-                        <p className="text-sm text-[#8b8d95]">
-                          ข้อมูลที่มีอยู่แล้วจะถูกดึงมาให้อัตโนมัติ
-                        </p>
                       </div>
                     </div>
 
@@ -911,7 +901,7 @@ export default function AssessmentDiabetesPage() {
                       <button
                         type="button"
                         onClick={startEditingProfile}
-                        className="rounded-full bg-[#fff0f2] px-5 py-2.5 text-sm font-bold text-[#b91c2b] transition hover:bg-[#ffe4e8]"
+                        className="rounded-full bg-[#ebf3e2] px-5 py-2.5 text-sm font-bold text-[#3f7a2e] transition hover:bg-[#ebf3e2]"
                       >
                         แก้ไขข้อมูล
                       </button>
@@ -931,7 +921,7 @@ export default function AssessmentDiabetesPage() {
                           type="button"
                           onClick={saveProfile}
                           disabled={savingProfile}
-                          className="flex items-center gap-2 rounded-full bg-[#b91c2b] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#9f1624] disabled:cursor-not-allowed disabled:opacity-60"
+                          className="flex items-center gap-2 rounded-full bg-[#3f7a2e] px-5 py-2.5 text-sm font-bold text-white transition hover:bg-[#2f5f22] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           <Save size={16} />
                           {savingProfile
@@ -940,27 +930,6 @@ export default function AssessmentDiabetesPage() {
                         </button>
                       </div>
                     )}
-                  </div>
-
-                  <div
-                    className={`mt-5 flex items-center gap-2 rounded-2xl px-4 py-3 text-xs ${
-                      isEditingProfile
-                        ? "bg-[#fff7e8] text-[#856404]"
-                        : "bg-[#faf8f8] text-[#85858d]"
-                    }`}
-                  >
-                    <Lock
-                      size={15}
-                      className={
-                        isEditingProfile
-                          ? "shrink-0 text-[#c98b00]"
-                          : "shrink-0 text-[#b91c2b]"
-                      }
-                    />
-
-                    {isEditingProfile
-                      ? "คุณกำลังแก้ไขข้อมูลสุขภาพ สามารถปรับข้อมูลที่ต้องการได้"
-                      : "ข้อมูลส่วนนี้ดึงมาจากข้อมูลสุขภาพของคุณ กด “แก้ไขข้อมูล” หากต้องการปรับข้อมูล"}
                   </div>
 
                   <div className="mt-7 space-y-4">
@@ -980,7 +949,7 @@ export default function AssessmentDiabetesPage() {
                         />
 
                         <div className="flex min-h-16 items-center rounded-2xl bg-[#faf8f8] px-4">
-                          <span className="mr-4 shrink-0 text-[#ef4962]">
+                          <span className="mr-4 shrink-0 text-[#5a9445]">
                             <UsersRound size={22} />
                           </span>
 
@@ -1004,8 +973,8 @@ export default function AssessmentDiabetesPage() {
                                 }
                                 className={`h-10 px-5 text-sm font-semibold transition ${
                                   draft.gender === option.value
-                                    ? "bg-[#f8e8ea] text-[#b91c2b]"
-                                    : "bg-white text-[#aaaab0] hover:bg-[#fceff1]"
+                                    ? "bg-[#ebf3e2] text-[#3f7a2e]"
+                                    : "bg-white text-[#aaaab0] hover:bg-[#f5f9f0]"
                                 }`}
                               >
                                 {option.label}
@@ -1129,10 +1098,6 @@ export default function AssessmentDiabetesPage() {
                       <h2 className="text-xl font-bold">
                         ความดันโลหิต
                       </h2>
-
-                      <p className="text-sm text-[#8b8d95]">
-                        ถ้ามีข้อมูลอยู่แล้ว ระบบจะกรอกให้อัตโนมัติ
-                      </p>
                     </div>
                   </div>
 
@@ -1212,10 +1177,6 @@ export default function AssessmentDiabetesPage() {
                       <h2 className="text-xl font-bold">
                         ประวัติครอบครัว
                       </h2>
-
-                      <p className="text-sm text-[#8b8d95]">
-                        ข้อมูลที่ใช้เพิ่มเติมในการคำนวณ
-                      </p>
                     </div>
                   </div>
 
@@ -1253,33 +1214,8 @@ export default function AssessmentDiabetesPage() {
                 </section>
               </div>
 
-              {/* =================================================
-                  RIGHT
-              ================================================= */}
-
-              <aside className="space-y-5">
-
-                <section className="rounded-[30px] border border-[#eee5e6] bg-white p-7 shadow-[0_16px_45px_rgba(35,25,30,0.05)]">
-
-                  <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-[#fff0f2] text-[#ef4962]">
-                    <HeartPulse size={48} />
-                  </div>
-
-                  <h3 className="mt-5 text-center text-xl font-black text-[#b91c2b]">
-                    Thai Diabetes Score
-                  </h3>
-
-                  <p className="mt-3 text-center text-sm leading-7 text-[#858791]">
-                    ประเมินโอกาสเสี่ยงการเกิดโรคเบาหวาน
-                    ใน 12 ปีข้างหน้า
-                  </p>
-
-                  <div className="mt-6 rounded-2xl bg-[#fff7f8] p-4 text-sm leading-7 text-[#686970]">
-                    ข้อมูลสุขภาพเดิมจะถูกนำมาใช้
-                    และคุณกรอกเฉพาะข้อมูลเพิ่มเติมที่จำเป็น
-                  </div>
-                </section>
-
+              {/* ปุ่มประเมิน */}
+              <div className="mt-6 flex justify-end">
                 <button
                   type="submit"
                   disabled={
@@ -1287,7 +1223,7 @@ export default function AssessmentDiabetesPage() {
                     isEditingProfile ||
                     familyDiabetes === null
                   }
-                  className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#ef3e59] to-[#b91c2b] text-lg font-bold text-white shadow-[0_15px_32px_rgba(185,28,43,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-16 w-full items-center sm:w-[320px] justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#5a9445] to-[#3f7a2e] text-lg font-bold text-white shadow-[0_15px_32px_rgba(63,122,46,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting
                     ? "กำลังประเมิน..."
@@ -1297,7 +1233,7 @@ export default function AssessmentDiabetesPage() {
                     <ArrowRight size={21} />
                   )}
                 </button>
-              </aside>
+              </div>
             </div>
           </form>
         </section>
@@ -1321,7 +1257,7 @@ function InfoRow({
 }) {
   return (
     <div className="flex min-h-16 items-center rounded-2xl bg-[#faf8f8] px-4">
-      <span className="mr-4 shrink-0 text-[#ef4962]">
+      <span className="mr-4 shrink-0 text-[#5a9445]">
         {icon}
       </span>
 
@@ -1329,7 +1265,7 @@ function InfoRow({
         {label}
       </span>
 
-      <span className="ml-auto font-bold text-[#b91c2b]">
+      <span className="ml-auto font-bold text-[#3f7a2e]">
         {value}
       </span>
     </div>
@@ -1360,7 +1296,7 @@ function EditRow({
 }) {
   return (
     <div className="flex min-h-16 items-center rounded-2xl bg-[#faf8f8] px-4">
-      <span className="mr-4 shrink-0 text-[#ef4962]">
+      <span className="mr-4 shrink-0 text-[#5a9445]">
         {icon}
       </span>
 
@@ -1378,7 +1314,7 @@ function EditRow({
           onChange={(event) =>
             onChange(event.target.value)
           }
-          className="h-11 w-24 rounded-xl border border-[#e7e1e2] bg-white px-3 text-right font-bold text-[#b91c2b] outline-none transition focus:border-[#ef4962]"
+          className="h-11 w-24 rounded-xl border border-[#e7e1e2] bg-white px-3 text-right font-bold text-[#3f7a2e] outline-none transition focus:border-[#5a9445]"
         />
 
         <span className="w-8 text-sm font-semibold text-[#8b8d95]">
@@ -1408,8 +1344,8 @@ function YesNoButton({
       onClick={onClick}
       className={`h-14 rounded-2xl border-2 font-bold transition ${
         active
-          ? "border-[#ef4962] bg-[#ef4962] text-white"
-          : "border-[#eee5e6] bg-white text-[#777982] hover:bg-[#fff0f2]"
+          ? "border-[#5a9445] bg-[#5a9445] text-white"
+          : "border-[#eee5e6] bg-white text-[#777982] hover:bg-[#ebf3e2]"
       }`}
     >
       {children}

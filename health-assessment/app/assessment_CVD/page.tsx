@@ -21,6 +21,8 @@ import {
 } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 /* =========================================================
    TYPES
@@ -1266,7 +1268,8 @@ export default function AssessmentPage() {
               HEADER
           ================================================= */}
 
-          <header>
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
 
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
               Health Assessment
@@ -1286,10 +1289,12 @@ export default function AssessmentPage() {
 
             </h1>
 
-            <p className="mt-3 text-base text-[#767780]">
-              ข้อมูลส่วนบุคคลอ้างอิงจากข้อมูลสุขภาพที่คุณบันทึกไว้
-            </p>
 
+            </div>
+
+            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+            <HealthConsentNotice />
+            <AssessmentBackLink href="/assessment-menu" />
           </header>
 
           {/* =================================================

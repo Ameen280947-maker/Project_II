@@ -4,19 +4,23 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Download } from "lucide-react";
 import { relativeTime, staffFetch } from "@/lib/staff/client";
-import { ErrorBox, Legend, PageHeader, Segmented, StatCard, btnPrimary } from "./components/ui";
+import { ErrorBox, Legend, PageHeader, Segmented, StatCard, btnPrimary, inputCls } from "./components/ui";
+import OverviewDetail, { type DetailKind } from "./components/OverviewDetail";
 
 /* =========================================================
    TYPES (ตรงกับ /api/staff/overview)
 ========================================================= */
 
 type Overview = {
-  range: "week" | "month" | "quarter";
+  from: string;
+  to: string;
+  bucket: "hour" | "day" | "week" | "month";
   kpi: {
     totalUsers: number;
     newUsers: number;
     assessments: number;
-    activeUsers30d: number;
+    highRisk: number;
+    activeUsers: number;
     waiting: number;
     overdue: number;
   };
@@ -33,11 +37,31 @@ type Overview = {
   activity: { type: "assessment" | "high" | "note"; text: string; at: string }[];
 };
 
-const RANGES: { key: Overview["range"]; label: string; noun: string }[] = [
-  { key: "week", label: "7 วัน", noun: "7 วันที่ผ่านมา" },
-  { key: "month", label: "30 วัน", noun: "30 วันที่ผ่านมา" },
-  { key: "quarter", label: "3 เดือน", noun: "3 เดือนที่ผ่านมา" },
+/* ---------- ช่วงเวลา (ตามเวลาไทย) ---------- */
+
+type RangeKey = "today" | "week" | "month" | "quarter" | "year" | "custom";
+
+// days = จำนวนวันย้อนหลังรวมวันนี้
+const RANGES: { key: RangeKey; label: string; noun: string; days?: number }[] = [
+  { key: "today", label: "วันนี้", noun: "วันนี้", days: 1 },
+  { key: "week", label: "7 วัน", noun: "7 วันที่ผ่านมา", days: 7 },
+  { key: "month", label: "30 วัน", noun: "30 วันที่ผ่านมา", days: 30 },
+  { key: "quarter", label: "3 เดือน", noun: "3 เดือนที่ผ่านมา", days: 90 },
+  { key: "year", label: "1 ปี", noun: "1 ปีที่ผ่านมา", days: 365 },
+  { key: "custom", label: "กำหนดเอง", noun: "ช่วงที่เลือก" },
 ];
+
+const todayInBangkok = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
+
+const shiftDate = (ymd: string, days: number) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+};
+
+const formatThaiDate = (ymd: string) => {
+  const [y, m, d] = ymd.split("-").map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+};
 
 const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
 
@@ -46,31 +70,47 @@ const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTim
 ========================================================= */
 
 export default function StaffOverviewPage() {
-  const [range, setRange] = useState<Overview["range"]>("week");
+  const today = todayInBangkok();
+  const [range, setRange] = useState<RangeKey>("week");
+  // ช่วงที่กำหนดเอง (ค่าเริ่มต้น 7 วันล่าสุด)
+  const [customFrom, setCustomFrom] = useState(() => shiftDate(todayInBangkok(), -6));
+  const [customTo, setCustomTo] = useState(() => todayInBangkok());
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
+  // กล่องที่กดดูรายละเอียดอยู่
+  const [detail, setDetail] = useState<DetailKind | null>(null);
 
   useEffect(() => {
     setName(localStorage.getItem("staffUsername") || "");
   }, []);
 
+  const preset = RANGES.find((r) => r.key === range);
+  const from = range === "custom" ? customFrom : shiftDate(today, -((preset?.days ?? 7) - 1));
+  const to = range === "custom" ? customTo : today;
+  const customInvalid = range === "custom" && (!customFrom || !customTo || customFrom > customTo);
+
   useEffect(() => {
+    if (customInvalid) return;
     let cancelled = false;
     setLoading(true);
     setError("");
-    staffFetch<Overview>(`/api/staff/overview?range=${range}`)
+    staffFetch<Overview>(`/api/staff/overview?from=${from}&to=${to}`)
       .then((d) => !cancelled && setData(d))
       .catch((e) => !cancelled && setError(e.message))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [range]);
+  }, [from, to, customInvalid]);
 
-  const rangeNoun = RANGES.find((r) => r.key === range)?.noun ?? "";
+  const rangeNoun = preset?.noun ?? "";
+  const rangeText = from === to ? formatThaiDate(from) : `${formatThaiDate(from)} – ${formatThaiDate(to)}`;
   const maxBar = Math.max(1, ...(data?.chart.map((c) => c.total) ?? [1]));
+  // แท่งเยอะ (เช่น 30 วัน / รายชั่วโมง) แสดงป้ายเว้นช่วง ไม่ให้ตัวหนังสือซ้อนกัน
+  const chartLen = data?.chart.length ?? 0;
+  const labelStep = Math.max(1, Math.ceil(chartLen / 12));
 
   return (
     <div className="flex flex-col gap-6">
@@ -78,7 +118,7 @@ export default function StaffOverviewPage() {
         eyebrow="Staff Dashboard"
         title="ภาพรวม"
         highlight="ระบบ"
-        desc={`สวัสดี ${name} · ข้อมูล ณ ${new Date().toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })}`}
+        desc={`สวัสดี ${name} · ข้อมูลช่วง ${rangeText}`}
         actions={
           <>
             <Segmented label="ช่วงเวลา" items={RANGES} value={range} onChange={setRange} />
@@ -90,35 +130,85 @@ export default function StaffOverviewPage() {
         }
       />
 
+      {range === "custom" && (
+        <div className="flex flex-wrap items-end gap-3 rounded-[22px] border border-staff-line bg-white p-4">
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            ตั้งแต่วันที่
+            <input
+              type="date"
+              className={inputCls}
+              value={customFrom}
+              max={customTo || today}
+              onChange={(e) => setCustomFrom(e.target.value)}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm font-semibold">
+            ถึงวันที่
+            <input
+              type="date"
+              className={inputCls}
+              value={customTo}
+              min={customFrom}
+              max={today}
+              onChange={(e) => setCustomTo(e.target.value)}
+            />
+          </label>
+          {customInvalid && <p className="pb-2.5 text-sm text-risk-crit">กรุณาเลือกวันเริ่มต้นที่ไม่อยู่หลังวันสิ้นสุด</p>}
+        </div>
+      )}
+
       <ErrorBox message={error} />
 
       {/* KPI */}
       <section className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${loading ? "opacity-60" : ""}`}>
-        <StatCard label="ผู้ใช้งานทั้งหมด" value={data?.kpi.totalUsers} note={`+${data?.kpi.newUsers ?? 0} คน ใน ${rangeNoun}`} />
-        <StatCard label={`การประเมินใน ${rangeNoun}`} value={data?.kpi.assessments} />
         <StatCard
-          label="ผู้มีความเสี่ยงสูงรอติดตาม"
+          label="ผู้ใช้งานทั้งหมด"
+          value={data?.kpi.totalUsers}
+          note={`+${data?.kpi.newUsers ?? 0} คน ใน ${rangeNoun}`}
+          onClick={() => setDetail("users")}
+        />
+        <StatCard
+          label={`การประเมินใน ${rangeNoun}`}
+          value={data?.kpi.assessments}
+          note={`ผลความเสี่ยงสูง ${data?.kpi.highRisk ?? 0} ครั้ง`}
+          onClick={() => setDetail("assessments")}
+        />
+        <StatCard
+          label="ผู้มีความเสี่ยงสูงรอติดตาม (ปัจจุบัน)"
           value={data?.kpi.waiting}
           note={data?.kpi.overdue ? `${data.kpi.overdue} รายรอเกิน 3 วัน` : "ไม่มีเคสค้างเกิน 3 วัน"}
           tone={data?.kpi.waiting ? "danger" : "brand"}
+          onClick={() => setDetail("waiting")}
         />
-        <StatCard label="ผู้ใช้ที่ประเมินใน 30 วัน" value={data?.kpi.activeUsers30d} note={`จาก ${data?.kpi.totalUsers ?? 0} คน`} />
+        <StatCard
+          label={`ผู้ใช้ที่ประเมินใน ${rangeNoun}`}
+          value={data?.kpi.activeUsers}
+          note={`จาก ${data?.kpi.totalUsers ?? 0} คน`}
+          onClick={() => setDetail("active")}
+        />
       </section>
 
       {/* CHART + URGENT */}
       <section className="flex flex-wrap gap-4">
         <div className="min-w-0 flex-[3_1_520px] rounded-[22px] border border-staff-line bg-white p-6">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold">จำนวนการประเมิน</h2>
+            <h2 className="text-lg font-bold">
+              จำนวนการประเมิน
+              <span className="ml-2 text-sm font-medium text-staff-muted">
+                {data?.bucket === "hour" ? "รายชั่วโมง" : data?.bucket === "week" ? "รายสัปดาห์" : data?.bucket === "month" ? "รายเดือน" : "รายวัน"}
+              </span>
+            </h2>
             <div className="flex gap-4 text-sm text-staff-muted">
               <Legend color="bg-staff-200" label="ทั้งหมด" />
               <Legend color="bg-risk-high" label="ผลความเสี่ยงสูง" />
             </div>
           </div>
-          <div className="flex h-56 items-end gap-3 border-b border-staff-line px-1">
+          <div className={`flex h-56 items-end border-b border-staff-line px-1 ${chartLen > 14 ? "gap-1" : "gap-3"}`}>
             {(data?.chart ?? []).map((c, i) => (
               <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-                <span className="text-xs font-semibold text-staff-muted">{c.total}</span>
+                {(chartLen <= 14 || c.total > 0) && (
+                  <span className="text-[11px] font-semibold text-staff-muted">{c.total}</span>
+                )}
                 <div
                   className="flex w-full max-w-[44px] flex-col justify-end overflow-hidden rounded-t-lg bg-staff-200 transition-all"
                   style={{ height: `${(c.total / maxBar) * 85}%` }}
@@ -129,10 +219,10 @@ export default function StaffOverviewPage() {
               </div>
             ))}
           </div>
-          <div className="mt-2 flex gap-3 px-1">
+          <div className={`mt-2 flex px-1 ${chartLen > 14 ? "gap-1" : "gap-3"}`}>
             {(data?.chart ?? []).map((c, i) => (
-              <span key={i} className="flex-1 text-center text-xs text-staff-muted">
-                {c.label}
+              <span key={i} className="flex-1 whitespace-nowrap text-center text-xs text-staff-muted">
+                {i % labelStep === 0 ? c.label : ""}
               </span>
             ))}
           </div>
@@ -185,7 +275,7 @@ export default function StaffOverviewPage() {
               <Legend color="bg-risk-high" label="สูง" />
             </div>
           </div>
-          <p className="-mt-2 mb-4 text-xs text-staff-muted">คิดจากผลล่าสุดของผู้ใช้แต่ละคน</p>
+          <p className="-mt-2 mb-4 text-xs text-staff-muted">คิดจากผลล่าสุดของผู้ใช้แต่ละคนใน{rangeNoun}</p>
           <div className="flex flex-col gap-3">
             {(data?.distribution ?? []).map((d) => (
               <div key={d.name} className="flex items-center gap-3">
@@ -201,13 +291,16 @@ export default function StaffOverviewPage() {
               </div>
             ))}
             {data && data.distribution.length === 0 && (
-              <p className="py-6 text-center text-sm text-staff-muted">ยังไม่มีผลการประเมิน</p>
+              <p className="py-6 text-center text-sm text-staff-muted">ไม่มีผลการประเมินในช่วงนี้</p>
             )}
           </div>
         </div>
 
         <div className="min-w-0 flex-[2_1_340px] rounded-[22px] border border-staff-line bg-white p-6">
           <h2 className="mb-2 text-lg font-bold">กิจกรรมล่าสุด</h2>
+          {data && data.activity.length === 0 && (
+            <p className="py-6 text-center text-sm text-staff-muted">ไม่มีกิจกรรมในช่วงนี้</p>
+          )}
           <div className="divide-y divide-staff-bg">
             {(data?.activity ?? []).map((a, i) => (
               <div key={i} className="flex gap-3 py-2.5">
@@ -230,6 +323,9 @@ export default function StaffOverviewPage() {
           )}
         </div>
       </section>
+      {detail && !customInvalid && (
+        <OverviewDetail kind={detail} from={from} to={to} rangeText={rangeText} onClose={() => setDetail(null)} />
+      )}
     </div>
   );
 }

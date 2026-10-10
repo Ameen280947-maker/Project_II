@@ -9,6 +9,7 @@ import { logSystemError } from "@/lib/errorLogger";
 /* =========================================================
    GET /api/staff/reports?months=3|6|12&type=all|<id>&gender=all|male|female&age=all|18-24|25-39|40-59|60+
    รายงานภาพรวมแบบไม่ระบุตัวตน
+   - นับเฉพาะผู้ใช้ที่อนุญาตให้ใช้ข้อมูลเพื่อการศึกษา (user_settings.consent_research)
    - กลุ่มที่มีผู้ใช้น้อยกว่า MIN_GROUP คน จะส่งค่า null (หน้าเว็บแสดง "–")
 ========================================================= */
 
@@ -70,7 +71,8 @@ export async function GET(request: NextRequest) {
          FROM assessment a
          JOIN assessment_types t USING (assessment_type_id)
          JOIN users u ON u.user_id = a.user_id
-         LEFT JOIN health_profile hp ON hp.user_id = a.user_id
+         JOIN user_settings st ON st.user_id::text = a.user_id::text AND st.consent_research IS TRUE
+         LEFT JOIN LATERAL (SELECT * FROM health_profile WHERE user_id = a.user_id ORDER BY profile_id DESC LIMIT 1) hp ON TRUE
         WHERE u.role_id = $1
           AND NOT (t.assessment_name = ANY($2))
           AND a.assessed_at >= date_trunc('month', NOW()) - make_interval(months => $3)

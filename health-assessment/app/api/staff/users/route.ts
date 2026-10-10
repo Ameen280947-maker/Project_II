@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
 
 async function userDetail(userId: number, staffId: number) {
   const { rows } = await pool.query(
-    `${BASE} SELECT x.*, hp.gender, hp.age FROM x LEFT JOIN health_profile hp ON hp.user_id = x.user_id WHERE x.user_id = $2`,
+    `${BASE} SELECT x.*, hp.gender, hp.age FROM x LEFT JOIN LATERAL (SELECT * FROM health_profile WHERE user_id = x.user_id ORDER BY profile_id DESC LIMIT 1) hp ON TRUE WHERE x.user_id = $2`,
     [USER_ROLE_ID, userId]
   );
   const u = rows[0];

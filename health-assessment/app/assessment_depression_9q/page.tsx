@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 
 import Sidebar from "@/app/components/Sidebar";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 /* =========================================================
    TYPES
@@ -177,8 +179,8 @@ function Depression9QContent() {
         <Sidebar />
         <main className="flex min-h-screen flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-4 text-[#666770]">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f8e8ea]">
-              <Loader2 size={28} className="animate-spin text-[#b91c2b]" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#eee9f9]">
+              <Loader2 size={28} className="animate-spin text-[#5b3ea6]" />
             </div>
             <p className="font-medium">กำลังโหลดแบบประเมินโรคซึมเศร้า 9Q...</p>
           </div>
@@ -198,12 +200,12 @@ function Depression9QContent() {
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f8e8ea] text-[#b91c2b]">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eee9f9] text-[#5b3ea6]">
                   <ClipboardCheck size={26} />
                 </div>
 
                 <div>
-                  <span className="text-sm font-semibold tracking-wide text-[#b91c2b]">
+                  <span className="text-sm font-semibold tracking-wide text-[#5b3ea6]">
                     แบบประเมินสุขภาพจิต
                   </span>
                   <h1 className="text-2xl sm:text-3xl font-bold text-[#2f3037]">
@@ -212,20 +214,15 @@ function Depression9QContent() {
                 </div>
               </div>
 
-              <Link
-                href={
-                  previousAssessmentId
-                    ? `/assessment_depression_2q`
-                    : `/assessment-menu-mental-health`
-                }
-                className="flex items-center gap-2 rounded-xl border border-[#eee5e6] bg-white px-4 py-2.5 text-sm font-medium text-[#666770] shadow-sm transition hover:bg-gray-50"
-              >
-                <ArrowLeft size={16} />
-                {previousAssessmentId ? "ย้อนกลับไป 2Q" : "กลับสู่เมนู"}
-              </Link>
+              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+              <HealthConsentNotice />
+              <AssessmentBackLink
+                href={previousAssessmentId ? "/assessment_depression_2q" : "/assessment-menu-mental-health"}
+                label={previousAssessmentId ? "ย้อนกลับไป 2Q" : "ย้อนกลับ"}
+              />
             </div>
 
-            <div className="mt-4 rounded-2xl border border-[#eedfe1] bg-[#fff8f9] p-4 text-sm text-[#7e454b]">
+            <div className="mt-4 rounded-2xl border border-[#d4c9ee] bg-[#f7f4fc] p-4 text-sm text-[#4a3289]">
               <p className="font-medium">
                 ในช่วง 2 สัปดาห์ที่ผ่านมารวมถึงวันนี้ ท่านมีอาการเหล่านี้บ่อยแค่ไหน?
               </p>
@@ -241,14 +238,14 @@ function Depression9QContent() {
               <span className="font-semibold text-[#2f3037]">
                 ความคืบหน้า
               </span>
-              <span className="font-medium text-[#b91c2b]">
+              <span className="font-medium text-[#5b3ea6]">
                 {answeredCount} จาก {questions.length} ข้อ ({progressPercent}%)
               </span>
             </div>
 
             <div className="h-2.5 overflow-hidden rounded-full bg-[#f1eeee]">
               <div
-                className="h-full rounded-full bg-[#b91c2b] transition-all duration-300"
+                className="h-full rounded-full bg-[#5b3ea6] transition-all duration-300"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -278,7 +275,7 @@ function Depression9QContent() {
                     <div
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm font-bold transition ${
                         isAnswered
-                          ? "bg-[#f8e8ea] text-[#b91c2b]"
+                          ? "bg-[#eee9f9] text-[#5b3ea6]"
                           : "bg-gray-100 text-gray-500"
                       }`}
                     >
@@ -316,15 +313,15 @@ function Depression9QContent() {
                             flex items-center gap-3 rounded-2xl border-2 p-4 text-left transition-all
                             ${
                               isSelected
-                                ? "border-[#b91c2b] bg-[#fff5f6] shadow-sm"
-                                : "border-[#eee9e9] bg-white hover:border-[#d9a6ad] hover:bg-[#fffafa]"
+                                ? "border-[#5b3ea6] bg-[#f7f4fc] shadow-sm"
+                                : "border-[#eee9e9] bg-white hover:border-[#d4c9ee] hover:bg-[#f7f4fc]"
                             }
                           `}
                         >
                           <div
                             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${
                               isSelected
-                                ? "border-[#b91c2b] bg-[#b91c2b]"
+                                ? "border-[#5b3ea6] bg-[#5b3ea6]"
                                 : "border-gray-300"
                             }`}
                           >
@@ -337,7 +334,7 @@ function Depression9QContent() {
                             <span
                               className={`text-sm font-medium ${
                                 isSelected
-                                  ? "font-semibold text-[#b91c2b]"
+                                  ? "font-semibold text-[#5b3ea6]"
                                   : "text-[#4f535b]"
                               }`}
                             >
@@ -348,7 +345,7 @@ function Depression9QContent() {
                           {isSelected && (
                             <CheckCircle2
                               size={18}
-                              className="shrink-0 text-[#b91c2b]"
+                              className="shrink-0 text-[#5b3ea6]"
                             />
                           )}
                         </button>
@@ -385,7 +382,7 @@ function Depression9QContent() {
             <button
               onClick={submitAssessment}
               disabled={submitting}
-              className="flex items-center gap-3 rounded-2xl bg-[#b91c2b] px-8 py-3.5 text-base font-semibold text-white shadow-[0_10px_25px_rgba(185,28,43,0.18)] transition hover:bg-[#9f1726] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+              className="flex items-center gap-3 rounded-2xl bg-[#5b3ea6] px-8 py-3.5 text-base font-semibold text-white shadow-[0_10px_25px_rgba(91,62,166,0.18)] transition hover:bg-[#4a3289] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {submitting ? (
                 <>
@@ -425,7 +422,7 @@ export default function Depression9QPage() {
     <Suspense
       fallback={
         <div className="flex min-h-screen items-center justify-center bg-[#f8f9fb]">
-          <Loader2 className="animate-spin text-[#b91c2b]" size={32} />
+          <Loader2 className="animate-spin text-[#5b3ea6]" size={32} />
         </div>
       }
     >

@@ -4,19 +4,19 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
 
 import {
-  Activity,
   CalendarDays,
-  ChevronDown,
-  Heart,
+  Cigarette,
+  Droplet,
   Lightbulb,
-  Pencil,
+  Lock,
+  PencilLine,
   Ruler,
   Save,
-  Scale,
-  Settings,
   UserRound,
   UsersRound,
-  VenusAndMars,
+  Torus,
+  Weight,
+  X,
 } from "lucide-react";
 
 import type { ReactNode } from "react";
@@ -147,15 +147,6 @@ export default function ProfilePage() {
     useRouter();
 
   /* =========================================================
-     USER
-  ========================================================= */
-
-  const [
-    username,
-    setUsername,
-  ] = useState("");
-
-  /* =========================================================
      PROFILE DATA
   ========================================================= */
 
@@ -243,6 +234,17 @@ export default function ProfilePage() {
     isEditing,
     setIsEditing,
   ] = useState(false);
+
+  const [
+    notice,
+    setNotice,
+  ] = useState("");
+
+  // เวลาของข้อมูลเวอร์ชันล่าสุด (แสดง "อัปเดตล่าสุด")
+  const [
+    updatedAt,
+    setUpdatedAt,
+  ] = useState<string | null>(null);
 
   const [
     originalData,
@@ -449,22 +451,6 @@ export default function ProfilePage() {
             );
           }
 
-          /* =========================
-             USERNAME
-          ========================= */
-
-          const loadedUsername =
-            data.user
-              ?.username ??
-            localStorage.getItem(
-              "username",
-            ) ??
-            "";
-
-          setUsername(
-            loadedUsername,
-          );
-
           /* =================================================
              USER ใหม่
 
@@ -528,6 +514,12 @@ export default function ProfilePage() {
 
           const profile =
             data.profile;
+
+          setUpdatedAt(
+            profile.updated_at ??
+              profile.created_at ??
+              null,
+          );
 
           /* =========================
              GENDER
@@ -701,6 +693,7 @@ export default function ProfilePage() {
   const startEditing =
     () => {
       setError("");
+      setNotice("");
 
       /*
         เก็บข้อมูลก่อนแก้ไข
@@ -1024,6 +1017,13 @@ export default function ProfilePage() {
            SUCCESS
         ========================= */
 
+        const wasExisting =
+          hasProfile;
+
+        setUpdatedAt(
+          new Date().toISOString(),
+        );
+
         localStorage.setItem(
           "hasProfile",
           "true",
@@ -1048,6 +1048,20 @@ export default function ProfilePage() {
           familyDiabetes,
         });
 
+        /*
+          ผู้ใช้เก่าแก้ไขผ่านหน้าต่าง: อยู่หน้าเดิม เห็นประวัติที่เพิ่งบันทึก
+        */
+
+        if (
+          wasExisting
+        ) {
+          setNotice(
+            "บันทึกข้อมูลสุขภาพเรียบร้อย",
+          );
+
+          return;
+        }
+
         alert(
           "บันทึกข้อมูลสุขภาพเรียบร้อย",
         );
@@ -1059,7 +1073,7 @@ export default function ProfilePage() {
           Profile → บันทึก → Assessment Type
 
           ผู้ใช้เก่าแก้ไข Profile:
-          บันทึก → Assessment Type เช่นกัน
+          อยู่หน้าเดิม (จัดการด้านบน)
         */
 
         router.push(
@@ -1090,6 +1104,108 @@ export default function ProfilePage() {
     };
 
   /* =========================================================
+     FIELDS
+     ใช้ทั้งในหน้า (ผู้ใช้ใหม่กรอกครั้งแรก / ผู้ใช้เก่าดูแบบล็อก)
+     และในหน้าต่างแก้ไข (ผู้ใช้เก่า)
+  ========================================================= */
+
+  const renderFields = (disabled: boolean) => (
+    <div className="space-y-7">
+      {/* ข้อมูลร่างกาย */}
+      <section>
+        <h3 className="text-base font-bold text-[#16181d]">
+          ข้อมูลร่างกาย
+        </h3>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <GenderTile
+            value={gender}
+            disabled={disabled}
+            onChange={setGender}
+          />
+          <EditTile
+            icon={<CalendarDays size={18} />}
+            label="อายุ"
+            unit="ปี"
+            value={age}
+            min={18}
+            max={100}
+            disabled={disabled}
+            onChange={setAge}
+          />
+          <EditTile
+            icon={<Weight size={18} />}
+            label="น้ำหนัก"
+            unit="กก."
+            value={weight}
+            min={30}
+            max={250}
+            disabled={disabled}
+            onChange={setWeight}
+          />
+          <EditTile
+            icon={<Ruler size={18} />}
+            label="ส่วนสูง"
+            unit="ซม."
+            value={height}
+            min={120}
+            max={230}
+            disabled={disabled}
+            onChange={setHeight}
+          />
+          <EditTile
+            icon={<Torus size={18} />}
+            label="รอบเอว"
+            unit="ซม."
+            value={waist}
+            min={40}
+            max={200}
+            disabled={disabled}
+            onChange={setWaist}
+          />
+        </div>
+      </section>
+
+      {/* ประวัติสุขภาพ */}
+      <section>
+        <h3 className="text-base font-bold text-[#16181d]">
+          ประวัติสุขภาพ
+        </h3>
+
+        <div className="mt-2 divide-y divide-[#f0eaeb] border-t border-[#f0eaeb]">
+          <ChoiceRow
+            icon={<Cigarette size={20} />}
+            label="สูบบุหรี่"
+            value={smoking}
+            yes="สูบ"
+            no="ไม่สูบ"
+            disabled={disabled}
+            onChange={setSmoking}
+          />
+          <ChoiceRow
+            icon={<Droplet size={20} />}
+            label="เป็นโรคเบาหวาน"
+            value={diabetes}
+            yes="เป็น"
+            no="ไม่เป็น"
+            disabled={disabled}
+            onChange={setDiabetes}
+          />
+          <ChoiceRow
+            icon={<UsersRound size={20} />}
+            label="ครอบครัวมีประวัติเบาหวาน"
+            value={familyDiabetes}
+            yes="มี"
+            no="ไม่มี"
+            disabled={disabled}
+            onChange={setFamilyDiabetes}
+          />
+        </div>
+      </section>
+    </div>
+  );
+
+  /* =========================================================
      UI
   ========================================================= */
 
@@ -1113,562 +1229,305 @@ export default function ProfilePage() {
               HEADER
           ================================================== */}
 
-          <header>
-            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
-              Health Profile
-            </p>
+          <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#b91c2b]">
+                Health Profile
+              </p>
 
-            <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">
-              health-
+              <h1 className="mt-3 text-4xl font-black tracking-tight text-[#16181d] sm:text-5xl">
+                ข้อมูลสุขภาพ
+                <span className="text-[#b91c2b]">ของคุณ</span>
+              </h1>
 
-              <span className="text-[#ef4962]">
-                profile
-              </span>
-            </h1>
+              <p className="mt-3 text-[#6b6d75]">
+                ใช้คำนวณผลในแบบประเมินโดยอัตโนมัติ
+                {hasProfile &&
+                  updatedAt &&
+                  ` · อัปเดตล่าสุด ${new Date(updatedAt).toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })}`}
+              </p>
+            </div>
 
-            <p className="mt-3 text-lg text-[#85858d]">
-              ข้อมูลสุขภาพของคุณ
-            </p>
+            {/* ปุ่มหลัก: ผู้ใช้เก่า = แก้ไข (เปิดหน้าต่าง) / ผู้ใช้ใหม่ = บันทึกครั้งแรก */}
+            {!loading &&
+              (hasProfile ? (
+                <button
+                  type="button"
+                  onClick={
+                    startEditing
+                  }
+                  className="inline-flex h-12 shrink-0 items-center justify-center gap-2.5 self-start rounded-2xl border border-[#e7e1e2] bg-white px-5 text-sm font-bold text-[#16181d] transition hover:-translate-y-0.5 hover:bg-[#faf7f7] sm:self-auto"
+                >
+                  <PencilLine
+                    size={18}
+                  />
+                  แก้ไขข้อมูล
+                </button>
+              ) : (
+                <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                  <button
+                    type="submit"
+                    form="profile-form"
+                    disabled={
+                      saving ||
+                      !isComplete ||
+                      !isValid
+                    }
+                    className="flex h-12 items-center justify-center gap-2.5 rounded-2xl bg-gradient-to-r from-[#ef3e59] to-[#b91c2b] px-6 font-bold text-white shadow-[0_12px_26px_rgba(185,28,43,0.24)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
+                  >
+                    <Save
+                      size={19}
+                    />
+                    {saving
+                      ? "กำลังบันทึก..."
+                      : "บันทึกข้อมูล"}
+                  </button>
+
+                  {!isComplete && (
+                    <p className="text-xs text-[#777780]">
+                      <span className="font-black text-[#dc2626]">*</span>{" "}
+                      กรุณากรอกข้อมูลให้ครบก่อนบันทึก
+                    </p>
+                  )}
+
+                  {isComplete &&
+                    !isValid && (
+                      <p className="text-xs font-semibold text-[#dc2626]">
+                        กรุณาตรวจสอบค่าข้อมูลให้ถูกต้อง
+                      </p>
+                    )}
+                </div>
+              ))}
           </header>
 
           {/* =================================================
-              REQUIRED MESSAGE
-          ================================================== */}
-
-          {!loading &&
-            isEditing && (
-              <p className="mt-5 text-sm text-[#777780]">
-                <span className="font-black text-[#dc2626]">
-                  *
-                </span>{" "}
-                กรุณากรอกข้อมูลที่จำเป็นให้ครบทุกช่อง
-              </p>
-            )}
-
-          {/* =================================================
-              LOCK STATUS
-          ================================================== */}
-
-          {!loading &&
-            hasProfile &&
-            !isEditing && (
-              <div className="mt-5 flex w-fit items-center gap-2 rounded-full bg-[#f5f3f3] px-4 py-2 text-sm text-[#777780]">
-
-                <Settings
-                  size={16}
-                />
-
-                ข้อมูลถูกล็อก กรุณากดแก้ไขข้อมูลหากต้องการเปลี่ยนแปลง
-
-              </div>
-            )}
-
-          {/* =================================================
-              LOADING
+              LOADING / NOTICE / ERROR
           ================================================== */}
 
           {loading && (
-            <div className="mt-6 rounded-2xl border border-[#eee5e6] bg-white p-4 text-sm text-[#777780] shadow-sm">
+            <div className="mt-8 rounded-2xl border border-[#eee5e6] bg-white p-4 text-sm text-[#777780]">
               กำลังโหลดข้อมูลสุขภาพ...
             </div>
           )}
 
-          {/* =================================================
-              ERROR
-          ================================================== */}
+          {notice && (
+            <div className="mt-6 rounded-2xl border border-[#cfe8d5] bg-[#eef8f0] p-4 text-sm font-semibold text-[#2f7a45]">
+              {notice}
+            </div>
+          )}
 
-          {error && (
+          {error && !(hasProfile && isEditing) && (
             <div className="mt-6 rounded-2xl border border-[#f3cdd1] bg-[#fff0f2] p-4 text-sm font-semibold text-[#b91c2b]">
               {error}
             </div>
           )}
 
           {/* =================================================
-              FORM
+              ผู้ใช้เก่า: แสดงข้อมูล (แก้ผ่านหน้าต่าง)
           ================================================== */}
 
-          <form
-            onSubmit={
-              handleSubmit
-            }
-          >
-            <div className="mt-8 grid gap-6 xl:grid-cols-[minmax(0,1fr)_310px]">
-
-              {/* =================================================
-                  LEFT
-              ================================================== */}
-
-              <div className="space-y-6">
-
-                {/* Section title */}
-
-                <div className="flex items-start gap-4">
-
-                  <span className="mt-3 h-2.5 w-2.5 rounded-full bg-[#ef4962]" />
-
-                  <div>
-                    <h2 className="text-3xl font-bold">
-                      ข้อมูลทั่วไป
+          {!loading &&
+            hasProfile && (
+              <>
+                <section className="mt-8 rounded-[28px] border border-[#ece6e3] bg-white p-6 sm:p-8">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <h2 className="text-xl font-bold text-[#16181d]">
+                      ข้อมูลร่างกาย
                     </h2>
-
-                    <p className="mt-2 text-lg text-[#74757d]">
-                      เพื่อใช้ในการประเมิน
-                    </p>
+                    <span className="inline-flex items-center gap-1.5 text-sm text-[#85858d]">
+                      <Lock size={15} />
+                      กดแก้ไขข้อมูลเพื่อเปลี่ยน
+                    </span>
                   </div>
 
+                  <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                    <StatTile
+                      icon={<UserRound size={18} />}
+                      label="เพศ"
+                      value={gender === "male" ? "ชาย" : gender === "female" ? "หญิง" : "-"}
+                    />
+                    <StatTile
+                      icon={<CalendarDays size={18} />}
+                      label="อายุ"
+                      value={age ?? "-"}
+                      unit="ปี"
+                    />
+                    <StatTile
+                      icon={<Weight size={18} />}
+                      label="น้ำหนัก"
+                      value={weight ?? "-"}
+                      unit="กก."
+                    />
+                    <StatTile
+                      icon={<Ruler size={18} />}
+                      label="ส่วนสูง"
+                      value={height ?? "-"}
+                      unit="ซม."
+                    />
+                    <StatTile
+                      icon={<Torus size={18} />}
+                      label="รอบเอว"
+                      value={waist ?? "-"}
+                      unit="ซม."
+                    />
+                  </div>
+                </section>
+
+                <section className="mt-6 rounded-[28px] border border-[#ece6e3] bg-white p-6 sm:p-8">
+                  <h2 className="text-xl font-bold text-[#16181d]">
+                    ประวัติสุขภาพ
+                  </h2>
+
+                  <div className="mt-4 divide-y divide-[#f0eaeb] border-t border-[#f0eaeb]">
+                    <HistoryRow
+                      icon={<Cigarette size={20} />}
+                      label="สูบบุหรี่"
+                      value={smoking}
+                      yes="สูบ"
+                      no="ไม่สูบ"
+                    />
+                    <HistoryRow
+                      icon={<Droplet size={20} />}
+                      label="เป็นโรคเบาหวาน"
+                      value={diabetes}
+                      yes="เป็น"
+                      no="ไม่เป็น"
+                    />
+                    <HistoryRow
+                      icon={<UsersRound size={20} />}
+                      label="ครอบครัวมีประวัติเบาหวาน"
+                      value={familyDiabetes}
+                      yes="มี"
+                      no="ไม่มี"
+                    />
+                  </div>
+                </section>
+              </>
+            )}
+
+          {/* =================================================
+              ผู้ใช้ใหม่: กรอกข้อมูลครั้งแรก
+          ================================================== */}
+
+          {!loading &&
+            !hasProfile && (
+              <form
+                id="profile-form"
+                onSubmit={
+                  handleSubmit
+                }
+                className="mt-8 rounded-[28px] border border-[#ece6e3] bg-white p-6 sm:p-8"
+              >
+                <h2 className="text-xl font-bold text-[#16181d]">
+                  กรอกข้อมูลสุขภาพ
+                </h2>
+                <p className="mt-1 text-sm text-[#777780]">
+                  <span className="font-black text-[#dc2626]">*</span>{" "}
+                  กรุณากรอกข้อมูลที่จำเป็นให้ครบทุกช่อง
+                </p>
+
+                <div className="mt-6">
+                  {renderFields(
+                    false,
+                  )}
                 </div>
+              </form>
+            )}
 
-                {/* =================================================
-                    BASIC INFORMATION
-                ================================================== */}
+          {/* =================================================
+              TIP
+          ================================================== */}
 
-                <section className="rounded-[28px] border border-[#eee5e6] bg-white p-6 shadow-[0_16px_45px_rgba(35,25,30,0.05)] sm:p-8">
+          {!loading && (
+            <p className="mt-6 flex items-center gap-3 px-1 text-sm text-[#6b6d75]">
+              <Lightbulb
+                size={20}
+                className="shrink-0 text-[#b91c2b]"
+              />
+              กรอกข้อมูลตามความเป็นจริง เพื่อให้ระบบประเมินความเสี่ยงสุขภาพได้แม่นยำขึ้น
+            </p>
+          )}
 
-                  <div className="flex items-center justify-between gap-4">
+          {/* =================================================
+              EDIT MODAL (ผู้ใช้เก่า)
+          ================================================== */}
 
-                    <div className="flex items-center gap-3">
-
-                      <UserRound
-                        size={26}
-                        className="text-[#ef4962]"
-                      />
-
-                      <h3 className="text-xl font-bold text-[#ef4962]">
-                        Basic Information
-                      </h3>
-
+          {hasProfile &&
+            isEditing && (
+              <div
+                className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center sm:p-6"
+                onClick={() =>
+                  !saving &&
+                  cancelEditing()
+                }
+              >
+                <form
+                  onSubmit={
+                    handleSubmit
+                  }
+                  onClick={(e) =>
+                    e.stopPropagation()
+                  }
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="edit-profile-title"
+                  className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-t-[28px] bg-white shadow-[0_24px_60px_rgba(0,0,0,0.2)] sm:rounded-[28px]"
+                >
+                  <div className="flex items-start justify-between gap-4 border-b border-[#f0eaeb] px-6 py-5">
+                    <div>
+                      <h2
+                        id="edit-profile-title"
+                        className="text-xl font-bold"
+                      >
+                        แก้ไขข้อมูลสุขภาพ
+                      </h2>
+                      <p className="mt-1 text-sm text-[#85858d]">
+                        ข้อมูลเดิมจะถูกเก็บไว้ ไม่ถูกเขียนทับ
+                      </p>
                     </div>
+                    <button
+                      type="button"
+                      onClick={
+                        cancelEditing
+                      }
+                      disabled={
+                        saving
+                      }
+                      aria-label="ปิด"
+                      className="grid h-10 w-10 shrink-0 place-items-center rounded-xl text-[#85858d] transition hover:bg-[#f5f3f3] disabled:opacity-50"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
 
-                    {hasProfile &&
-                      isEditing && (
-                        <span className="rounded-full bg-[#fff0f2] px-3 py-1.5 text-xs font-bold text-[#b91c2b]">
-                          กำลังแก้ไข
-                        </span>
+                  <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+                    {renderFields(
+                      false,
+                    )}
+                  </div>
+
+                  <div className="space-y-3 border-t border-[#f0eaeb] px-6 py-4">
+                    {error && (
+                      <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b91c2b]">
+                        {error}
+                      </p>
+                    )}
+
+                    {!isComplete && (
+                      <p className="text-xs text-[#777780]">
+                        <span className="font-black text-[#dc2626]">*</span>{" "}
+                        กรุณากรอกข้อมูลให้ครบก่อนบันทึก
+                      </p>
+                    )}
+
+                    {isComplete &&
+                      !isValid && (
+                        <p className="text-xs font-semibold text-[#dc2626]">
+                          กรุณาตรวจสอบค่าข้อมูลให้ถูกต้อง
+                        </p>
                       )}
 
-                  </div>
-
-                  <div className="mt-7 space-y-4">
-
-                    {/* =========================
-                        GENDER
-                    ========================= */}
-
-                    <SelectField
-                      icon={
-                        <VenusAndMars
-                          size={23}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          เพศ
-                        </RequiredLabel>
-                      }
-                      value={
-                        gender ??
-                        ""
-                      }
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={(
-                        value,
-                      ) => {
-                        if (
-                          value ===
-                            "male" ||
-                          value ===
-                            "female"
-                        ) {
-                          setGender(
-                            value,
-                          );
-                        } else {
-                          setGender(
-                            null,
-                          );
-                        }
-                      }}
-                      options={[
-                        {
-                          value:
-                            "",
-                          label:
-                            "กรุณาเลือก",
-                        },
-                        {
-                          value:
-                            "male",
-                          label:
-                            "ชาย",
-                        },
-                        {
-                          value:
-                            "female",
-                          label:
-                            "หญิง",
-                        },
-                      ]}
-                    />
-
-                    {/* =========================
-                        AGE
-                    ========================= */}
-
-                    <NumberField
-                      icon={
-                        <CalendarDays
-                          size={22}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          อายุ
-                        </RequiredLabel>
-                      }
-                      value={
-                        age
-                      }
-                      placeholder="กรอกอายุ"
-                      min={18}
-                      max={100}
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={
-                        setAge
-                      }
-                    />
-
-                    {/* =========================
-                        WEIGHT
-                    ========================= */}
-
-                    <NumberField
-                      icon={
-                        <Scale
-                          size={22}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          น้ำหนัก (กก.)
-                        </RequiredLabel>
-                      }
-                      value={
-                        weight
-                      }
-                      placeholder="กรอกน้ำหนัก"
-                      min={30}
-                      max={250}
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={
-                        setWeight
-                      }
-                    />
-
-                    {/* =========================
-                        HEIGHT
-                    ========================= */}
-
-                    <NumberField
-                      icon={
-                        <Ruler
-                          size={22}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          ส่วนสูง (ซม.)
-                        </RequiredLabel>
-                      }
-                      value={
-                        height
-                      }
-                      placeholder="กรอกส่วนสูง"
-                      min={120}
-                      max={230}
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={
-                        setHeight
-                      }
-                    />
-
-                    {/* =========================
-                        WAIST
-                    ========================= */}
-
-                    <NumberField
-                      icon={
-                        <Activity
-                          size={22}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          รอบเอว (ซม.)
-                        </RequiredLabel>
-                      }
-                      value={
-                        waist
-                      }
-                      placeholder="กรอกรอบเอว"
-                      min={40}
-                      max={200}
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={
-                        setWaist
-                      }
-                    />
-
-                    {/* =========================
-                        SMOKING
-                    ========================= */}
-
-                    <YesNoField
-                      icon={
-                        <Activity
-                          size={22}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          สูบบุหรี่หรือไม่?
-                        </RequiredLabel>
-                      }
-                      value={
-                        smoking
-                      }
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={
-                        setSmoking
-                      }
-                    />
-
-                    {/* =========================
-                        DIABETES
-                    ========================= */}
-
-                    <YesNoField
-                      icon={
-                        <UsersRound
-                          size={22}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          เป็นโรคเบาหวานหรือไม่?
-                        </RequiredLabel>
-                      }
-                      value={
-                        diabetes
-                      }
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={
-                        setDiabetes
-                      }
-                    />
-
-                    {/* =========================
-                        FAMILY DIABETES
-                    ========================= */}
-
-                    <YesNoField
-                      icon={
-                        <UsersRound
-                          size={22}
-                        />
-                      }
-                      label={
-                        <RequiredLabel>
-                          ครอบครัวมีประวัติเบาหวานหรือไม่?
-                        </RequiredLabel>
-                      }
-                      value={
-                        familyDiabetes
-                      }
-                      disabled={
-                        !isEditing
-                      }
-                      onChange={
-                        setFamilyDiabetes
-                      }
-                    />
-
-                  </div>
-
-                </section>
-
-                {/* =================================================
-                    TIP
-                ================================================== */}
-
-                <section className="flex flex-col gap-5 rounded-[26px] border border-[#eee5e6] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)] sm:flex-row sm:items-center">
-
-                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#fff0f2] text-[#ef4962]">
-
-                    <Lightbulb
-                      size={28}
-                    />
-
-                  </div>
-
-                  <div>
-                    <h3 className="font-bold">
-                      เคล็ดลับ
-                    </h3>
-
-                    <p className="mt-1 text-sm leading-6 text-[#898a92]">
-                      กรุณากรอกข้อมูลตามความเป็นจริง
-                      เพื่อให้ระบบสามารถประเมินความเสี่ยงสุขภาพได้แม่นยำมากขึ้น
-                    </p>
-                  </div>
-
-                </section>
-
-              </div>
-
-              {/* =================================================
-                  RIGHT PANEL
-              ================================================== */}
-
-              <aside className="space-y-5">
-
-                {/* =========================
-                    PROFILE CARD
-                ========================= */}
-
-                <section className="rounded-[30px] border border-[#eee5e6] bg-white p-7 text-center shadow-[0_16px_45px_rgba(35,25,30,0.05)]">
-
-                  <div className="mx-auto grid h-32 w-32 place-items-center rounded-full bg-[#fff0f2] text-[#ef4962] shadow-[0_16px_40px_rgba(239,73,98,0.12)]">
-
-                    <UserRound
-                      size={66}
-                      strokeWidth={
-                        1.5
-                      }
-                    />
-
-                  </div>
-
-                  {/* USERNAME */}
-
-                  <h3 className="mt-5 break-all text-xl font-black text-[#b91c2b]">
-                    {username ||
-                      "ผู้ใช้งาน"}
-                  </h3>
-
-                  {/* GENDER + AGE */}
-
-                  <p className="mt-2 text-sm leading-6 text-[#92939b]">
-
-                    {gender ===
-                    "male"
-                      ? "ชาย"
-                      : gender ===
-                          "female"
-                        ? "หญิง"
-                        : "ยังไม่ระบุเพศ"}
-
-                    {" • "}
-
-                    {age !== null
-                      ? `${age} ปี`
-                      : "ยังไม่ระบุอายุ"}
-
-                  </p>
-
-                  <div className="mt-7 rounded-[24px] bg-gradient-to-br from-[#fff6f7] to-[#fdebed] p-6">
-
-                    <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-white text-[#ef4962] shadow-sm">
-
-                      <Heart
-                        size={31}
-                      />
-
-                    </div>
-
-                    <p className="mt-4 leading-7 text-[#686970]">
-
-                      ดูแลสุขภาพวันนี้
-
-                      <span className="block">
-                        เพื่ออนาคตที่ดีกว่า
-                      </span>
-
-                    </p>
-
-                  </div>
-
-                </section>
-
-                {/* =================================================
-                    EXISTING PROFILE + LOCKED
-                ================================================== */}
-
-                {hasProfile &&
-                !isEditing ? (
-                  <button
-                    type="button"
-                    onClick={
-                      startEditing
-                    }
-                    className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl border-2 border-[#b91c2b] bg-white text-lg font-bold text-[#b91c2b] shadow-[0_10px_25px_rgba(185,28,43,0.06)] transition hover:-translate-y-0.5 hover:bg-[#fff0f2]"
-                  >
-
-                    <Pencil
-                      size={21}
-                    />
-
-                    แก้ไขข้อมูล
-
-                  </button>
-                ) : (
-                  /* =================================================
-                     NEW USER / EDITING
-                  ================================================= */
-
-                  <div className="space-y-3">
-
-                    {/* SAVE */}
-
-                    <button
-                      type="submit"
-                      disabled={
-                        loading ||
-                        saving ||
-                        !isComplete ||
-                        !isValid
-                      }
-                      className="flex h-16 w-full items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#ef3e59] to-[#b91c2b] text-lg font-bold text-white shadow-[0_15px_32px_rgba(185,28,43,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:translate-y-0"
-                    >
-
-                      <Save
-                        size={21}
-                      />
-
-                      {saving
-                        ? "กำลังบันทึก..."
-                        : hasProfile
-                          ? "บันทึกการแก้ไข"
-                          : "บันทึกข้อมูล"}
-
-                    </button>
-
-                    {/* CANCEL */}
-
-                    {hasProfile && (
+                    <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                       <button
                         type="button"
                         onClick={
@@ -1677,44 +1536,29 @@ export default function ProfilePage() {
                         disabled={
                           saving
                         }
-                        className="flex h-14 w-full items-center justify-center rounded-2xl border border-[#e8e2e3] bg-white font-semibold text-[#777880] transition hover:bg-[#faf7f7] disabled:cursor-not-allowed disabled:opacity-50"
+                        className="flex h-12 items-center justify-center rounded-2xl border border-[#e8e2e3] bg-white px-6 font-semibold text-[#777880] transition hover:bg-[#faf7f7] disabled:cursor-not-allowed disabled:opacity-50"
                       >
-                        ยกเลิกการแก้ไข
+                        ยกเลิก
                       </button>
-                    )}
-
-                    {/* REQUIRED */}
-
-                    {!isComplete &&
-                      !loading && (
-                        <p className="text-center text-xs text-[#777780]">
-
-                          <span className="font-black text-[#dc2626]">
-                            *
-                          </span>{" "}
-
-                          กรุณากรอกข้อมูลให้ครบก่อนบันทึก
-
-                        </p>
-                      )}
-
-                    {/* INVALID */}
-
-                    {isComplete &&
-                      !isValid &&
-                      !loading && (
-                        <p className="text-center text-xs font-semibold text-[#dc2626]">
-                          กรุณาตรวจสอบค่าข้อมูลให้ถูกต้อง
-                        </p>
-                      )}
-
+                      <button
+                        type="submit"
+                        disabled={
+                          saving ||
+                          !isComplete ||
+                          !isValid
+                        }
+                        className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#ef3e59] to-[#b91c2b] px-6 font-bold text-white shadow-[0_12px_26px_rgba(185,28,43,0.24)] transition disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        <Save size={18} />
+                        {saving
+                          ? "กำลังบันทึก..."
+                          : "บันทึกการแก้ไข"}
+                      </button>
+                    </div>
                   </div>
-                )}
-
-              </aside>
-
-            </div>
-          </form>
+                </form>
+              </div>
+            )}
 
         </section>
 
@@ -1724,322 +1568,225 @@ export default function ProfilePage() {
 }
 
 /* =========================================================
-   REQUIRED LABEL
+   STAT TILE (ข้อมูลร่างกาย)
 ========================================================= */
 
-function RequiredLabel({
-  children,
-}: {
-  children: ReactNode;
-}) {
-  return (
-    <>
-      {children}
-
-      <span className="ml-1 font-black text-[#dc2626]">
-        *
-      </span>
-    </>
-  );
-}
-
-/* =========================================================
-   SELECT FIELD
-========================================================= */
-
-function SelectField({
+function StatTile({
   icon,
   label,
   value,
-  onChange,
-  options,
-  disabled = false,
+  unit,
 }: {
   icon: ReactNode;
-
-  label: ReactNode;
-
-  value: string;
-
-  onChange: (
-    value: string,
-  ) => void;
-
-  options: {
-    value: string;
-    label: string;
-  }[];
-
-  disabled?: boolean;
+  label: string;
+  value: ReactNode;
+  unit?: string;
 }) {
   return (
-    <label
-      className={`flex min-h-14 items-center rounded-2xl px-4 transition ${
-        disabled
-          ? "bg-[#f4f3f3]"
-          : "bg-[#faf8f8] focus-within:ring-2 focus-within:ring-[#b91c2b]/10"
-      }`}
-    >
-
-      <span className="mr-4 shrink-0 text-[#ef4962]">
-        {icon}
-      </span>
-
-      <span className="font-semibold">
+    <div className="rounded-[22px] bg-[#faf6f4] p-5">
+      <div className="flex items-center gap-2 text-sm text-[#6b6d75]">
+        <span className="text-[#b91c2b]">{icon}</span>
         {label}
-      </span>
-
-      <div className="relative ml-auto">
-
-        <select
-          value={
-            value
-          }
-          disabled={
-            disabled
-          }
-          onChange={(
-            event,
-          ) =>
-            onChange(
-              event.target
-                .value,
-            )
-          }
-          className={`appearance-none bg-transparent py-2 pl-5 pr-8 text-right font-semibold outline-none ${
-            disabled
-              ? "cursor-not-allowed text-[#777780]"
-              : "cursor-pointer"
-          }`}
-        >
-
-          {options.map(
-            (
-              option,
-            ) => (
-              <option
-                key={
-                  option.value
-                }
-                value={
-                  option.value
-                }
-              >
-                {
-                  option.label
-                }
-              </option>
-            ),
-          )}
-
-        </select>
-
-        <ChevronDown
-          size={18}
-          className="pointer-events-none absolute right-0 top-1/2 -translate-y-1/2"
-        />
-
       </div>
-
-    </label>
+      <p className="mt-3 text-3xl font-bold text-[#16181d]">
+        {value}
+        {unit && value !== "-" && <span className="ml-1.5 text-base font-medium text-[#6b6d75]">{unit}</span>}
+      </p>
+    </div>
   );
 }
 
 /* =========================================================
-   NUMBER FIELD
+   HISTORY ROW (ประวัติสุขภาพ)
 ========================================================= */
 
-function NumberField({
+function HistoryRow({
   icon,
   label,
   value,
-  placeholder,
+  yes,
+  no,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: boolean | null;
+  yes: string;
+  no: string;
+}) {
+  return (
+    <div className="flex items-center gap-4 py-4">
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#fde8ea] text-[#b91c2b]">
+        {icon}
+      </span>
+      <span className="min-w-0 flex-1 font-semibold text-[#16181d]">{label}</span>
+      <span
+        className={`shrink-0 rounded-full px-4 py-1.5 text-sm font-semibold ${
+          value ? "bg-[#fde8ea] text-[#b91c2b]" : "bg-[#f1f1f3] text-[#4f535b]"
+        }`}
+      >
+        {value === null ? "-" : value ? yes : no}
+      </span>
+    </div>
+  );
+}
+
+/* =========================================================
+   EDIT TILE (กรอกตัวเลข ในหน้าต่างแก้ไข / ฟอร์มครั้งแรก)
+========================================================= */
+
+function EditTile({
+  icon,
+  label,
+  unit,
+  value,
   min,
   max,
+  disabled,
   onChange,
-  disabled = false,
 }: {
   icon: ReactNode;
-
-  label: ReactNode;
-
-  value:
-    | number
-    | null;
-
-  placeholder: string;
-
+  label: string;
+  unit: string;
+  value: number | null;
   min: number;
-
   max: number;
-
-  onChange: (
-    value:
-      | number
-      | null,
-  ) => void;
-
-  disabled?: boolean;
+  disabled: boolean;
+  onChange: (value: number | null) => void;
 }) {
+  const outOfRange = value !== null && (!Number.isFinite(value) || value < min || value > max);
+
   return (
     <label
-      className={`flex min-h-14 items-center rounded-2xl px-4 transition ${
-        disabled
-          ? "bg-[#f4f3f3]"
-          : "bg-[#faf8f8] focus-within:ring-2 focus-within:ring-[#b91c2b]/10"
+      className={`block rounded-[20px] bg-[#faf6f4] p-4 ring-1 transition focus-within:bg-white ${
+        outOfRange ? "ring-[#f3b6c0]" : "ring-transparent focus-within:ring-[#ead7d9]"
       }`}
     >
-
-      <span className="mr-4 shrink-0 text-[#ef4962]">
-        {icon}
-      </span>
-
-      <span className="font-semibold">
+      <span className="flex items-center gap-2 text-sm text-[#6b6d75]">
+        <span className="text-[#b91c2b]">{icon}</span>
         {label}
+        <span className="text-[#dc2626]">*</span>
       </span>
 
-      <input
-        type="number"
-        min={min}
-        max={max}
-        value={
-          value ?? ""
-        }
-        placeholder={
-          placeholder
-        }
-        disabled={
-          disabled
-        }
-        onChange={(
-          event,
-        ) => {
-          const inputValue =
-            event.target
-              .value;
+      <span className="mt-2 flex items-baseline gap-1.5">
+        <input
+          type="number"
+          inputMode="decimal"
+          min={min}
+          max={max}
+          value={value ?? ""}
+          placeholder="-"
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+          className="w-full min-w-0 bg-transparent text-3xl font-bold text-[#16181d] outline-none placeholder:text-[#c9c6c4] disabled:cursor-not-allowed"
+        />
+        <span className="shrink-0 text-base font-medium text-[#6b6d75]">{unit}</span>
+      </span>
 
-          if (
-            inputValue ===
-            ""
-          ) {
-            onChange(
-              null,
-            );
-
-            return;
-          }
-
-          onChange(
-            Number(
-              inputValue,
-            ),
-          );
-        }}
-        className={`ml-auto w-36 bg-transparent text-right font-semibold outline-none placeholder:font-normal placeholder:text-[#b6b6bc] ${
-          disabled
-            ? "cursor-not-allowed text-[#777780]"
-            : "text-[#2f3037]"
-        }`}
-      />
-
+      <span className={`mt-1 block text-xs ${outOfRange ? "font-semibold text-[#dc2626]" : "text-[#a0a1a8]"}`}>
+        ช่วงที่กรอกได้ {min}–{max} {unit}
+      </span>
     </label>
   );
 }
 
 /* =========================================================
-   YES / NO FIELD
+   GENDER TILE
 ========================================================= */
 
-function YesNoField({
+function GenderTile({
+  value,
+  disabled,
+  onChange,
+}: {
+  value: Gender;
+  disabled: boolean;
+  onChange: (value: Gender) => void;
+}) {
+  return (
+    <div className="rounded-[20px] bg-[#faf6f4] p-4">
+      <span className="flex items-center gap-2 text-sm text-[#6b6d75]">
+        <span className="text-[#b91c2b]">
+          <UserRound size={18} />
+        </span>
+        เพศ
+        <span className="text-[#dc2626]">*</span>
+      </span>
+
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        {(["male", "female"] as const).map((g) => (
+          <button
+            key={g}
+            type="button"
+            disabled={disabled}
+            aria-pressed={value === g}
+            onClick={() => onChange(g)}
+            className={`h-11 rounded-xl text-base font-bold transition disabled:cursor-not-allowed ${
+              value === g
+                ? "bg-white text-[#b91c2b] shadow-[0_4px_12px_rgba(22,24,29,0.08)] ring-1 ring-[#f0c9cf]"
+                : "text-[#6b6d75] hover:bg-white/60"
+            }`}
+          >
+            {g === "male" ? "ชาย" : "หญิง"}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   CHOICE ROW (ใช่ / ไม่ใช่ ในหน้าต่างแก้ไข / ฟอร์มครั้งแรก)
+========================================================= */
+
+function ChoiceRow({
   icon,
   label,
   value,
+  yes,
+  no,
+  disabled,
   onChange,
-  disabled = false,
 }: {
   icon: ReactNode;
-
-  label: ReactNode;
-
-  value:
-    | boolean
-    | null;
-
-  onChange: (
-    value: boolean,
-  ) => void;
-
-  disabled?: boolean;
+  label: string;
+  value: boolean | null;
+  yes: string;
+  no: string;
+  disabled: boolean;
+  onChange: (value: boolean) => void;
 }) {
   return (
-    <div
-      className={`flex min-h-16 items-center gap-4 rounded-2xl px-4 transition ${
-        disabled
-          ? "bg-[#f4f3f3]"
-          : "bg-[#faf8f8]"
-      }`}
-    >
-
-      <span className="shrink-0 text-[#ef4962]">
+    <div className="flex flex-wrap items-center gap-4 py-4">
+      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#fde8ea] text-[#b91c2b]">
         {icon}
       </span>
-
-      <span className="min-w-0 flex-1 font-semibold">
+      <span className="min-w-0 flex-1 font-semibold text-[#16181d]">
         {label}
+        <span className="ml-1 text-[#dc2626]">*</span>
       </span>
 
-      <div className="flex shrink-0 overflow-hidden rounded-xl border border-[#e7dfe0]">
-
-        {/* YES */}
-
-        <button
-          type="button"
-          disabled={
-            disabled
-          }
-          onClick={() =>
-            onChange(
-              true,
-            )
-          }
-          className={`min-w-[58px] px-4 py-2 text-sm font-bold transition ${
-            value === true
-              ? "bg-[#ef4962] text-white"
-              : "bg-white text-[#777780]"
-          } ${
-            disabled
-              ? "cursor-not-allowed opacity-70"
-              : "hover:bg-[#fff0f2]"
-          }`}
-        >
-          Yes
-        </button>
-
-        {/* NO */}
-
-        <button
-          type="button"
-          disabled={
-            disabled
-          }
-          onClick={() =>
-            onChange(
-              false,
-            )
-          }
-          className={`min-w-[58px] border-l border-[#e7dfe0] px-4 py-2 text-sm font-bold transition ${
-            value === false
-              ? "bg-[#ef4962] text-white"
-              : "bg-white text-[#777780]"
-          } ${
-            disabled
-              ? "cursor-not-allowed opacity-70"
-              : "hover:bg-[#fff0f2]"
-          }`}
-        >
-          No
-        </button>
-
+      <div role="group" aria-label={label} className="flex shrink-0 gap-1 rounded-full bg-[#f5f3f3] p-1">
+        {[
+          { v: false, text: no },
+          { v: true, text: yes },
+        ].map((opt) => (
+          <button
+            key={opt.text}
+            type="button"
+            disabled={disabled}
+            aria-pressed={value === opt.v}
+            onClick={() => onChange(opt.v)}
+            className={`rounded-full px-4 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed ${
+              value === opt.v
+                ? opt.v
+                  ? "bg-[#fde8ea] text-[#b91c2b] ring-1 ring-[#f0c9cf]"
+                  : "bg-white text-[#16181d] shadow-[0_2px_8px_rgba(22,24,29,0.08)]"
+                : "text-[#85858d] hover:text-[#4f535b]"
+            }`}
+          >
+            {opt.text}
+          </button>
+        ))}
       </div>
     </div>
   );

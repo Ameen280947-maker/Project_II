@@ -14,12 +14,26 @@ export async function POST(request: NextRequest) {
     const username = String(body.username || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
+    // ความยินยอม 3 ข้อ ตรงกับหน้าการตั้งค่า
+    // ข้อมูลสุขภาพจำเป็นต้องยินยอม ส่วนเจ้าหน้าที่/การศึกษาไม่บังคับ (ค่าเริ่มต้นไม่ยินยอม)
+    const consentHealth = body.consentHealth === true;
+    const consentStaff = body.consentStaff === true;
+    const consentResearch = body.consentResearch === true;
 
     // ตรวจสอบข้อมูล
     if (!username || !email || !password) {
       return NextResponse.json(
         {
           message: "กรุณากรอกข้อมูลให้ครบ",
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!consentHealth) {
+      return NextResponse.json(
+        {
+          message: "กรุณายินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ เพื่อใช้งานการประเมิน",
         },
         { status: 400 }
       );
@@ -99,21 +113,56 @@ export async function POST(request: NextRequest) {
     // User ที่สมัครเองจะเป็น role_id = 2
     const roleId = 2;
 
-    // บันทึกลง Database
-    const result = await pool.query(
-      `
-      INSERT INTO users (
-        username,
-        password_hash,
-        email,
-        role_id,
-        created_at
-      )
-      VALUES ($1, $2, $3, $4, NOW())
-      RETURNING user_id, username, email, role_id, created_at
-      `,
-      [username, passwordHash, email, roleId]
-    );
+    // บันทึกผู้ใช้ และความยินยอมใน user_settings พร้อมกัน (สำเร็จทั้งคู่หรือไม่บันทึกเลย)
+    const client = await pool.connect();
+    let result;
+    try {
+      await client.query("BEGIN");
+
+      result = await client.query(
+        `
+        INSERT INTO users (
+          username,
+          password_hash,
+          email,
+          role_id,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, NOW())
+        RETURNING user_id, username, email, role_id, created_at
+        `,
+        [username, passwordHash, email, roleId]
+      );
+
+      // เก็บเวลาที่ตัดสินใจไว้ เหมือนตอนเปลี่ยนในหน้าการตั้งค่า
+      await client.query(
+        `
+        INSERT INTO user_settings (
+          user_id,
+          consent_health, consent_health_at,
+          consent_staff, consent_staff_at,
+          consent_research, consent_research_at
+        )
+        VALUES ($1, $2, NOW(), $3, NOW(), $4, NOW())
+        ON CONFLICT (user_id) DO UPDATE
+          SET consent_health = EXCLUDED.consent_health,
+              consent_health_at = EXCLUDED.consent_health_at,
+              consent_staff = EXCLUDED.consent_staff,
+              consent_staff_at = EXCLUDED.consent_staff_at,
+              consent_research = EXCLUDED.consent_research,
+              consent_research_at = EXCLUDED.consent_research_at,
+              updated_at = NOW()
+        `,
+        [result.rows[0].user_id, consentHealth, consentStaff, consentResearch]
+      );
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
 
     return NextResponse.json(
       {
