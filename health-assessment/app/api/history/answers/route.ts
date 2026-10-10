@@ -25,6 +25,8 @@ type AnswerRow = {
   question_type: string | null;
   answer_value: string | null;
   choice_text: string | null;
+  score: string | number | null;
+  max_score: string | number | null;
 };
 
 export async function GET(request: Request) {
@@ -63,7 +65,10 @@ export async function GET(request: Request) {
         q.question_text,
         q.question_type,
         aa.answer_value,
-        c.choice_text
+        c.choice_text,
+        aa.score,
+        -- คะแนนเต็มของข้อ = คะแนนสูงสุดในตัวเลือกของข้อนั้น (ข้อที่กรอกตัวเลขจะเป็น null)
+        (SELECT MAX(c2.score) FROM question_choices c2 WHERE c2.question_id = q.question_id) AS max_score
       FROM assessment_answers aa
       JOIN questions q
         ON q.question_id = aa.question_id
@@ -83,6 +88,8 @@ export async function GET(request: Request) {
         question: row.question_text,
         // ตัวเลือกที่เลือก ใช้ข้อความของตัวเลือกก่อน ถ้าไม่มี (เช่นช่องกรอกตัวเลข) ใช้ค่าที่กรอก
         answer: row.choice_text || VALUE_LABELS[raw.toLowerCase()] || raw || "-",
+        score: row.score === null ? null : Number(row.score),
+        maxScore: row.max_score === null ? null : Number(row.max_score),
       };
     });
 

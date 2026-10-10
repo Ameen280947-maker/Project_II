@@ -144,10 +144,10 @@ export default function NotificationsPage() {
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-gray-400">ครบกำหนดประเมินซ้ำ</p>
+                    <p className="text-sm font-semibold text-gray-600">ถึงเวลาประเมินซ้ำ</p>
                     <p className="text-3xl font-extrabold text-[#b91c2b] mt-1">{dueCount}</p>
-                    <p className="text-xs text-red-500 font-medium mt-1">
-                      {dueCount > 0 ? "ควรทำแบบประเมินทันที" : "ไม่มีรายการค้าง"}
+                    <p className="text-sm text-red-600 mt-1">
+                      {dueCount > 0 ? "ควรทำแบบประเมินโดยเร็ว" : "ไม่มีรายการค้าง"}
                     </p>
                   </div>
                   <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-[#b91c2b]">
@@ -160,9 +160,9 @@ export default function NotificationsPage() {
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-gray-400">ใกล้ถึงกำหนด (ใน 7 วัน)</p>
+                    <p className="text-sm font-semibold text-gray-600">ใกล้ถึงกำหนด</p>
                     <p className="text-3xl font-extrabold text-amber-600 mt-1">{upcomingCount}</p>
-                    <p className="text-xs text-amber-600 font-medium mt-1">เตรียมตัวประเมิน</p>
+                    <p className="text-sm text-amber-700 mt-1">ภายใน 7 วันข้างหน้า</p>
                   </div>
                   <div className="w-10 h-10 rounded-2xl bg-amber-50 flex items-center justify-center text-amber-600">
                     <Calendar size={20} />
@@ -174,11 +174,11 @@ export default function NotificationsPage() {
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-gray-400">โรคที่อยู่ในระบบติดตาม</p>
+                    <p className="text-sm font-semibold text-gray-600">แบบประเมินที่ติดตาม</p>
                     <p className="text-3xl font-extrabold text-gray-800 mt-1">
                       {notifications.length}
                     </p>
-                    <p className="text-xs text-gray-400 font-medium mt-1">รายการที่ประเมินแล้ว</p>
+                    <p className="text-sm text-gray-500 mt-1">จากที่คุณเคยทำ</p>
                   </div>
                   <div className="w-10 h-10 rounded-2xl bg-green-50 flex items-center justify-center text-green-600">
                     <HeartPulse size={20} />
@@ -190,15 +190,15 @@ export default function NotificationsPage() {
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-xs font-semibold text-gray-400">การแจ้งเตือนใหม่</p>
+                    <p className="text-sm font-semibold text-gray-600">ยังไม่ได้อ่าน</p>
                     <p className="text-3xl font-extrabold text-blue-600 mt-1">{unreadCount}</p>
-                    <p className="text-xs text-gray-400 font-medium mt-1">
+                    <p className="text-sm text-gray-500 mt-1">
                       {unreadCount > 0 ? (
                         <button
                           onClick={markAllRead}
                           className="text-blue-600 underline font-semibold hover:text-blue-700"
                         >
-                          อ่านทั้งหมด
+                          ทำเครื่องหมายว่าอ่านแล้ว
                         </button>
                       ) : (
                         "อ่านครบแล้ว"
@@ -226,21 +226,21 @@ export default function NotificationsPage() {
                     <ShieldCheck size={22} />
                   </span>
                   <span className="font-bold text-gray-800 md:text-base">
-                    เกณฑ์กำหนดระยะเวลาการแจ้งเตือนของแต่ละโรค
+                    ควรประเมินซ้ำบ่อยแค่ไหน?
                   </span>
                 </span>
                 <span className="shrink-0 inline-flex items-center gap-1 px-4 py-2 rounded-xl bg-white border border-blue-200 text-blue-700 text-sm font-semibold hover:bg-blue-50 transition">
-                  <span className="hidden sm:inline">{showGuidelines ? "ซ่อนตาราง" : "ดูตารางเกณฑ์แต่ละโรค"}</span>
+                  <span className="hidden sm:inline">{showGuidelines ? "ซ่อนเกณฑ์" : "ดูเกณฑ์แต่ละโรค"}</span>
                   <ChevronDown size={18} className={`transition-transform ${showGuidelines ? "rotate-180" : ""}`} />
                 </span>
               </button>
 
               {showGuidelines && (
                 <div id="follow-up-guidelines" className="mt-5 p-5 bg-white rounded-2xl border border-blue-100">
-                  <p className="text-sm text-gray-500">
-                    Clinical Follow-up Protocol — ระบบแจ้งเตือนรอบการประเมินซ้ำตามเกณฑ์ทางการแพทย์ของแต่ละโรค
-                    โดยคำนวณระยะการประเมินซ้ำตามความเสี่ยงอัตโนมัติ (เช่น กลุ่มเสี่ยงสูง 14-30 วัน,
-                    เสี่ยงปานกลาง 2-6 เดือน, เสี่ยงต่ำ 6 เดือน - 1 ปี)
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    ระบบจะเตือนให้ประเมินซ้ำตามระดับความเสี่ยงของคุณ ยิ่งเสี่ยงมากยิ่งต้องประเมินถี่ขึ้น เช่น
+                    เสี่ยงสูง ทุก 14-30 วัน · เสี่ยงปานกลาง ทุก 2-6 เดือน · เสี่ยงต่ำ ทุก 6 เดือน - 1 ปี
+                    <span className="text-gray-400"> (อ้างอิงเกณฑ์ทางการแพทย์ของแต่ละโรค — Clinical Follow-up Protocol)</span>
                   </p>
 
                   <div className="mt-5 flex flex-col gap-6">
@@ -273,7 +273,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => setCategoryFilter("all")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold transition ${
                     categoryFilter === "all"
                       ? "bg-[#b91c2b] text-white shadow-sm"
                       : "text-gray-600 hover:text-gray-900"
@@ -284,7 +284,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => setCategoryFilter("ncd")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold transition ${
                     categoryFilter === "ncd"
                       ? "bg-[#b91c2b] text-white shadow-sm"
                       : "text-gray-600 hover:text-gray-900"
@@ -295,7 +295,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => setCategoryFilter("behavior")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold transition ${
                     categoryFilter === "behavior"
                       ? "bg-[#b91c2b] text-white shadow-sm"
                       : "text-gray-600 hover:text-gray-900"
@@ -306,7 +306,7 @@ export default function NotificationsPage() {
                 <button
                   type="button"
                   onClick={() => setCategoryFilter("mental")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition ${
+                  className={`px-3.5 py-1.5 rounded-xl text-sm font-semibold transition ${
                     categoryFilter === "mental"
                       ? "bg-[#b91c2b] text-white shadow-sm"
                       : "text-gray-600 hover:text-gray-900"
@@ -317,7 +317,7 @@ export default function NotificationsPage() {
               </div>
 
               {/* Status Filter */}
-              <div className="flex items-center gap-1.5 bg-white border border-gray-200 p-1.5 rounded-2xl shadow-sm text-xs font-medium text-gray-600">
+              <div className="flex items-center gap-1.5 bg-white border border-gray-200 p-1.5 rounded-2xl shadow-sm text-sm font-medium text-gray-600">
                 <Filter size={14} className="text-gray-400 ml-2" />
                 <button
                   type="button"
@@ -326,7 +326,7 @@ export default function NotificationsPage() {
                     statusFilter === "all" ? "bg-gray-100 text-gray-900 font-bold" : "hover:text-gray-900"
                   }`}
                 >
-                  สถานะทั้งหมด
+                  ทุกสถานะ
                 </button>
                 <button
                   type="button"
@@ -337,7 +337,7 @@ export default function NotificationsPage() {
                       : "hover:text-gray-900"
                   }`}
                 >
-                  ครบกำหนด ({dueCount})
+                  ถึงเวลาแล้ว ({dueCount})
                 </button>
                 <button
                   type="button"
@@ -348,7 +348,7 @@ export default function NotificationsPage() {
                       : "hover:text-gray-900"
                   }`}
                 >
-                  เร็วๆ นี้ ({upcomingCount})
+                  ใกล้ถึงกำหนด ({upcomingCount})
                 </button>
               </div>
             </div>
@@ -393,11 +393,14 @@ export default function NotificationsPage() {
                   if (items.length === 0) return null;
                   return (
                     <section key={g.key} aria-label={g.title}>
-                      <h2 className="mb-2 px-1 flex items-center gap-2 text-sm font-bold text-gray-700">
-                        <span className={`w-2 h-2 rounded-full ${g.dot}`} />
-                        {g.title}
-                        <span className="text-gray-400 font-medium">({items.length})</span>
-                      </h2>
+                      <div className="mb-2 px-1">
+                        <h2 className="flex items-center gap-2 font-bold text-gray-800">
+                          <span className={`w-2 h-2 rounded-full ${g.dot}`} />
+                          {g.title}
+                          <span className="text-gray-400 font-medium">({items.length})</span>
+                        </h2>
+                        <p className="mt-0.5 pl-4 text-sm text-gray-500">{g.desc}</p>
+                      </div>
                       <ul className="bg-white border border-gray-100 rounded-3xl divide-y divide-gray-100">
                         {items.map((item) => (
                           <NotificationRow
@@ -420,10 +423,34 @@ export default function NotificationsPage() {
 }
 
 // จัดกลุ่มตามความเร่งด่วน: ต้องทำตอนนี้ → ใกล้ถึงกำหนด → ตามรอบปกติ
-const GROUPS: { key: string; title: string; dot: string; statuses: CalculatedNotification["status"][] }[] = [
-  { key: "due", title: "ครบกำหนดประเมินซ้ำ", dot: "bg-[#b91c2b]", statuses: ["overdue", "due_today"] },
-  { key: "upcoming", title: "ใกล้ถึงกำหนด (ใน 7 วัน)", dot: "bg-amber-500", statuses: ["upcoming"] },
-  { key: "scheduled", title: "ตามรอบติดตาม", dot: "bg-gray-300", statuses: ["scheduled"] },
+const GROUPS: {
+  key: string;
+  title: string;
+  desc: string;
+  dot: string;
+  statuses: CalculatedNotification["status"][];
+}[] = [
+  {
+    key: "due",
+    title: "ถึงเวลาประเมินซ้ำ",
+    desc: "ครบรอบแล้ว ควรทำแบบประเมินซ้ำเพื่อดูว่าผลดีขึ้นหรือแย่ลง",
+    dot: "bg-[#b91c2b]",
+    statuses: ["overdue", "due_today"],
+  },
+  {
+    key: "upcoming",
+    title: "ใกล้ถึงกำหนด (ภายใน 7 วัน)",
+    desc: "จะครบรอบในอีกไม่กี่วัน เตรียมทำแบบประเมินได้เลย",
+    dot: "bg-amber-500",
+    statuses: ["upcoming"],
+  },
+  {
+    key: "scheduled",
+    title: "ยังไม่ถึงกำหนด",
+    desc: "ยังอยู่ในรอบติดตาม ระบบจะแจ้งเตือนเมื่อถึงวันที่ควรประเมินซ้ำ",
+    dot: "bg-gray-300",
+    statuses: ["scheduled"],
+  },
 ];
 
 // แถวสรุปของแต่ละแบบประเมิน กด "รายละเอียด" เพื่อดูคำแนะนำและรอบการติดตาม
@@ -454,9 +481,9 @@ function NotificationRow({
             <h3 className="font-bold text-gray-900 leading-snug">{item.assessmentName}</h3>
           </div>
           <p className="mt-1 text-sm text-gray-500">
-            ผลล่าสุด: <span className="font-semibold text-gray-800">{item.riskLevel}</span>
+            ผลครั้งล่าสุด: <span className="font-semibold text-gray-800">{item.riskLevel}</span>
             <span className="mx-1.5 text-gray-300">·</span>
-            ครบกำหนด {formatDate(item.dueDate)}
+            {isDue ? "ควรประเมินตั้งแต่" : "ประเมินครั้งถัดไป"} {formatDate(item.dueDate)}
           </p>
         </div>
 
@@ -477,7 +504,7 @@ function NotificationRow({
               isDue ? "bg-[#b91c2b] text-white hover:bg-[#8a1420]" : "bg-[#2f3037] text-white hover:bg-black"
             }`}
           >
-            <span>{isDue ? "ทำแบบประเมินซ้ำตอนนี้" : "เริ่มทำแบบประเมิน"}</span>
+            <span>{isDue ? "ประเมินซ้ำ" : "ทำแบบประเมิน"}</span>
             <ArrowRight size={16} />
           </Link>
         </div>
@@ -486,17 +513,15 @@ function NotificationRow({
       {open && (
         <div id={detailId} className="mt-3 p-4 rounded-2xl bg-gray-50 text-sm">
           <p className="text-gray-700 leading-relaxed">{item.message}</p>
-          <dl className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 text-gray-500">
+          <dl className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 text-gray-500">
             <div>
-              <dt className="inline">รอบติดตาม: </dt>
-              <dd className="inline font-semibold text-gray-700">{item.intervalLabel}</dd>
+              <dt className="inline">ควรประเมินซ้ำ: </dt>
+              <dd className="inline font-semibold text-gray-700">
+                {item.intervalLabel} ({item.intervalDays} วัน)
+              </dd>
             </div>
             <div>
-              <dt className="inline">เกณฑ์ประเมินซ้ำ: </dt>
-              <dd className="inline font-semibold text-gray-700">{item.intervalDays} วัน</dd>
-            </div>
-            <div>
-              <dt className="inline">ประเมินเมื่อ: </dt>
+              <dt className="inline">ทำครั้งล่าสุดเมื่อ: </dt>
               <dd className="inline font-semibold text-gray-700">{formatDate(item.assessedAt)}</dd>
             </div>
           </dl>
