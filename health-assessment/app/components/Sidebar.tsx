@@ -259,7 +259,7 @@ export default function Sidebar() {
     { href: "/profile", icon: <UserRound size={21} />, label: "ข้อมูลสุขภาพของคุณ", active: isProfileActive },
     { href: "/assessment-type", icon: <ClipboardList size={21} />, label: "แบบประเมินสุขภาพ", active: isAssessmentActive },
     { href: "/dashboard", icon: <BarChart3 size={21} />, label: "Dashboard", active: isResultActive },
-    { href: "/notifications", icon: <Bell size={21} />, label: "การแจ้งเตือน", active: isNotificationsActive, badge },
+    { href: "/notifications", icon: <Bell size={21} />, label: "การแจ้งเตือนและติดตามสุขภาพ", active: isNotificationsActive, badge },
     { href: "/history", icon: <History size={21} />, label: "ประวัติการประเมิน", active: isHistoryActive },
     { href: "/recommendation-health", icon: <Heart size={21} />, label: "คำแนะนำสุขภาพ", active: isRecommendationActive },
     { href: "/settings", icon: <Settings size={21} />, label: "ตั้งค่า", active: isSettingsActive },

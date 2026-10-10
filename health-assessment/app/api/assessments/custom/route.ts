@@ -11,6 +11,7 @@ import {
   userExists,
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
+import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
 
 /* =========================================================
    /api/assessments/custom  (แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม)
@@ -115,6 +116,10 @@ export async function POST(request: NextRequest) {
   const auth = requireUser(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
+
+  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
+  const noConsent = await rejectIfNoHealthConsent(userId);
+  if (noConsent) return noConsent;
 
   const typeId = toId(body.typeId);
   if (typeId === null) {

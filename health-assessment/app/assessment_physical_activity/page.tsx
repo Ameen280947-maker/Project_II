@@ -2,6 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+  ArrowRight,
+  CheckCircle2,
+  Dumbbell,
+} from "lucide-react";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 type Choice = {
   choice_id: number;
@@ -199,11 +206,11 @@ export default function PhysicalActivityAssessmentPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <main className="flex min-h-screen items-center justify-center bg-[#fbf9f9]">
         <div className="text-center">
-          <div className="animate-spin h-10 w-10 rounded-full border-4 border-gray-300 border-t-red-600 mx-auto mb-4" />
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#bbdfd7] border-t-[#1f7a69]" />
 
-          <p className="text-gray-600">
+          <p className="mt-4 font-semibold text-[#777]">
             กำลังโหลดแบบประเมิน...
           </p>
         </div>
@@ -212,100 +219,99 @@ export default function PhysicalActivityAssessmentPage() {
   }
 
   /* =========================================================
-     ERROR
+     ERROR (โหลดคำถามไม่ได้)
   ========================================================= */
 
   if (error && questions.length === 0) {
     return (
-      <main className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-3xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-sm border p-8 text-center">
-            <div className="text-red-600 text-4xl mb-4">
-              ⚠️
-            </div>
+      <main className="flex min-h-screen items-center justify-center bg-[#fbf9f9] px-5">
+        <div className="w-full max-w-xl rounded-[28px] border border-red-100 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-2xl font-bold text-[#b91c2b]">
+            ไม่สามารถโหลดแบบประเมินได้
+          </h1>
 
-            <h1 className="text-xl font-bold text-gray-800 mb-2">
-              ไม่สามารถโหลดแบบประเมินได้
-            </h1>
+          <p className="mt-3 text-sm text-[#777]">
+            {error}
+          </p>
 
-            <p className="text-gray-600 mb-6">
-              {error}
-            </p>
-
-            <button
-              onClick={() => window.location.reload()}
-              className="px-6 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700"
-            >
-              ลองอีกครั้ง
-            </button>
-          </div>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-6 rounded-2xl bg-[#1f7a69] px-6 py-3 font-bold text-white"
+          >
+            ลองใหม่
+          </button>
         </div>
       </main>
     );
   }
 
   /* =========================================================
-     MAIN UI
+     MAIN UI (รูปแบบเดียวกับแบบประเมินการสูบบุหรี่)
   ========================================================= */
 
   return (
-    <main className="min-h-screen bg-gray-50 py-8 px-4">
-      <div className="max-w-3xl mx-auto">
+    <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
+      <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 lg:py-12">
 
-        {/* Header */}
+        {/* HEADER */}
 
-        <div className="bg-white rounded-2xl shadow-sm border p-6 mb-6">
-          <h1 className="text-2xl font-bold text-gray-800">
-            แบบประเมินกิจกรรมทางกาย
-          </h1>
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#1f7a69]">
+              Health Assessment
+            </p>
 
-          <p className="text-gray-500 mt-2">
-            กรุณาเลือกคำตอบที่ตรงกับพฤติกรรมของคุณมากที่สุด
-          </p>
-        </div>
-
-        {/* Error */}
-
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-4 mb-6">
-            {error}
+            <h1 className="mt-3 text-3xl font-black sm:text-4xl">
+              แบบประเมิน
+              <span className="text-[#1f7a69]">
+                การออกกำลังกาย
+              </span>
+            </h1>
           </div>
-        )}
 
-        {/* Questions */}
+          {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+          <HealthConsentNotice />
+          <AssessmentBackLink href="/assessment-menu-behavior" />
+        </header>
 
-        <div className="space-y-6">
+        {/* ICON */}
+
+        <section className="mt-8 rounded-[28px] border border-[#d6ebe6] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.04)]">
+          <div className="flex items-center gap-4">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#e2f3ef] text-[#1f7a69]">
+              <Dumbbell
+                size={28}
+                strokeWidth={1.8}
+              />
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold">
+                กิจกรรมทางกาย
+              </h2>
+            </div>
+          </div>
+        </section>
+
+        {/* QUESTIONS */}
+
+        <section className="mt-6 space-y-5">
           {questions.map((question, index) => (
-            <div
+            <article
               key={question.question_id}
-              className="bg-white rounded-2xl shadow-sm border p-6"
+              className="rounded-[26px] border border-[#eee8e9] bg-white p-6 shadow-[0_12px_35px_rgba(35,25,30,0.04)]"
             >
+              <div className="flex gap-3">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#e2f3ef] text-sm font-black text-[#1f7a69]">
+                  {index + 1}
+                </span>
 
-              {/* Question */}
-
-              <div className="mb-5">
-                <div className="flex gap-3">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold">
-                    {index + 1}
-                  </div>
-
-                  <div>
-                    <h2 className="font-semibold text-gray-800 text-lg">
-                      {question.question_text}
-                    </h2>
-
-                    {question.is_required && (
-                      <span className="text-sm text-red-500">
-                        * จำเป็นต้องตอบ
-                      </span>
-                    )}
-                  </div>
-                </div>
+                <h2 className="pt-1 font-bold leading-7">
+                  {question.question_text}
+                </h2>
               </div>
 
-              {/* Choices */}
-
-              <div className="space-y-3">
+              <div className="mt-5 space-y-3">
                 {question.choices.map((choice) => {
                   const selected =
                     answers[question.question_id] ===
@@ -321,62 +327,62 @@ export default function PhysicalActivityAssessmentPage() {
                           choice.choice_id
                         )
                       }
-                      className={`w-full text-left p-4 rounded-xl border-2 transition ${
+                      className={`flex w-full items-center gap-3 rounded-2xl border px-5 py-4 text-left transition ${
                         selected
-                          ? "border-red-500 bg-red-50 text-red-700"
-                          : "border-gray-200 hover:border-red-300 hover:bg-gray-50"
+                          ? "border-[#1f7a69] bg-[#e2f3ef] text-[#186355]"
+                          : "border-[#eee8e9] bg-[#fafafa] hover:border-[#bbdfd7] hover:bg-[#f1f9f7]"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
+                      <span
+                        className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${
+                          selected
+                            ? "border-[#1f7a69] bg-[#1f7a69] text-white"
+                            : "border-[#d5d5d5]"
+                        }`}
+                      >
+                        {selected && (
+                          <CheckCircle2
+                            size={17}
+                          />
+                        )}
+                      </span>
 
-                        <div
-                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
-                            selected
-                              ? "border-red-500"
-                              : "border-gray-300"
-                          }`}
-                        >
-                          {selected && (
-                            <div className="w-2.5 h-2.5 rounded-full bg-red-500" />
-                          )}
-                        </div>
-
-                        <span>
-                          {choice.choice_text}
-                        </span>
-
-                      </div>
+                      <span className="font-medium">
+                        {choice.choice_text}
+                      </span>
                     </button>
                   );
                 })}
               </div>
-            </div>
+            </article>
           ))}
-        </div>
+        </section>
 
-        {/* Submit */}
+        {/* ERROR (ตอนบันทึก) */}
 
-        <div className="bg-white rounded-2xl shadow-sm border p-6 mt-6">
+        {error && (
+          <div className="mt-6 rounded-2xl border border-[#f2d3d7] bg-[#fff0f2] p-4 text-sm font-medium text-[#b91c2b]">
+            {error}
+          </div>
+        )}
 
+        {/* BUTTONS */}
+
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
-            onClick={handleSubmit}
             disabled={submitting}
-            className={`w-full py-4 rounded-xl text-white font-semibold text-lg transition ${
-              submitting
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-red-600 hover:bg-red-700"
-            }`}
+            onClick={handleSubmit}
+            className="flex h-14 items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#3b998a] to-[#1f7a69] px-8 font-bold text-white shadow-[0_12px_26px_rgba(31,122,105,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting
               ? "กำลังบันทึก..."
               : "ดูผลการประเมิน"}
+
+            {!submitting && (
+              <ArrowRight size={21} />
+            )}
           </button>
-
-          <p className="text-center text-sm text-gray-500 mt-3">
-            กรุณาตอบคำถามให้ครบทุกข้อก่อนดูผลการประเมิน
-          </p>
-
         </div>
 
       </div>

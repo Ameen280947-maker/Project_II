@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 
 import { useEffect, useMemo, useState } from "react";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 /* =========================================================
    TYPES
@@ -392,9 +394,9 @@ export default function AlcoholAssessmentPage() {
      BACK
   ====================================================== */
 
+  // ย้อนกลับเฉพาะข้อคำถาม (ข้อ 1 ไม่มีปุ่มนี้)
   const previousQuestion = () => {
     if (currentQuestion === 0) {
-      router.back();
       return;
     }
 
@@ -509,22 +511,23 @@ export default function AlcoholAssessmentPage() {
 
             {/* HEADER */}
 
-            <header className="mb-8">
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
+            <header className="mb-8 flex items-start justify-between gap-4">
+              <div className="min-w-0">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#8a5a00]">
                 Health Assessment
               </p>
 
               <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">
                 แบบประเมิน
-                <span className="text-[#b91c2b]">
+                <span className="text-[#8a5a00]">
                   การดื่มแอลกอฮอล์
                 </span>
               </h1>
+              </div>
 
-              <p className="mt-3 text-base leading-7 text-[#85858d]">
-                ประเมินพฤติกรรมการดื่มเครื่องดื่มแอลกอฮอล์
-                และระดับความเสี่ยงที่อาจส่งผลต่อสุขภาพ
-              </p>
+              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+              <HealthConsentNotice />
+              <AssessmentBackLink href="/assessment-menu-behavior" />
             </header>
 
             {/* PROGRESS */}
@@ -543,14 +546,14 @@ export default function AlcoholAssessmentPage() {
                   </p>
                 </div>
 
-                <span className="font-black text-[#b91c2b]">
+                <span className="font-black text-[#8a5a00]">
                   {progress}%
                 </span>
               </div>
 
-              <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#f4e9ea]">
+              <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#fbf1dd]">
                 <div
-                  className="h-full rounded-full bg-[#b91c2b] transition-all duration-300"
+                  className="h-full rounded-full bg-[#8a5a00] transition-all duration-300"
                   style={{
                     width: `${progress}%`,
                   }}
@@ -564,12 +567,12 @@ export default function AlcoholAssessmentPage() {
 
               <div className="flex items-start gap-4">
 
-                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#fff0f2] text-[#b91c2b]">
+                <div className="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-[#fbf1dd] text-[#8a5a00]">
                   <Wine size={27} />
                 </div>
 
                 <div>
-                  <p className="text-sm font-bold text-[#b91c2b]">
+                  <p className="text-sm font-bold text-[#8a5a00]">
                     คำถามที่ {question.id}
                   </p>
 
@@ -603,15 +606,15 @@ export default function AlcoholAssessmentPage() {
                         }
                         className={`flex w-full items-center gap-4 rounded-2xl border p-4 text-left transition ${
                           selected
-                            ? "border-[#b91c2b] bg-[#fff0f2] text-[#b91c2b]"
-                            : "border-[#eee5e6] bg-white hover:border-[#e9b9bf] hover:bg-[#fffafa]"
+                            ? "border-[#8a5a00] bg-[#fbf1dd] text-[#8a5a00]"
+                            : "border-[#eee5e6] bg-white hover:border-[#edd5a6] hover:bg-[#fdf8ee]"
                         }`}
                       >
 
                         <span
                           className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl font-black ${
                             selected
-                              ? "bg-[#b91c2b] text-white"
+                              ? "bg-[#8a5a00] text-white"
                               : "bg-[#f7f4f4] text-[#777880]"
                           }`}
                         >
@@ -666,19 +669,21 @@ export default function AlcoholAssessmentPage() {
 
               {/* BUTTONS */}
 
-              <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+              <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
 
-                <button
-                  type="button"
-                  disabled={submitting}
-                  onClick={
-                    previousQuestion
-                  }
-                  className="flex h-13 items-center justify-center gap-2 rounded-2xl border border-[#eee5e6] bg-white px-6 font-bold text-[#666770] transition hover:bg-[#faf7f7]"
-                >
-                  <ArrowLeft size={19} />
-                  ย้อนกลับ
-                </button>
+                {!isFirstQuestion && (
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={
+                      previousQuestion
+                    }
+                    className="flex h-13 items-center justify-center gap-2 rounded-2xl border border-[#eee5e6] bg-white px-6 font-bold text-[#666770] transition hover:bg-[#faf7f7] sm:mr-auto"
+                  >
+                    <ArrowLeft size={19} />
+                    ย้อนกลับ
+                  </button>
+                )}
 
                 <button
                   type="button"
@@ -688,7 +693,7 @@ export default function AlcoholAssessmentPage() {
                       undefined
                   }
                   onClick={nextQuestion}
-                  className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-[#b91c2b] px-7 font-bold text-white shadow-[0_10px_25px_rgba(185,28,43,0.2)] transition hover:bg-[#991b2b] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex h-13 items-center justify-center gap-2 rounded-2xl bg-[#8a5a00] px-7 font-bold text-white shadow-[0_10px_25px_rgba(138,90,0,0.2)] transition hover:bg-[#6f4800] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {submitting
                     ? "กำลังบันทึก..."

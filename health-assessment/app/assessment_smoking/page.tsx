@@ -4,16 +4,20 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Cigarette,
-  ArrowLeft,
   ArrowRight,
   CheckCircle2,
 } from "lucide-react";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 type SmokingQuestion = {
   id: number;
   question: string;
   options: string[];
 };
+
+// ตัวเลือกข้อ 2 ที่แปลว่าไม่เคยสูบตลอดชีวิต
+const NEVER_SMOKED = "ไม่สูบ";
 
 type SmokingAssessment = {
   assessment_id?: number;
@@ -106,16 +110,30 @@ export default function SmokingAssessmentPage() {
   };
 
   /* =====================================================
+     SKIP
+     ข้อ 2 ตอบ "ไม่สูบ" (ไม่เคยสูบตลอดชีวิต) → ไม่ถามข้อถัดไป
+  ===================================================== */
+
+  const questions = assessment?.questions ?? [];
+  const lifetimeQuestion = questions[1];
+  const neverSmoked =
+    !!lifetimeQuestion &&
+    answers[lifetimeQuestion.id] === NEVER_SMOKED;
+  const visibleQuestions = neverSmoked
+    ? questions.slice(0, 2)
+    : questions;
+
+  /* =====================================================
      SUBMIT
   ===================================================== */
 
   const handleSubmit = async () => {
-    if (!assessment?.questions) {
+    if (visibleQuestions.length === 0) {
       return;
     }
 
     const unanswered =
-      assessment.questions.some(
+      visibleQuestions.some(
         (question) =>
           !answers[question.id]
       );
@@ -150,7 +168,13 @@ export default function SmokingAssessmentPage() {
             userId: Number(
               storedUserId
             ),
-            answers,
+            // ส่งเฉพาะข้อที่แสดงอยู่ (ไม่ส่งคำตอบของข้อที่ถูกข้าม)
+            answers: Object.fromEntries(
+              visibleQuestions.map((question) => [
+                question.id,
+                answers[question.id],
+              ])
+            ),
           }),
         }
       );
@@ -196,7 +220,7 @@ export default function SmokingAssessmentPage() {
     return (
       <main className="min-h-screen bg-[#fbf9f9] flex items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#dcebd7] border-t-[#65a05b]" />
+          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-4 border-[#cde0c0] border-t-[#3f7a2e]" />
 
           <p className="mt-4 font-semibold text-[#777]">
             กำลังโหลดแบบประเมิน...
@@ -226,7 +250,7 @@ export default function SmokingAssessmentPage() {
             onClick={() =>
               window.location.reload()
             }
-            className="mt-6 rounded-2xl bg-[#65a05b] px-6 py-3 font-bold text-white"
+            className="mt-6 rounded-2xl bg-[#3f7a2e] px-6 py-3 font-bold text-white"
           >
             ลองใหม่
           </button>
@@ -245,30 +269,31 @@ export default function SmokingAssessmentPage() {
 
         {/* HEADER */}
 
-        <header>
-          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
+        <header className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#3f7a2e]">
             Health Assessment
           </p>
 
           <h1 className="mt-3 text-3xl font-black sm:text-4xl">
             แบบประเมิน
-            <span className="text-[#65a05b]">
+            <span className="text-[#3f7a2e]">
               การสูบบุหรี่
             </span>
           </h1>
+          </div>
 
-          <p className="mt-3 text-[#858991]">
-            ประเมินพฤติกรรมการสูบบุหรี่
-            และปัจจัยที่เกี่ยวข้องกับสุขภาพ
-          </p>
+          {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+          <HealthConsentNotice />
+          <AssessmentBackLink href="/assessment-menu-behavior" />
         </header>
 
         {/* ICON */}
 
-        <section className="mt-8 rounded-[28px] border border-[#e7eee4] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.04)]">
+        <section className="mt-8 rounded-[28px] border border-[#cde0c0] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.04)]">
 
           <div className="flex items-center gap-4">
-            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#eef8e9] text-[#65a05b]">
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#ebf3e2] text-[#3f7a2e]">
               <Cigarette
                 size={28}
                 strokeWidth={1.8}
@@ -279,10 +304,6 @@ export default function SmokingAssessmentPage() {
               <h2 className="text-xl font-bold">
                 การสูบบุหรี่
               </h2>
-
-              <p className="mt-1 text-sm text-[#898a92]">
-                กรุณาตอบคำถามตามพฤติกรรมจริงของคุณ
-              </p>
             </div>
           </div>
         </section>
@@ -291,14 +312,14 @@ export default function SmokingAssessmentPage() {
 
         <section className="mt-6 space-y-5">
 
-          {assessment?.questions?.map(
+          {visibleQuestions.map(
             (question, index) => (
               <article
                 key={question.id}
                 className="rounded-[26px] border border-[#eee8e9] bg-white p-6 shadow-[0_12px_35px_rgba(35,25,30,0.04)]"
               >
                 <div className="flex gap-3">
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#eef8e9] text-sm font-black text-[#57965c]">
+                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-[#ebf3e2] text-sm font-black text-[#3f7a2e]">
                     {index + 1}
                   </span>
 
@@ -328,14 +349,14 @@ export default function SmokingAssessmentPage() {
                           }
                           className={`flex w-full items-center gap-3 rounded-2xl border px-5 py-4 text-left transition ${
                             selected
-                              ? "border-[#65a05b] bg-[#eef8e9] text-[#477c40]"
-                              : "border-[#eee8e9] bg-[#fafafa] hover:border-[#b9d8b1] hover:bg-[#f5faf3]"
+                              ? "border-[#3f7a2e] bg-[#ebf3e2] text-[#2f5f22]"
+                              : "border-[#eee8e9] bg-[#fafafa] hover:border-[#cde0c0] hover:bg-[#f5f9f0]"
                           }`}
                         >
                           <span
                             className={`grid h-6 w-6 shrink-0 place-items-center rounded-full border ${
                               selected
-                                ? "border-[#65a05b] bg-[#65a05b] text-white"
+                                ? "border-[#3f7a2e] bg-[#3f7a2e] text-white"
                                 : "border-[#d5d5d5]"
                             }`}
                           >
@@ -359,30 +380,24 @@ export default function SmokingAssessmentPage() {
             )
           )}
 
+          {neverSmoked && (
+            <div className="rounded-2xl bg-[#ebf3e2] p-5 text-sm leading-7 text-[#3f7a2e]">
+              คุณเลือก “ไม่สูบ” ในข้อ 2
+              ระบบจะไม่ถามข้อ 3–{questions.length}
+              และจะแสดงผลตามเกณฑ์ของแบบประเมิน
+            </div>
+          )}
+
         </section>
 
         {/* BUTTONS */}
 
-        <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
-
-          <button
-            type="button"
-            onClick={() =>
-              router.push(
-                "/assessment-menu-behavior"
-              )
-            }
-            className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-[#e7e2e2] bg-white px-6 font-bold text-[#777]"
-          >
-            <ArrowLeft size={19} />
-            ย้อนกลับ
-          </button>
-
+        <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"
             disabled={submitting}
             onClick={handleSubmit}
-            className="flex h-14 items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#9ac982] to-[#72ad64] px-8 font-bold text-white shadow-[0_12px_26px_rgba(114,173,100,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex h-14 items-center justify-center gap-3 rounded-2xl bg-gradient-to-r from-[#5a9445] to-[#3f7a2e] px-8 font-bold text-white shadow-[0_12px_26px_rgba(63,122,46,0.22)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting
               ? "กำลังบันทึก..."

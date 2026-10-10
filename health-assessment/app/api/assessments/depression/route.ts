@@ -10,6 +10,7 @@ import {
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
+import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -308,6 +309,9 @@ export async function POST(request: NextRequest) {
   // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(stage === "2q" ? TYPE_2Q : TYPE_9Q);
   if (closed) return closed;
+  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
+  const noConsent = await rejectIfNoHealthConsent(numericUserId);
+  if (noConsent) return noConsent;
 
   if (!Array.isArray(answers) || answers.length === 0) {
     return fail("กรุณาระบุคำตอบให้ครบถ้วน");

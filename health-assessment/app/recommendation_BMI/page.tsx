@@ -1,9 +1,27 @@
 "use client";
 
-import Link from "next/link";
+import type { ReactNode } from "react";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import AnswerReview from "@/app/components/AnswerReview";
+import {
+    Apple,
+    PersonStanding,
+    Ruler,
+    Scale,
+    ShieldCheck,
+    Stethoscope,
+} from "lucide-react";
+import RecommendationLayout, {
+    AdviceCard,
+    RECOMMENDATION_TONES,
+    RecommendationError,
+    RecommendationLoading,
+    RecommendationSection,
+    ScoreCircle,
+    type RiskColor,
+} from "@/app/components/recommendation/RecommendationLayout";
+
+const TONE = "mint";
 
 type AssessmentResult = {
     assessmentId: number;
@@ -22,25 +40,30 @@ type ResultResponse = {
     message?: string;
 };
 
-/*
-  สีป้ายตามระดับ BMI
-  อ้างอิงตารางของสำนักโภชนาการ กรมอนามัย
-*/
+/* =========================================================
+   เกณฑ์ระดับ BMI (ตรงกับ API)
+   สีตามตารางของสำนักโภชนาการ กรมอนามัย
+========================================================= */
 
-const LEVEL_COLORS: Record<
-    string,
-    { bg: string; text: string; ring: string }
-> = {
-    "ผอม": { bg: "#eef8ec", text: "#4f9857", ring: "#8bc86f" },
-    "ปกติ": { bg: "#fdf8e2", text: "#a68b1f", ring: "#e8d84a" },
-    "น้ำหนักเกิน": { bg: "#fff1e2", text: "#c2740f", ring: "#f5a445" },
-    "อ้วน": { bg: "#fdeef1", text: "#b91c2b", ring: "#ef4962" },
-    "อ้วนอันตราย": { bg: "#fbe4e6", text: "#7c0c21", ring: "#9c1029" },
+const BMI_LEVELS: { level: string; range: string; color: RiskColor }[] = [
+    { level: "ผอม", range: "< 18.5", color: "green" },
+    { level: "ปกติ", range: "18.5 – 22.9", color: "yellow" },
+    { level: "น้ำหนักเกิน", range: "23.0 – 24.9", color: "orange" },
+    { level: "อ้วน", range: "25.0 – 29.9", color: "red" },
+    { level: "อ้วนอันตราย", range: "≥ 30.0", color: "red" },
+];
+
+const DOT: Record<RiskColor, string> = {
+    green: "bg-[#4f9857]",
+    yellow: "bg-[#d9a400]",
+    orange: "bg-[#e07a1f]",
+    red: "bg-[#c81e3a]",
+    gray: "bg-[#a3a4ab]",
 };
 
 export default function BmiResultPage() {
     return (
-        <Suspense fallback={<LoadingState />}>
+        <Suspense fallback={<RecommendationLoading tone={TONE} />}>
             <BmiResultContent />
         </Suspense>
     );
@@ -100,372 +123,97 @@ function BmiResultContent() {
     }, [assessmentId]);
 
     if (loading) {
-        return <LoadingState />;
+        return <RecommendationLoading tone={TONE} />;
     }
 
     if (error || !result) {
-        return (
-            <main className="errorPage">
-                <div className="errorCard">
-                    <div className="errorIcon">!</div>
-                    <h1>ไม่สามารถแสดงผลได้</h1>
-                    <p>{error || "ไม่พบผลการประเมิน"}</p>
-                    <Link href="/assessment_BMI" className="backButton">
-                        กลับไปทำแบบประเมิน
-                    </Link>
-                </div>
-
-                <style jsx>{`
-          .errorPage {
-            display: grid;
-            place-items: center;
-            min-height: 100vh;
-            background: #f7f6f4;
-            padding: 24px;
-          }
-          .errorCard {
-            width: 100%;
-            max-width: 420px;
-            background: #fff;
-            border-radius: 28px;
-            padding: 36px;
-            text-align: center;
-            box-shadow: 0 16px 40px rgba(30, 20, 20, 0.08);
-          }
-          .errorIcon {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto;
-            border-radius: 50%;
-            background: #fdeef1;
-            color: #9c1029;
-            font-weight: 800;
-            font-size: 22px;
-            display: grid;
-            place-items: center;
-          }
-          h1 {
-            margin-top: 18px;
-            font-size: 22px;
-            font-family: "Prompt", sans-serif;
-          }
-          p {
-            margin-top: 10px;
-            color: #7a828e;
-          }
-          .backButton {
-            margin-top: 26px;
-            display: flex;
-            height: 52px;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            border-radius: 14px;
-            background: #9c1029;
-            color: #fff;
-            font-weight: 700;
-            text-decoration: none;
-          }
-        `}</style>
-            </main>
-        );
+        return <RecommendationError tone={TONE} message={error} editHref="/assessment_BMI" />;
     }
 
-    const colors = LEVEL_COLORS[result.riskLevel] ?? LEVEL_COLORS["ปกติ"];
+    const riskColor: RiskColor =
+        BMI_LEVELS.find((b) => b.level === result.riskLevel)?.color ?? "gray";
+    const t = RECOMMENDATION_TONES[TONE];
 
     return (
-        <main className="page">
-            <div className="wrap">
-                <header className="header">
-                    <div>
-                        <p className="eyebrow">Health Recommendation</p>
-                        <h1 className="title">คำแนะนำ</h1>
-                        <div className="rule" />
-                        <p className="lede">คำแนะนำจากผลประเมินภาวะน้ำหนักเกิน</p>
-                        <h2 className="heading">
-                            ค่าดัชนีมวลกาย <span>(BMI)</span> ของคุณ
-                        </h2>
-                    </div>
+        <RecommendationLayout
+            tone={TONE}
+            title={
+                <>
+                    ค่าดัชนีมวลกาย <span className={t.accent}>(BMI)</span> ของคุณ
+                </>
+            }
+            score={
+                <ScoreCircle
+                    tone={TONE}
+                    // เทียบกับเกณฑ์อ้วนอันตราย (BMI 30)
+                    progress={result.bmi / 30}
+                    value={result.bmi.toFixed(1)}
+                    caption="BMI (kg/m²)"
+                />
+            }
+            riskLevel={result.riskLevel}
+            riskColor={riskColor}
+            summary={
+                <>
+                    ผลประเมินของคุณอยู่ในระดับ{" "}
+                    <strong className={t.eyebrow}>{result.riskLevel}</strong>{" "}
+                    โดยมีค่าดัชนีมวลกาย (BMI) ประมาณ{" "}
+                    <strong className={t.accent}>{result.bmi.toFixed(2)}</strong>
+                    {result.weightKg && result.heightCm && (
+                        <>
+                            {" "}
+                            (จากน้ำหนัก {result.weightKg} กก. ส่วนสูง {result.heightCm} ซม.)
+                        </>
+                    )}
+                </>
+            }
+            recommendation={result.recommendation}
+            assessmentId={assessmentId}
+            editHref="/assessment_BMI"
+        >
+            {/* =====================================================
+                เกณฑ์ BMI + แนวทางดูแลสุขภาพตามระดับ
+            ====================================================== */}
 
-                    <div className="scoreWrap">
-                        <div
-                            className="scoreCircle"
-                            style={{ borderColor: colors.ring, background: colors.bg }}
-                        >
-                            <span className="scoreValue" style={{ color: colors.text }}>
-                                {result.bmi.toFixed(2)}
-                            </span>
-                            <span className="scoreUnit" style={{ color: colors.text }}>
-                                BMI
-                            </span>
-                        </div>
+            <RecommendationSection
+                icon={<Ruler size={27} className={t.eyebrow} />}
+                title="เกณฑ์ดัชนีมวลกาย (BMI)"
+            >
+                <div className="overflow-hidden rounded-[25px] border border-[#eee8e9] bg-white">
+                    {BMI_LEVELS.map((band) => {
+                        const active = band.level === result.riskLevel;
 
-                        <span
-                            className="levelPill"
-                            style={{ background: colors.bg, color: colors.text }}
-                        >
-                            {result.riskLevel}
-                        </span>
-                    </div>
-                </header>
-
-                <section className="infoCard">
-                    <div className="infoIcon">i</div>
-                    <div>
-                        <h3>ผลและคำแนะนำ</h3>
-                        <p>
-                            ผลประเมินของคุณอยู่ในระดับ{" "}
-                            <strong style={{ color: colors.text }}>
-                                {result.riskLevel}
-                            </strong>{" "}
-                            โดยมีค่าดัชนีมวลกาย (BMI) ประมาณ{" "}
-                            <strong style={{ color: colors.text }}>
-                                {result.bmi.toFixed(2)}
-                            </strong>
-                            {result.weightKg && result.heightCm && (
-                                <>
-                                    {" "}
-                                    (จากน้ำหนัก {result.weightKg} กก. ส่วนสูง {result.heightCm}{" "}
-                                    ซม.)
-                                </>
-                            )}
-                        </p>
-                        <p className="recommendationText">{result.recommendation}</p>
-                    </div>
-                </section>
-
-                <section className="adviceSection">
-                    <h3>แนวทางดูแลสุขภาพ</h3>
-
-                    <div className="adviceGrid">
-                        {getAdviceCards(result.riskLevel).map((card) => (
-                            <AdviceCard
-                                key={card.title}
-                                title={card.title}
-                                description={card.description}
-                            />
-                        ))}
-                    </div>
-                </section>
-
-                <AnswerReview assessmentId={assessmentId} className="mt-6" />
-
-                <div className="actions">
-                    <Link href="/assessment_BMI" className="secondaryButton">
-                        กลับไปแก้แบบประเมิน
-                    </Link>
-                    <Link href="/assessment-menu" className="primaryButton">
-                        เลือกแบบประเมินอื่น
-                    </Link>
+                        return (
+                            <div
+                                key={band.level}
+                                className={`flex items-center justify-between gap-4 border-b border-[#f3eeef] px-6 py-4 last:border-b-0 ${
+                                    active ? "bg-[#f4f9f5] font-bold" : "text-[#666872]"
+                                }`}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <span className={`h-3 w-3 shrink-0 rounded-full ${DOT[band.color]}`} />
+                                    <span>{band.level}</span>
+                                </div>
+                                <span className="shrink-0 text-sm">{band.range} kg/m²</span>
+                            </div>
+                        );
+                    })}
                 </div>
-            </div>
+            </RecommendationSection>
 
-            <style jsx>{`
-        .page {
-          min-height: 100vh;
-          background: #f7f6f4;
-          color: #1f2430;
-          font-family: "Sarabun", "Prompt", sans-serif;
-          padding: 48px 24px;
-        }
-
-        .wrap {
-          max-width: 1100px;
-          margin: 0 auto;
-        }
-
-        .header {
-          display: grid;
-          gap: 32px;
-          grid-template-columns: 1fr;
-          align-items: start;
-        }
-
-        @media (min-width: 960px) {
-          .header {
-            grid-template-columns: 1fr 220px;
-          }
-        }
-
-        .eyebrow {
-          font-size: 12px;
-          font-weight: 700;
-          letter-spacing: 0.16em;
-          text-transform: uppercase;
-          color: #9c1029;
-        }
-
-        .title {
-          margin-top: 10px;
-          font-family: "Prompt", sans-serif;
-          font-size: 40px;
-          font-weight: 800;
-        }
-
-        .rule {
-          margin-top: 14px;
-          width: 40px;
-          height: 4px;
-          border-radius: 999px;
-          background: #ef4962;
-        }
-
-        .lede {
-          margin-top: 14px;
-          color: #85858d;
-        }
-
-        .heading {
-          margin-top: 22px;
-          font-family: "Prompt", sans-serif;
-          font-size: 30px;
-          font-weight: 700;
-          line-height: 1.3;
-        }
-
-        .heading :global(span) {
-          color: #ef4962;
-        }
-
-        .scoreWrap {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-        }
-
-        .scoreCircle {
-          width: 176px;
-          height: 176px;
-          border-radius: 50%;
-          border-width: 8px;
-          border-style: solid;
-          display: grid;
-          place-items: center;
-        }
-
-        .scoreValue {
-          display: block;
-          font-family: "Prompt", sans-serif;
-          font-size: 44px;
-          font-weight: 800;
-          text-align: center;
-        }
-
-        .scoreUnit {
-          display: block;
-          font-size: 13px;
-          font-weight: 700;
-          text-align: center;
-        }
-
-        .levelPill {
-          margin-top: 16px;
-          padding: 8px 20px;
-          border-radius: 999px;
-          font-weight: 600;
-        }
-
-        .infoCard {
-          margin-top: 32px;
-          display: flex;
-          gap: 16px;
-          border-radius: 28px;
-          border: 1px solid #f1e2e4;
-          background: linear-gradient(135deg, #fff8f9, #fff0f2);
-          padding: 32px;
-        }
-
-        .infoIcon {
-          flex-shrink: 0;
-          width: 56px;
-          height: 56px;
-          border-radius: 50%;
-          background: #fff;
-          color: #ef4962;
-          font-weight: 800;
-          font-size: 22px;
-          display: grid;
-          place-items: center;
-        }
-
-        .infoCard h3 {
-          font-family: "Prompt", sans-serif;
-          font-size: 22px;
-          font-weight: 700;
-        }
-
-        .infoCard p {
-          margin-top: 14px;
-          line-height: 1.9;
-          color: #666872;
-        }
-
-        .recommendationText {
-          white-space: pre-line;
-        }
-
-        .adviceSection {
-          margin-top: 32px;
-        }
-
-        .adviceSection h3 {
-          font-family: "Prompt", sans-serif;
-          font-size: 22px;
-          font-weight: 700;
-        }
-
-        .adviceGrid {
-          margin-top: 20px;
-          display: grid;
-          gap: 18px;
-          grid-template-columns: 1fr;
-        }
-
-        @media (min-width: 768px) {
-          .adviceGrid {
-            grid-template-columns: repeat(3, 1fr);
-          }
-        }
-
-        .actions {
-          margin-top: 32px;
-          display: flex;
-          flex-direction: column;
-          gap: 12px;
-        }
-
-        @media (min-width: 640px) {
-          .actions {
-            flex-direction: row;
-            justify-content: flex-end;
-          }
-        }
-
-        .secondaryButton,
-        .primaryButton {
-          display: flex;
-          height: 52px;
-          align-items: center;
-          justify-content: center;
-          gap: 8px;
-          padding: 0 24px;
-          border-radius: 999px;
-          font-weight: 600;
-          text-decoration: none;
-        }
-
-        .secondaryButton {
-          border: 1px solid #ead9db;
-          background: #fff;
-          color: #8a1420;
-        }
-
-        .primaryButton {
-          background: #fff0f2;
-          color: #ef4962;
-        }
-      `}</style>
-        </main>
+            <RecommendationSection
+                icon={<ShieldCheck size={27} className={t.eyebrow} />}
+                title="แนวทางดูแลสุขภาพ"
+            >
+                <div className="grid gap-5 md:grid-cols-3">
+                    {getAdviceCards(result.riskLevel).map((card) => (
+                        <AdviceCard key={card.title} tone={TONE} icon={card.icon} title={card.title}>
+                            {card.description}
+                        </AdviceCard>
+                    ))}
+                </div>
+            </RecommendationSection>
+        </RecommendationLayout>
     );
 }
 
@@ -473,18 +221,25 @@ function BmiResultContent() {
   การ์ดแนวทางแยกตามระดับ ให้สอดคล้องกับคำแนะนำในเอกสารอ้างอิง ตารางที่ 12
   ผอม = ควรเพิ่มน้ำหนัก, ปกติ = ควบคุมน้ำหนัก, น้ำหนักเกินขึ้นไป = ลดน้ำหนัก, อ้วนอันตราย = พบแพทย์
 */
-function getAdviceCards(riskLevel: string) {
+function getAdviceCards(riskLevel: string): { icon: ReactNode; title: string; description: string }[] {
+    const nutrition = <Apple size={31} />;
+    const exercise = <PersonStanding size={32} />;
+    const followUp = <Scale size={30} />;
+
     if (riskLevel === "ผอม") {
         return [
             {
+                icon: nutrition,
                 title: "โภชนาการ",
                 description: "เพิ่มพลังงานจากอาหารให้ครบ 5 หมู่ เพิ่มโปรตีน และกินให้ตรงเวลา เพื่อเพิ่มน้ำหนักให้อยู่ในเกณฑ์ปกติ",
             },
             {
+                icon: exercise,
                 title: "การออกกำลังกาย",
                 description: "ออกกำลังกายแบบเสริมสร้างกล้ามเนื้อควบคู่กับการกินให้เพียงพอ",
             },
             {
+                icon: followUp,
                 title: "ติดตามสุขภาพ",
                 description: "ชั่งน้ำหนักสม่ำเสมอ หากน้ำหนักลดลงต่อเนื่องโดยไม่ทราบสาเหตุควรพบแพทย์",
             },
@@ -494,14 +249,17 @@ function getAdviceCards(riskLevel: string) {
     if (riskLevel === "ปกติ") {
         return [
             {
+                icon: nutrition,
                 title: "โภชนาการ",
                 description: "กินอาหารให้ครบ 5 หมู่ เน้นผัก ผลไม้ ลดอาหารหวาน มัน เค็ม เพื่อคงน้ำหนักให้อยู่ในเกณฑ์ปกติ",
             },
             {
+                icon: exercise,
                 title: "การออกกำลังกาย",
                 description: "ออกกำลังกายระดับปานกลางอย่างน้อย 150 นาทีต่อสัปดาห์",
             },
             {
+                icon: followUp,
                 title: "ติดตามสุขภาพ",
                 description: "ชั่งน้ำหนักสม่ำเสมอเพื่อควบคุมน้ำหนักให้คงที่",
             },
@@ -510,101 +268,25 @@ function getAdviceCards(riskLevel: string) {
 
     return [
         {
+            icon: nutrition,
             title: "โภชนาการ",
             description: "ลดอาหารหวาน มัน เค็ม และอาหารแปรรูป ควบคุมปริมาณอาหาร เน้นผักและผลไม้รสไม่หวาน",
         },
         {
+            icon: exercise,
             title: "การออกกำลังกาย",
             description: "ออกกำลังกายระดับปานกลางอย่างน้อย 150 นาทีต่อสัปดาห์ เพื่อช่วยลดน้ำหนัก",
         },
         riskLevel === "อ้วนอันตราย"
             ? {
+                  icon: <Stethoscope size={30} />,
                   title: "พบแพทย์",
                   description: "ความอ้วนอยู่ในระดับอันตราย ควรลดน้ำหนักอย่างเร่งด่วนและไปพบแพทย์",
               }
             : {
+                  icon: followUp,
                   title: "ติดตามสุขภาพ",
                   description: "ชั่งน้ำหนักสม่ำเสมอ ตั้งเป้าลดน้ำหนักให้เข้าสู่เกณฑ์ปกติ และตรวจสุขภาพเป็นประจำ",
               },
     ];
-}
-
-function AdviceCard({
-    title,
-    description,
-}: {
-    title: string;
-    description: string;
-}) {
-    return (
-        <article className="card">
-            <h4>{title}</h4>
-            <p>{description}</p>
-
-            <style jsx>{`
-        .card {
-          border-radius: 25px;
-          border: 1px solid #eee8e9;
-          background: #fff;
-          padding: 24px;
-          box-shadow: 0 14px 35px rgba(35, 25, 30, 0.04);
-        }
-
-        h4 {
-          font-family: "Prompt", sans-serif;
-          font-size: 19px;
-          font-weight: 700;
-        }
-
-        p {
-          margin-top: 10px;
-          font-size: 14px;
-          line-height: 1.7;
-          color: #767880;
-        }
-      `}</style>
-        </article>
-    );
-}
-
-function LoadingState() {
-    return (
-        <main className="loadingPage">
-            <div className="loadingBox">
-                <div className="spinner" />
-                <p>กำลังโหลดผลการประเมิน...</p>
-            </div>
-
-            <style jsx>{`
-        .loadingPage {
-          display: grid;
-          place-items: center;
-          min-height: 100vh;
-          background: #f7f6f4;
-        }
-        .loadingBox {
-          text-align: center;
-        }
-        .spinner {
-          margin: 0 auto;
-          width: 48px;
-          height: 48px;
-          border-radius: 50%;
-          border: 4px solid #f1dadd;
-          border-top-color: #9c1029;
-          animation: spin 0.8s linear infinite;
-        }
-        p {
-          margin-top: 18px;
-          font-weight: 600;
-          color: #7a828e;
-        }
-        @keyframes spin {
-          to {
-            transform: rotate(360deg);
-          }
-        }
-      `}</style>
-        </main>
-    );
 }

@@ -15,6 +15,14 @@ import {
   UserRound,
 } from "lucide-react";
 import { FormEvent, ReactNode, useState } from "react";
+import { CONSENT_TEXT } from "@/lib/consents";
+
+// ช่องความยินยอม เรียงและใช้ข้อความเดียวกับหน้าการตั้งค่า
+const CONSENTS = [
+  { name: "consentHealth", required: true, ...CONSENT_TEXT.health },
+  { name: "consentStaff", required: false, ...CONSENT_TEXT.staff },
+  { name: "consentResearch", required: false, ...CONSENT_TEXT.research },
+];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -44,6 +52,11 @@ export default function RegisterPage() {
       formData.get("password") || ""
     );
 
+    // ความยินยอม 3 ข้อ ตรงกับหน้าการตั้งค่า > ความเป็นส่วนตัวและข้อมูลของฉัน
+    // ข้อมูลสุขภาพจำเป็นต้องยินยอม ส่วนอีก 2 ข้อไม่บังคับ
+    const consentHealth = formData.get("consentHealth") === "on";
+    const consentStaff = formData.get("consentStaff") === "on";
+    const consentResearch = formData.get("consentResearch") === "on";
     const confirmPassword = String(
       formData.get("confirmPassword") || ""
     );
@@ -86,6 +99,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!consentHealth) {
+      setError("กรุณายินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ เพื่อใช้งานการประเมิน");
+      return;
+    }
+
     // ตรงนี้ค่อยส่งไป API
     try {
       const response = await fetch("/api/auth/register", {
@@ -97,6 +115,9 @@ export default function RegisterPage() {
           username,
           email,
           password,
+          consentHealth,
+          consentStaff,
+          consentResearch,
         }),
       });
 
@@ -208,6 +229,33 @@ export default function RegisterPage() {
                   setShowConfirmPassword((value) => !value)
                 }
               />
+
+              {/* ความยินยอม (PDPA) ไม่ติ๊กไว้ก่อน ผู้ใช้ต้องเลือกเอง
+                  ข้อความตรงกับหน้าการตั้งค่า เปลี่ยนได้ภายหลังที่นั่น */}
+              <fieldset className="space-y-3 px-1">
+                <legend className="mb-2 text-sm font-semibold text-[#2f3037]">
+                  ความเป็นส่วนตัวและข้อมูลของฉัน
+                </legend>
+                {CONSENTS.map((c) => (
+                  <label
+                    key={c.name}
+                    className="flex cursor-pointer items-start gap-2.5 text-sm leading-6 text-[#5f6068]"
+                  >
+                    <input
+                      type="checkbox"
+                      name={c.name}
+                      className="mt-1 h-4 w-4 shrink-0 cursor-pointer accent-[#b91c2b]"
+                    />
+                    <span>
+                      <span className="font-medium text-[#2f3037]">{c.title}</span>
+                      {c.required && <span className="text-[#b91c2b]"> (จำเป็น)</span>}
+                    </span>
+                  </label>
+                ))}
+                <p className="text-xs text-[#909199]">
+                  เปลี่ยนความยินยอมได้ภายหลังที่หน้าการตั้งค่า
+                </p>
+              </fieldset>
 
               {error && (
                 <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-medium text-[#b91c2b]">

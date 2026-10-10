@@ -7,6 +7,8 @@ import { ArrowLeft, CheckCircle2, ClipboardList, Phone, RotateCcw } from "lucide
 import Sidebar from "@/app/components/Sidebar";
 import AnswerReview from "@/app/components/AnswerReview";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 /* =========================================================
    หน้ากลางสำหรับแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
@@ -146,8 +148,15 @@ function Form({ typeId }: { typeId: number }) {
 
   return (
     <>
-      <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">Assessment</p>
-      <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">{data.name}</h1>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">Assessment</p>
+          <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">{data.name}</h1>
+        </div>
+        {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+        <HealthConsentNotice />
+        <AssessmentBackLink href="/assessment-type" />
+      </div>
       {data.description && <p className="mt-3 leading-7 text-[#8b8f98]">{data.description}</p>}
 
       <div className="mt-6 h-2 overflow-hidden rounded-full bg-[#f1e9ea]" aria-hidden>

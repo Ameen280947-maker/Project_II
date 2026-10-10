@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 
 import Sidebar from "@/app/components/Sidebar";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 /* =========================================================
    TYPES
@@ -296,8 +298,8 @@ export default function Depression2QPage() {
         <Sidebar />
         <main className="flex min-h-screen flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#f8e8ea]">
-              <Loader2 className="animate-spin text-[#b91c2b]" size={28} />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#eee9f9]">
+              <Loader2 className="animate-spin text-[#5b3ea6]" size={28} />
             </div>
             <p className="text-base font-medium text-[#666770]">
               กำลังโหลดแบบประเมิน...
@@ -318,8 +320,8 @@ export default function Depression2QPage() {
         <Sidebar />
         <main className="flex min-h-screen flex-1 items-center justify-center px-6">
           <div className="w-full max-w-lg rounded-3xl bg-white p-8 text-center shadow-sm">
-            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-red-50">
-              <ClipboardList size={30} className="text-[#b91c2b]" />
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-[#eee9f9]">
+              <ClipboardList size={30} className="text-[#5b3ea6]" />
             </div>
 
             <h2 className="text-xl font-bold text-[#2f3037]">
@@ -331,7 +333,7 @@ export default function Depression2QPage() {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="mt-6 rounded-2xl bg-[#b91c2b] px-6 py-3 font-semibold text-white transition hover:bg-[#9f1726]"
+              className="mt-6 rounded-2xl bg-[#5b3ea6] px-6 py-3 font-semibold text-white transition hover:bg-[#4a3289]"
             >
               ลองใหม่อีกครั้ง
             </button>
@@ -364,12 +366,12 @@ export default function Depression2QPage() {
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#f8e8ea]">
-                  <ClipboardList size={25} className="text-[#b91c2b]" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#eee9f9]">
+                  <ClipboardList size={25} className="text-[#5b3ea6]" />
                 </div>
 
                 <div>
-                  <p className="text-sm font-semibold tracking-wide text-[#b91c2b]">
+                  <p className="text-sm font-semibold tracking-wide text-[#5b3ea6]">
                     แบบประเมินสุขภาพจิต
                   </p>
 
@@ -379,13 +381,9 @@ export default function Depression2QPage() {
                 </div>
               </div>
 
-              <Link
-                href="/assessment-menu-mental-health"
-                className="flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-[#666770] border border-[#eee5e6] shadow-sm transition hover:bg-gray-50"
-              >
-                <ArrowLeft size={16} />
-                กลับสู่เมนู
-              </Link>
+              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+              <HealthConsentNotice />
+              <AssessmentBackLink href="/assessment-menu-mental-health" />
             </div>
 
             <p className="mt-4 max-w-2xl text-sm leading-7 text-[#777780]">
@@ -416,7 +414,7 @@ export default function Depression2QPage() {
                 </p>
               </div>
 
-              <div className="text-sm font-semibold text-[#b91c2b]">
+              <div className="text-sm font-semibold text-[#5b3ea6]">
                 {Math.round(progress)}%
               </div>
             </div>
@@ -424,7 +422,7 @@ export default function Depression2QPage() {
             {/* Progress bar */}
             <div className="h-2.5 overflow-hidden rounded-full bg-[#f1eeee]">
               <div
-                className="h-full rounded-full bg-[#b91c2b] transition-all duration-300"
+                className="h-full rounded-full bg-[#5b3ea6] transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
             </div>
@@ -451,9 +449,9 @@ export default function Depression2QPage() {
                       transition
                       ${
                         active
-                          ? "bg-[#b91c2b] text-white shadow-sm"
+                          ? "bg-[#5b3ea6] text-white shadow-sm"
                           : answered
-                          ? "bg-[#f8e8ea] text-[#b91c2b]"
+                          ? "bg-[#eee9f9] text-[#5b3ea6]"
                           : "bg-[#f5f5f6] text-[#999aa2]"
                       }
                     `}
@@ -472,7 +470,7 @@ export default function Depression2QPage() {
             <div className="rounded-[28px] border border-[#eee5e6] bg-white p-6 shadow-sm sm:p-8">
               {/* Question number badge */}
               <div className="mb-6 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#b91c2b] text-sm font-bold text-white shadow-sm">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#5b3ea6] text-sm font-bold text-white shadow-sm">
                   {currentQuestion + 1}
                 </div>
 
@@ -518,8 +516,8 @@ export default function Depression2QPage() {
                         text-left transition-all
                         ${
                           selected
-                            ? "border-[#b91c2b] bg-[#fff5f6] shadow-sm"
-                            : "border-[#eee9e9] bg-white hover:border-[#d9a6ad] hover:bg-[#fffafa]"
+                            ? "border-[#5b3ea6] bg-[#f7f4fc] shadow-sm"
+                            : "border-[#eee9e9] bg-white hover:border-[#d4c9ee] hover:bg-[#f7f4fc]"
                         }
                       `}
                     >
@@ -530,13 +528,13 @@ export default function Depression2QPage() {
                           rounded-full border-2
                           ${
                             selected
-                              ? "border-[#b91c2b]"
+                              ? "border-[#5b3ea6]"
                               : "border-[#c8c8ce]"
                           }
                         `}
                       >
                         {selected ? (
-                          <div className="h-3.5 w-3.5 rounded-full bg-[#b91c2b]" />
+                          <div className="h-3.5 w-3.5 rounded-full bg-[#5b3ea6]" />
                         ) : (
                           <Circle size={10} className="text-transparent" />
                         )}
@@ -546,7 +544,7 @@ export default function Depression2QPage() {
                         className={`
                           text-base font-medium
                           ${
-                            selected ? "text-[#b91c2b] font-semibold" : "text-[#55565e]"
+                            selected ? "text-[#5b3ea6] font-semibold" : "text-[#55565e]"
                           }
                         `}
                       >
@@ -556,7 +554,7 @@ export default function Depression2QPage() {
                       {selected && (
                         <CheckCircle2
                           size={22}
-                          className="ml-auto shrink-0 text-[#b91c2b]"
+                          className="ml-auto shrink-0 text-[#5b3ea6]"
                         />
                       )}
                     </button>
@@ -596,7 +594,7 @@ export default function Depression2QPage() {
                   type="button"
                   onClick={handleNext}
                   disabled={submitting}
-                  className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#b91c2b] px-7 font-semibold text-white shadow-[0_10px_25px_rgba(185,28,43,0.18)] transition hover:bg-[#9f1726] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-[#5b3ea6] px-7 font-semibold text-white shadow-[0_10px_25px_rgba(91,62,166,0.18)] transition hover:bg-[#4a3289] active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? (
                     <>
@@ -620,7 +618,7 @@ export default function Depression2QPage() {
           )}
 
           {/* Footer Note */}
-          <div className="mt-6 rounded-2xl bg-[#fffafa] border border-[#f5ecec] px-5 py-4">
+          <div className="mt-6 rounded-2xl bg-[#f7f4fc] border border-[#f5ecec] px-5 py-4">
             <p className="text-center text-xs leading-6 text-[#999aa2]">
               แบบคัดกรอง 2Q เป็นการประเมินเบื้องต้น หากผลพบความเสี่ยง ระบบจะนำท่านเข้าสู่แบบประเมินโรคซึมเศร้า 9Q เพื่อการประเมินที่ละเอียดต่อไป
             </p>

@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 
 /* =========================================================
-   TYPES (ตรงกับ /api/dashboard และ /api/notifications)
+   TYPES (ตรงกับ /api/dashboard)
 ========================================================= */
 
 type Assessment = {
@@ -53,13 +53,6 @@ type DashboardData = {
   };
   latestByType: Assessment[];
   assessments: Assessment[];
-};
-
-type NotifSummary = {
-  total: number;
-  unreadCount: number;
-  dueCount: number;
-  upcomingCount: number;
 };
 
 type Category = "mind" | "body";
@@ -337,7 +330,6 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [data, setData] = useState<DashboardData | null>(null);
-  const [notifSummary, setNotifSummary] = useState<NotifSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userName, setUserName] = useState("");
@@ -356,17 +348,11 @@ export default function DashboardPage() {
           throw new Error("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
         }
 
-        // โหลด Dashboard และการแจ้งเตือนพร้อมกัน
-        const [dashRes, notifRes] = await Promise.all([
-          fetch(`/api/dashboard?userId=${encodeURIComponent(userId)}`, {
-            method: "GET",
-            cache: "no-store",
-          }),
-          fetch(`/api/notifications?userId=${encodeURIComponent(userId)}`, {
-            method: "GET",
-            cache: "no-store",
-          }),
-        ]);
+        // กระดิ่งแจ้งเตือน (NotificationBell) โหลดการแจ้งเตือนเอง
+        const dashRes = await fetch(`/api/dashboard?userId=${encodeURIComponent(userId)}`, {
+          method: "GET",
+          cache: "no-store",
+        });
 
         // session หมดอายุ → กลับไปหน้า login
         if (dashRes.status === 401) {
@@ -376,16 +362,11 @@ export default function DashboardPage() {
         }
 
         const result = await dashRes.json();
-        const notifResult = await notifRes.json();
 
         if (!dashRes.ok) {
           throw new Error(result.message || "ไม่สามารถโหลด Dashboard ได้");
         }
         setData(result);
-
-        if (notifResult.success) {
-          setNotifSummary(notifResult.summary || null);
-        }
       } catch (err) {
         console.error(err);
         setError(err instanceof Error ? err.message : "ไม่สามารถโหลดข้อมูลได้");
@@ -416,7 +397,6 @@ export default function DashboardPage() {
         <DashboardContent
           data={data}
           userName={userName}
-          notifSummary={notifSummary}
           openResult={openResult}
         />
       ) : null}
@@ -444,12 +424,10 @@ function PageShell({ children }: { children: ReactNode }) {
 function DashboardContent({
   data,
   userName,
-  notifSummary,
   openResult,
 }: {
   data: DashboardData;
   userName: string;
-  notifSummary: NotifSummary | null;
   openResult: (a: Assessment) => void;
 }) {
   const router = useRouter();
@@ -457,7 +435,6 @@ function DashboardContent({
   const latest = summary.latestAssessment;
 
   const okTypes = latestByType.filter((a) => getLevel(a) === "ok");
-  const dueCount = notifSummary?.dueCount ?? 0;
 
   // ส่วนที่ไม่จำเป็นต้องเห็นตลอด ซ่อนไว้ก่อน กดดูได้ (จำสถานะไว้ในเบราว์เซอร์)
   const [allCardsOpen, toggleAllCards] = useToggle("dashboard.cards", false);
@@ -497,19 +474,6 @@ function DashboardContent({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <Link
-            href="/notifications"
-            className="inline-flex items-center gap-2 min-h-12 px-4 rounded-2xl bg-white border border-[#E7E4DC] font-semibold text-[#16181D] hover:bg-[#F6F5F1]"
-          >
-            <CalendarDays size={18} className="text-[#4A4F59]" />
-            รอบติดตาม
-            {dueCount > 0 && (
-              <span className="min-w-5 px-1.5 py-0.5 rounded-full text-white text-[11px] font-bold text-center" style={{ background: ACCENT }}>
-                {dueCount}
-              </span>
-            )}
-          </Link>
-
           <NotificationBell />
 
           <Link

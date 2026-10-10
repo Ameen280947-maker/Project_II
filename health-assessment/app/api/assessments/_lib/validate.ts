@@ -122,14 +122,17 @@ export type ResolvedAnswers =
   จับคู่คำตอบกับตัวเลือกจริงในฐานข้อมูล แล้วรวมคะแนนจากฐานข้อมูล
   - ถ้าส่ง choiceId มา ใช้ choiceId (ไม่งั้นใช้ choiceText ที่ตรงกันทุกตัวอักษร)
   - ปฏิเสธ: คำถามของแบบประเมินอื่น, ตอบข้อเดียวกันซ้ำ, ตัวเลือกที่ไม่มีจริง
-  - ต้องตอบครบทุกคำถามที่ใช้งานอยู่
+  - ต้องตอบครบทุกคำถามที่ใช้งานอยู่ ยกเว้นข้อใน skippedIds (ข้อที่ถูกข้ามตามเงื่อนไข)
   picked เรียงตามลำดับคำถาม
 */
 export function resolveChoiceAnswers(
   choices: ChoiceRow[],
   submitted: SubmittedChoice[],
+  skippedIds: ReadonlySet<number> = new Set(),
 ): ResolvedAnswers {
-  const requiredIds = new Set(choices.map((c) => c.question_id));
+  const requiredIds = new Set(
+    choices.map((c) => c.question_id).filter((id) => !skippedIds.has(id)),
+  );
 
   if (requiredIds.size === 0) {
     return { ok: false, message: "ไม่พบคำถามของแบบประเมินนี้" };

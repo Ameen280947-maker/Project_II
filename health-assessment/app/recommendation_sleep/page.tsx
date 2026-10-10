@@ -2,17 +2,20 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import {
-    CheckCircle2,
-    AlertTriangle,
-    ShieldAlert,
-    Moon,
-    ArrowRight,
-    Loader2,
-    CalendarDays,
-} from "lucide-react";
-import AnswerReview from "@/app/components/AnswerReview";
+import { Moon } from "lucide-react";
+import RecommendationLayout, {
+    RECOMMENDATION_TONES,
+    RecommendationError,
+    RecommendationLoading,
+    RecommendationSection,
+    ScoreCircle,
+    type RiskColor,
+} from "@/app/components/recommendation/RecommendationLayout";
+
+const TONE = "violet";
+
+// คะแนนเต็มของแบบประเมินการนอน (≥3 = เพียงพอ)
+const MAX_SCORE = 3;
 
 type Recommendation = {
     id: number;
@@ -32,6 +35,16 @@ type ResultData = {
     createdAt: string;
     recommendation: Recommendation;
 };
+
+/* =====================================================
+   สีป้ายระดับตามคะแนน: 3 เพียงพอ, 2 ไม่เพียงพอ, ต่ำกว่านั้นเสี่ยงสูง
+===================================================== */
+
+function getRiskColor(score: number): RiskColor {
+    if (score >= 3) return "green";
+    if (score === 2) return "yellow";
+    return "red";
+}
 
 export default function RecommendationSleepPage() {
     const router = useRouter();
@@ -129,24 +142,7 @@ export default function RecommendationSleepPage() {
 
     // ไม่มี recordId → ข้ามไปแสดงหน้าไม่พบผลแทนการโหลดค้าง
     if (recordId === undefined || (recordId && loading)) {
-        return (
-            <main className="flex min-h-screen items-center justify-center bg-[#FCFBFA]">
-
-                <div className="flex flex-col items-center gap-4">
-
-                    <Loader2
-                        size={42}
-                        className="animate-spin text-[#5D9F61]"
-                    />
-
-                    <p className="text-[#777780]">
-                        กำลังโหลดผลการประเมิน...
-                    </p>
-
-                </div>
-
-            </main>
-        );
+        return <RecommendationLoading tone={TONE} />;
     }
 
     // =====================================================
@@ -155,331 +151,80 @@ export default function RecommendationSleepPage() {
 
     if (!result || !result.recommendation) {
         return (
-            <main className="flex min-h-screen items-center justify-center bg-[#FCFBFA]">
-
-                <div className="text-center">
-
-                    <AlertTriangle
-                        size={50}
-                        className="mx-auto text-[#D5B900]"
-                    />
-
-                    <h2 className="mt-4 text-xl font-bold text-[#303038]">
-                        ไม่พบผลการประเมิน
-                    </h2>
-
-                    <p className="mt-2 text-[#888890]">
-                        {error ||
-                            "กรุณากลับไปทำแบบประเมินใหม่"}
-                    </p>
-
-                    <button
-                        type="button"
-                        onClick={() =>
-                            router.push(
-                                "/sleep-assessment"
-                            )
-                        }
-                        className="mt-6 rounded-2xl bg-[#5D9F61] px-6 py-3 font-semibold text-white"
-                    >
-                        ทำแบบประเมินอีกครั้ง
-                    </button>
-
-                    <Link
-                        href="/assessment-menu-behavior"
-                        className="mt-4 block text-sm font-semibold text-[#5D9F61] hover:underline"
-                    >
-                        กลับไปหน้าเมนูแบบประเมิน
-                    </Link>
-
-                </div>
-
-            </main>
-        );
-    }
-
-    const recommendation =
-        result.recommendation;
-
-    const score = result.score;
-
-
-    // =====================================================
-    // วันที่
-    // =====================================================
-
-    const formattedDate =
-        new Date(
-            result.createdAt
-        ).toLocaleDateString("th-TH", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-        });
-
-    return (
-        <main className="min-h-screen bg-[#FCFBFA]">
-
-            <div className="mx-auto max-w-5xl px-6 py-14">
-
-                {/* =================================================
-            Header
-        ================================================= */}
-
-                <div className="mb-8">
-
-                    <p className="mb-3 text-sm font-bold tracking-[0.2em] text-[#56965B]">
-                        HEALTH ASSESSMENT
-                    </p>
-
-                    <h1 className="text-4xl font-bold text-[#303038]">
-                        ผลการประเมินการนอนหลับ
-                    </h1>
-
-                    <p className="mt-3 text-lg text-[#92929A]">
-                        ผลการประเมินและคำแนะนำสำหรับคุณ
-                    </p>
-
-                </div>
-
-
-                {/* =================================================
-            Main Card
-        ================================================= */}
-
-                <div className="overflow-hidden rounded-[30px] border border-[#E7E5E2] bg-white shadow-[0_10px_40px_rgba(0,0,0,0.04)]">
-
-                    {/* Color Bar */}
-
-                    <div
-                        className="h-3 w-full"
-                        style={{
-                            backgroundColor:
-                                recommendation.color,
-                        }}
-                    />
-
-
-                    <div className="p-8 md:p-10">
-
-                        {/* =================================================
-                Icon
-            ================================================= */}
-
-                        <div className="flex flex-col items-center text-center">
-
-                            <ResultIcon score={score} />
-
-                            <p className="mt-6 text-sm font-semibold text-[#99999F]">
-                                คะแนนของคุณ
-                            </p>
-
-                            <div className="mt-1">
-
-                                <span className="text-6xl font-bold text-[#303038]">
-                                    {score}
-                                </span>
-
-                                <span className="ml-2 text-xl text-[#99999F]">
-                                    คะแนน
-                                </span>
-
-                            </div>
-
-
-                            {/* Interpretation */}
-
-                            <h2 className="mt-5 text-3xl font-bold text-[#303038]">
-                                {recommendation.interpretation}
-                            </h2>
-
-
-                            {/* Title */}
-
-                            {recommendation.title && (
-                                <p className="mt-3 text-lg font-semibold text-[#55555D]">
-                                    {recommendation.title}
-                                </p>
-                            )}
-
-
-                            {/* Description */}
-
-                            {recommendation.description && (
-                                <p className="mt-3 max-w-2xl leading-7 text-[#85858D]">
-                                    {recommendation.description}
-                                </p>
-                            )}
-
-                        </div>
-
-
-                        {/* =================================================
-                Date
-            ================================================= */}
-
-                        <div className="mt-7 flex items-center justify-center gap-2 text-sm text-[#99999F]">
-
-                            <CalendarDays size={16} />
-
-                            ประเมินเมื่อ {formattedDate}
-
-                        </div>
-
-
-                        {/* =================================================
-                Recommendation
-            ================================================= */}
-
-                        <div className="mt-10 rounded-[24px] bg-[#F8F8F6] p-7">
-
-                            <div className="flex items-center gap-3">
-
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAF5E7]">
-
-                                    <Moon
-                                        size={23}
-                                        className="text-[#5D9F61]"
-                                    />
-
-                                </div>
-
-                                <h3 className="text-xl font-bold text-[#303038]">
-                                    คำแนะนำสำหรับคุณ
-                                </h3>
-
-                            </div>
-
-
-                            {/* =================================================
-                  Recommendation List
-              ================================================= */}
-
-                            <div className="mt-6 space-y-4">
-
-                                {Array.isArray(
-                                    recommendation.recommendations
-                                ) &&
-                                    recommendation.recommendations.map(
-                                        (item, index) => (
-                                            <div
-                                                key={index}
-                                                className="flex items-start gap-4"
-                                            >
-
-                                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E5F3E1] text-sm font-bold text-[#5D9F61]">
-                                                    {index + 1}
-                                                </div>
-
-                                                <p className="flex-1 pt-0.5 leading-7 text-[#55555D]">
-                                                    {item}
-                                                </p>
-
-                                            </div>
-                                        )
-                                    )}
-
-                            </div>
-
-                        </div>
-
-
-                        <AnswerReview assessmentId={recordId} className="mt-6" />
-
-                        {/* =================================================
-                Important Note
-            ================================================= */}
-
-                        <div className="mt-6 rounded-2xl border border-[#E8E4D8] bg-[#FFFDF5] p-5">
-
-                            <p className="text-sm leading-6 text-[#77715F]">
-                                <span className="font-bold">
-                                    หมายเหตุ:
-                                </span>{" "}
-                                ผลการประเมินนี้เป็นข้อมูลเบื้องต้น
-                                สำหรับใช้ประกอบการดูแลสุขภาพ
-                                ไม่สามารถใช้แทนการวินิจฉัยจากแพทย์ได้
-                            </p>
-
-                        </div>
-
-
-                        {/* =================================================
-                Finish Button
-            ================================================= */}
-
-                        <button
-                            type="button"
-                            onClick={() =>
-                                router.push("/history")
-                            }
-                            className="mt-8 flex h-14 w-full items-center justify-center gap-3 rounded-2xl bg-[#5D9F61] font-semibold text-white transition hover:bg-[#4F8E53]"
-                        >
-
-                            ดูบันทึกแบบประเมิน
-
-                            <ArrowRight size={20} />
-
-                        </button>
-
-
-                        {/* Back */}
-
-                        <button
-                            type="button"
-                            onClick={() =>
-                                router.push(
-                                    "/assessment-type"
-                                )
-                            }
-                            className="mt-3 h-12 w-full rounded-2xl font-semibold text-[#777780] transition hover:bg-[#F7F7F5]"
-                        >
-                            กลับไปเลือกแบบประเมิน
-                        </button>
-
-                    </div>
-
-                </div>
-
-            </div>
-
-        </main>
-    );
-}
-
-// =====================================================
-// Icon ตามคะแนน
-// =====================================================
-
-function ResultIcon({ score }: { score: number }) {
-    if (score === 3) {
-        return (
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#EDF8E9]">
-                <CheckCircle2
-                    size={46}
-                    className="text-[#65A85B]"
-                />
-            </div>
-        );
-    }
-
-    if (score === 2) {
-        return (
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFFDE5]">
-                <AlertTriangle
-                    size={46}
-                    className="text-[#D1BD00]"
-                />
-            </div>
-        );
-    }
-
-    return (
-        <div className="flex h-20 w-20 items-center justify-center rounded-full bg-[#FFF0ED]">
-            <ShieldAlert
-                size={46}
-                className="text-[#FF321A]"
+            <RecommendationError
+                tone={TONE}
+                message={error || "กรุณากลับไปทำแบบประเมินใหม่"}
+                editHref="/sleep-assessment"
             />
-        </div>
+        );
+    }
+
+    const recommendation = result.recommendation;
+    const score = Number(result.score);
+    const t = RECOMMENDATION_TONES[TONE];
+    const adviceList = Array.isArray(recommendation.recommendations)
+        ? recommendation.recommendations
+        : [];
+
+    return (
+        <RecommendationLayout
+            tone={TONE}
+            title={
+                <>
+                    ผลการประเมิน<span className={t.accent}>การนอนหลับ</span>
+                </>
+            }
+            score={
+                <ScoreCircle
+                    tone={TONE}
+                    progress={score / MAX_SCORE}
+                    value={String(score)}
+                    unit={`/${MAX_SCORE}`}
+                    caption="คะแนน"
+                />
+            }
+            riskLevel={recommendation.interpretation}
+            riskColor={getRiskColor(score)}
+            summary={
+                <>
+                    ผลประเมินของคุณอยู่ในระดับ{" "}
+                    <strong className={t.eyebrow}>{recommendation.interpretation}</strong>
+                    {recommendation.title && <> — {recommendation.title}</>}
+                </>
+            }
+            recommendation={recommendation.description}
+            assessmentId={recordId}
+            editHref="/sleep-assessment"
+            menuHref="/assessment-menu-behavior"
+            disclaimer="ผลการประเมินนี้เป็นข้อมูลเบื้องต้น สำหรับใช้ประกอบการดูแลสุขภาพ ไม่สามารถใช้แทนการวินิจฉัยจากแพทย์ได้"
+        >
+            {/* =================================================
+                รายการคำแนะนำการนอน
+            ================================================= */}
+
+            {adviceList.length > 0 && (
+                <RecommendationSection
+                    icon={
+                        <div className={`grid h-11 w-11 place-items-center rounded-full ${t.iconSoft}`}>
+                            <Moon size={23} />
+                        </div>
+                    }
+                    title="คำแนะนำสำหรับคุณ"
+                >
+                    <div className="space-y-4 rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
+                        {adviceList.map((item, index) => (
+                            <div key={index} className="flex items-start gap-4">
+                                <div className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-bold ${t.iconSoft}`}>
+                                    {index + 1}
+                                </div>
+                                <p className="flex-1 pt-0.5 leading-7 text-[#55555D]">
+                                    {item}
+                                </p>
+                            </div>
+                        ))}
+                    </div>
+                </RecommendationSection>
+            )}
+        </RecommendationLayout>
     );
 }

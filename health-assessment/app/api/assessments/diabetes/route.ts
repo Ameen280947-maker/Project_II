@@ -9,6 +9,7 @@ import {
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
+import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -649,6 +650,9 @@ export async function GET(
 
             WHERE hp.user_id = $1
 
+            -- เก็บทุกเวอร์ชัน แถวล่าสุดคือข้อมูลปัจจุบัน
+            ORDER BY hp.profile_id DESC
+
             LIMIT 1
             `,
             [assessment.user_id],
@@ -820,6 +824,9 @@ export async function POST(
   // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(4);
   if (closed) return closed;
+  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
+  const noConsent = await rejectIfNoHealthConsent(auth.userId);
+  if (noConsent) return noConsent;
 
   const userId = auth.userId;
 
@@ -903,6 +910,9 @@ export async function POST(
         FROM health_profile hp
 
         WHERE hp.user_id = $1
+
+        -- เก็บทุกเวอร์ชัน แถวล่าสุดคือข้อมูลปัจจุบัน
+        ORDER BY hp.profile_id DESC
 
         LIMIT 1
         `,

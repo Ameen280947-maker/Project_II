@@ -73,6 +73,40 @@ export async function GET(
     }
 
     /* =========================
+       ประวัติการแก้ไข
+       GET /api/profile?history=1
+       ทุกเวอร์ชันของข้อมูลสุขภาพ ใหม่สุดก่อน
+    ========================= */
+
+    if (request.nextUrl.searchParams.get("history") === "1") {
+      const historyResult = await pool.query(
+        `
+        SELECT
+          profile_id,
+          age,
+          gender,
+          height_cm,
+          weight_kg,
+          waist_cm,
+          smoking,
+          has_diabetes,
+          family_diabetes,
+          created_at
+        FROM health_profile
+        WHERE user_id = $1
+        ORDER BY profile_id DESC
+        LIMIT 100
+        `,
+        [userId],
+      );
+
+      return NextResponse.json({
+        success: true,
+        history: historyResult.rows,
+      });
+    }
+
+    /* =========================
        หา User ก่อน
     ========================= */
 
@@ -132,10 +166,8 @@ export async function GET(
           updated_at
         FROM health_profile
         WHERE user_id = $1
-        ORDER BY
-          updated_at DESC NULLS LAST,
-          created_at DESC NULLS LAST,
-          profile_id DESC
+        -- เก็บทุกเวอร์ชัน แถวล่าสุด (profile_id มากสุด) คือข้อมูลปัจจุบัน
+        ORDER BY profile_id DESC
         LIMIT 1
         `,
         [userId],
@@ -224,9 +256,9 @@ export async function GET(
 
 /* =========================================================
    PUT PROFILE
-
-   สมาชิกใหม่ -> INSERT
-   สมาชิกเก่า -> UPDATE
+   ทุกครั้งที่บันทึกจะ INSERT เป็นเวอร์ชันใหม่ ไม่แก้แถวเดิม
+   (แถวเก่าเก็บไว้เป็นประวัติ แถวล่าสุดคือข้อมูลปัจจุบัน)
+   ถ้าค่าไม่ต่างจากเวอร์ชันล่าสุด จะไม่เพิ่มแถวซ้ำ
 ========================================================= */
 
 export async function PUT(
@@ -523,89 +555,64 @@ export async function PUT(
     }
 
     /* =========================
-       หา Profile เดิม
+       หา Profile เวอร์ชันล่าสุด
+       (ล็อกแถว users ไว้แล้วด้านบน กันบันทึกซ้อนกัน)
     ========================= */
 
     const existingProfile =
-      await client.query<{
-        profile_id: number;
-      }>(
+      await client.query(
         `
-        SELECT profile_id
+        SELECT
+          profile_id,
+          user_id,
+          age,
+          gender,
+          height_cm,
+          weight_kg,
+          waist_cm,
+          smoking,
+          has_diabetes,
+          family_diabetes,
+          created_at,
+          updated_at
         FROM health_profile
         WHERE user_id = $1
-        ORDER BY
-          updated_at DESC NULLS LAST,
-          created_at DESC NULLS LAST,
-          profile_id DESC
+        ORDER BY profile_id DESC
         LIMIT 1
-        FOR UPDATE
         `,
         [userId],
       );
 
     let result;
 
+    const latest =
+      existingProfile.rows[0];
+
+    // เทียบค่าแบบตัวเลข (numeric จากฐานข้อมูลเป็น string)
+    const sameNumber = (a: unknown, b: number | null) =>
+      (a === null || a === undefined ? null : Number(a)) === b;
+
+    const unchanged =
+      latest &&
+      sameNumber(latest.age, age) &&
+      latest.gender === gender &&
+      sameNumber(latest.height_cm, heightCm) &&
+      sameNumber(latest.weight_kg, weightKg) &&
+      sameNumber(latest.waist_cm, waistCm) &&
+      latest.smoking === smoking &&
+      latest.has_diabetes === hasDiabetes &&
+      latest.family_diabetes === familyDiabetes;
+
     /* =====================================================
-       มีแล้ว -> UPDATE
+       ไม่มีอะไรเปลี่ยน -> ไม่เพิ่มเวอร์ชันใหม่
     ===================================================== */
 
-    if (
-      (existingProfile.rowCount ??
-        0) > 0
-    ) {
-      const profileId =
-        existingProfile.rows[0]
-          .profile_id;
-
-      result =
-        await client.query(
-          `
-          UPDATE health_profile
-
-          SET
-            age = $1,
-            gender = $2,
-            height_cm = $3,
-            weight_kg = $4,
-            waist_cm = $5,
-            smoking = $6,
-            has_diabetes = $7,
-            family_diabetes = $8,
-            updated_at = CURRENT_TIMESTAMP
-
-          WHERE profile_id = $9
-
-          RETURNING
-            profile_id,
-            user_id,
-            age,
-            gender,
-            height_cm,
-            weight_kg,
-            waist_cm,
-            smoking,
-            has_diabetes,
-            family_diabetes,
-            created_at,
-            updated_at
-          `,
-          [
-            age,
-            gender,
-            heightCm,
-            weightKg,
-            waistCm,
-            smoking,
-            hasDiabetes,
-            familyDiabetes,
-            profileId,
-          ],
-        );
+    if (unchanged) {
+      result = existingProfile;
     }
 
     /* =====================================================
-       ไม่มี -> INSERT
+       มีการเปลี่ยนแปลง / ยังไม่มีข้อมูล -> INSERT เวอร์ชันใหม่
     ===================================================== */
 
     else {

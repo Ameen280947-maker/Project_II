@@ -4,95 +4,95 @@ import { requireStaff, USER_ROLE_ID } from "@/lib/staff/auth";
 import { EXCLUDED_TYPES, severityOf, riskLabel, typeLabel } from "@/lib/staff/riskLevels";
 import { syncFollowUpCases } from "@/lib/staff/syncFollowUps";
 import { logSystemError } from "@/lib/errorLogger";
+import {
+  KEY_FORMAT,
+  LOCAL_ASSESSED,
+  bucketFor,
+  bucketLabel,
+  inRange,
+  localOf,
+  parseRange,
+  spanDays,
+} from "@/lib/staff/overviewRange";
 
 /* =========================================================
-   GET /api/staff/overview?range=week|month|quarter
+   GET /api/staff/overview?from=YYYY-MM-DD&to=YYYY-MM-DD
    ข้อมูลหน้า "ภาพรวม" ของ Staff ทั้งหมดคำนวณจากตารางจริง
+   - from / to เป็นวันที่ตามเวลาไทย (รวมทั้งสองวัน)
+   - ทุกส่วนคิดตามช่วงเวลานี้ ยกเว้นเคสรอติดตาม ซึ่งเป็นสถานะปัจจุบัน
+   - ยังรับ ?range=week|month|quarter แบบเดิมได้ (นับย้อนจากวันนี้)
 ========================================================= */
-
-const RANGES = {
-  week: { days: 7, bucket: "day" },
-  month: { days: 30, bucket: "week" },
-  quarter: { days: 90, bucket: "month" },
-} as const;
-
-type RangeKey = keyof typeof RANGES;
-
-const TH_DAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
-const TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-
-// แปลง key ของช่วงเวลา (มาจาก SQL) เป็นป้ายภาษาไทย
-function bucketLabel(key: string, bucket: string) {
-  const [y, m, d] = key.split("-").map(Number);
-  if (bucket === "month") return TH_MONTHS[m - 1];
-  const date = new Date(y, m - 1, d);
-  return bucket === "day" ? TH_DAYS[date.getDay()] : `${d} ${TH_MONTHS[m - 1]}`;
-}
-
-// เวลาในฐานข้อมูลเป็น UTC แปลงเป็นเวลาไทยก่อนแบ่งช่วง
-const LOCAL_TS = "((a.assessed_at AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Bangkok')";
-const LOCAL_NOW = "(NOW() AT TIME ZONE 'Asia/Bangkok')";
 
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
 
-  const rangeParam = new URL(request.url).searchParams.get("range") as RangeKey | null;
-  const range: RangeKey = rangeParam && rangeParam in RANGES ? rangeParam : "week";
-  const { days, bucket } = RANGES[range];
-  const keyFormat = bucket === "month" ? "YYYY-MM" : "YYYY-MM-DD";
+  const parsed = parseRange(new URL(request.url).searchParams);
+  if ("error" in parsed) {
+    return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
+  }
+
+  const { from, to } = parsed;
+  const days = spanDays(from, to);
+  const bucket = bucketFor(days);
+  const keyFormat = KEY_FORMAT[bucket];
+  const multiYear = from.slice(0, 4) !== to.slice(0, 4);
 
   try {
     await syncFollowUpCases();
 
     const [usersRes, activeRes, bucketRes, slotsRes, latestRes, urgentRes, waitingRes, recentRes, notesRes] = await Promise.all([
-      // ผู้ใช้ทั้งหมด และผู้ใช้ใหม่ในช่วงเวลา
+      // ผู้ใช้ทั้งหมด ณ สิ้นสุดช่วง และผู้ใช้ใหม่ในช่วง
       pool.query(
-        `SELECT COUNT(*)::int AS total,
-                COUNT(*) FILTER (WHERE created_at >= NOW() - make_interval(days => $2))::int AS new_in_range
+        `SELECT COUNT(*) FILTER (WHERE ${localOf("created_at")} < $3::date + 1)::int AS total,
+                COUNT(*) FILTER (WHERE ${inRange(localOf("created_at"), "$2", "$3")})::int AS new_in_range
            FROM users WHERE role_id = $1`,
-        [USER_ROLE_ID, days]
+        [USER_ROLE_ID, from, to]
       ),
-      // ผู้ใช้ที่ทำแบบประเมินใน 30 วัน
+      // ผู้ใช้ที่ทำแบบประเมินในช่วง
       pool.query(
         `SELECT COUNT(DISTINCT a.user_id)::int AS n
-           FROM assessment a JOIN users u ON u.user_id = a.user_id
-          WHERE u.role_id = $1 AND a.assessed_at >= NOW() - INTERVAL '30 days'`,
-        [USER_ROLE_ID]
+           FROM assessment a
+           JOIN assessment_types t USING (assessment_type_id)
+           JOIN users u ON u.user_id = a.user_id
+          WHERE u.role_id = $1 AND ${inRange(LOCAL_ASSESSED, "$2", "$3")}
+            AND NOT (t.assessment_name = ANY($4))`,
+        [USER_ROLE_ID, from, to, EXCLUDED_TYPES]
       ),
       // จำนวนการประเมินแยกช่วงเวลา + ระดับ
       pool.query(
-        `SELECT to_char(date_trunc($1, ${LOCAL_TS}), $2) AS b,
+        `SELECT to_char(date_trunc($1, ${LOCAL_ASSESSED}), $2) AS b,
                 t.assessment_name, a.risk_level, COUNT(*)::int AS n
            FROM assessment a
            JOIN assessment_types t USING (assessment_type_id)
            JOIN users u ON u.user_id = a.user_id
           WHERE u.role_id = $3
-            AND ${LOCAL_TS} >= date_trunc($1, ${LOCAL_NOW} - make_interval(days => $4))
-            AND NOT (t.assessment_name = ANY($5))
+            AND ${inRange(LOCAL_ASSESSED, "$4", "$5")}
+            AND NOT (t.assessment_name = ANY($6))
           GROUP BY 1, 2, 3`,
-        [bucket, keyFormat, USER_ROLE_ID, days - 1, EXCLUDED_TYPES]
+        [bucket, keyFormat, USER_ROLE_ID, from, to, EXCLUDED_TYPES]
       ),
       // ช่องเวลาทั้งหมดในช่วง (ให้ช่วงที่ไม่มีการประเมินแสดงเป็น 0)
       pool.query(
         `SELECT to_char(g, $2) AS b
            FROM generate_series(
-                  date_trunc($1, ${LOCAL_NOW} - make_interval(days => $3)),
-                  date_trunc($1, ${LOCAL_NOW}),
+                  date_trunc($1, $3::date::timestamp),
+                  date_trunc($1, $4::date::timestamp + INTERVAL '1 day' - INTERVAL '1 second'),
                   ('1 ' || $1)::interval) AS g`,
-        [bucket, keyFormat, days - 1]
+        [bucket, keyFormat, from, to]
       ),
-      // ผลล่าสุดของแต่ละคน/แต่ละแบบประเมิน (ใช้คิดสัดส่วนความเสี่ยง)
+      // ผลล่าสุดในช่วงของแต่ละคน/แต่ละแบบประเมิน (ใช้คิดสัดส่วนความเสี่ยง)
       pool.query(
         `SELECT DISTINCT ON (a.user_id, a.assessment_type_id) t.assessment_name, a.risk_level
            FROM assessment a
            JOIN assessment_types t USING (assessment_type_id)
            JOIN users u ON u.user_id = a.user_id
           WHERE u.role_id = $1 AND NOT (t.assessment_name = ANY($2))
+            AND ${inRange(LOCAL_ASSESSED, "$3", "$4")}
           ORDER BY a.user_id, a.assessment_type_id, a.assessed_at DESC`,
-        [USER_ROLE_ID, EXCLUDED_TYPES]
+        [USER_ROLE_ID, EXCLUDED_TYPES, from, to]
       ),
-      // เคสรอติดตาม (เฉพาะผู้ที่ยินยอมให้เจ้าหน้าที่ติดตาม)
+      // เคสรอติดตาม (สถานะปัจจุบัน เฉพาะผู้ที่ยินยอมให้เจ้าหน้าที่ติดตาม)
       pool.query(
         `SELECT c.case_id, c.severity, c.created_at, u.username, t.assessment_name, a.risk_level, a.total_score
            FROM follow_up_cases c
@@ -111,37 +111,44 @@ export async function GET(request: NextRequest) {
            JOIN user_settings s ON s.user_id::text = c.user_id::text
           WHERE c.status = 'waiting' AND s.consent_staff IS TRUE`
       ),
-      // การประเมินล่าสุด
+      // การประเมินล่าสุดในช่วง
       pool.query(
         `SELECT u.username, t.assessment_name, a.risk_level, a.assessed_at
            FROM assessment a
            JOIN assessment_types t USING (assessment_type_id)
            JOIN users u ON u.user_id = a.user_id
           WHERE u.role_id = $1 AND NOT (t.assessment_name = ANY($2))
+            AND ${inRange(LOCAL_ASSESSED, "$3", "$4")}
           ORDER BY a.assessed_at DESC LIMIT 6`,
-        [USER_ROLE_ID, EXCLUDED_TYPES]
+        [USER_ROLE_ID, EXCLUDED_TYPES, from, to]
       ),
-      // บันทึกการติดตามล่าสุด
+      // บันทึกการติดตามล่าสุดในช่วง (created_at เป็น timestamptz)
       pool.query(
         `SELECT s.username AS staff, u.username AS target, n.status, n.created_at
            FROM follow_up_notes n
            JOIN follow_up_cases c ON c.case_id = n.case_id
            JOIN users u ON u.user_id = c.user_id
            LEFT JOIN users s ON s.user_id = n.staff_id
-          ORDER BY n.created_at DESC LIMIT 4`
+          WHERE ${inRange("(n.created_at AT TIME ZONE 'Asia/Bangkok')", "$1", "$2")}
+          ORDER BY n.created_at DESC LIMIT 4`,
+        [from, to]
       ),
     ]);
 
     /* ---------- chart ---------- */
     const chartMap = new Map<string, { label: string; total: number; high: number }>(
-      slotsRes.rows.map((r) => [r.b, { label: bucketLabel(r.b, bucket), total: 0, high: 0 }])
+      slotsRes.rows.map((r) => [r.b, { label: bucketLabel(r.b, bucket, days, multiYear), total: 0, high: 0 }])
     );
     let assessmentsInRange = 0;
+    let highInRange = 0;
     for (const r of bucketRes.rows) {
       const slot = chartMap.get(r.b);
       if (!slot) continue;
       slot.total += r.n;
-      if (severityOf(r.assessment_name, r.risk_level) >= 2) slot.high += r.n;
+      if (severityOf(r.assessment_name, r.risk_level) >= 2) {
+        slot.high += r.n;
+        highInRange += r.n;
+      }
       assessmentsInRange += r.n;
     }
 
@@ -181,12 +188,15 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      range,
+      from,
+      to,
+      bucket,
       kpi: {
         totalUsers: usersRes.rows[0].total,
         newUsers: usersRes.rows[0].new_in_range,
         assessments: assessmentsInRange,
-        activeUsers30d: activeRes.rows[0].n,
+        highRisk: highInRange,
+        activeUsers: activeRes.rows[0].n,
         waiting: waitingRes.rows[0].waiting,
         overdue: waitingRes.rows[0].overdue,
       },

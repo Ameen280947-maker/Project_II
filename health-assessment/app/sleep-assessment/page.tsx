@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import {
     Moon,
     ArrowRight,
-    ArrowLeft,
     Loader2,
     Check,
 } from "lucide-react";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 type SleepOption = {
     id: number;
@@ -174,25 +175,6 @@ export default function SleepAssessmentPage() {
     }
 
     // =====================================================
-    // ย้อนกลับ
-    // =====================================================
-
-    function handleBack() {
-        if (currentQuestion > 0) {
-            setCurrentQuestion(
-                currentQuestion - 1
-            );
-
-            window.scrollTo({
-                top: 0,
-                behavior: "smooth",
-            });
-        } else {
-            router.back();
-        }
-    }
-
-    // =====================================================
     // Submit
     // =====================================================
 
@@ -277,7 +259,7 @@ export default function SleepAssessmentPage() {
                 <div className="flex flex-col items-center gap-4">
                     <Loader2
                         size={40}
-                        className="animate-spin text-[#5D9F61]"
+                        className="animate-spin text-[#5b3ea6]"
                     />
 
                     <p className="text-[#777780]">
@@ -312,7 +294,7 @@ export default function SleepAssessmentPage() {
                     <button
                         type="button"
                         onClick={() => router.back()}
-                        className="mt-6 rounded-2xl bg-[#5D9F61] px-6 py-3 font-semibold text-white"
+                        className="mt-6 rounded-2xl bg-[#5b3ea6] px-6 py-3 font-semibold text-white"
                     >
                         ย้อนกลับ
                     </button>
@@ -330,20 +312,21 @@ export default function SleepAssessmentPage() {
             Header
         ================================================= */}
 
-                <div className="mb-8">
+                <div className="mb-8 flex items-start justify-between gap-4">
+                    <div className="min-w-0">
 
-                    <p className="mb-3 text-sm font-bold tracking-[0.2em] text-[#56965B]">
+                    <p className="mb-3 text-sm font-bold tracking-[0.2em] text-[#5b3ea6]">
                         HEALTH ASSESSMENT
                     </p>
 
                     <h1 className="text-4xl font-bold text-[#303038]">
                         แบบประเมินการนอนหลับ
                     </h1>
+                    </div>
 
-                    <p className="mt-3 text-lg text-[#92929A]">
-                        ประเมินพฤติกรรมการนอนหลับ
-                        และปัจจัยที่เกี่ยวข้องกับสุขภาพ
-                    </p>
+                    {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+                    <HealthConsentNotice />
+                    <AssessmentBackLink href="/assessment-menu-behavior" />
 
                 </div>
 
@@ -360,7 +343,7 @@ export default function SleepAssessmentPage() {
                             ความคืบหน้า
                         </span>
 
-                        <span className="text-sm font-semibold text-[#5D9F61]">
+                        <span className="text-sm font-semibold text-[#5b3ea6]">
                             {currentQuestion + 1} /{" "}
                             {questions.length}
                         </span>
@@ -392,7 +375,7 @@ export default function SleepAssessmentPage() {
 
                     <div className="flex items-center gap-5">
 
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#EEF8EA]">
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-[#eee9f9]">
 
                             <Moon
                                 size={32}
@@ -426,7 +409,7 @@ export default function SleepAssessmentPage() {
 
                     <div className="mb-7 flex items-start gap-4">
 
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#EDF8E9] font-bold text-[#5D9F61]">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#eee9f9] font-bold text-[#5b3ea6]">
 
                             {question.questionNo}
 
@@ -462,8 +445,8 @@ export default function SleepAssessmentPage() {
                                             )
                                         }
                                         className={`flex w-full items-center gap-4 rounded-2xl border p-5 text-left transition-all ${isSelected
-                                            ? "border-[#A8D6A2] bg-[#F3FAF1]"
-                                            : "border-[#ECE9E7] bg-white hover:border-[#C6DCC2] hover:bg-[#FAFCF9]"
+                                            ? "border-[#d4c9ee] bg-[#f7f4fc]"
+                                            : "border-[#ECE9E7] bg-white hover:border-[#d4c9ee] hover:bg-[#f7f4fc]"
                                             }`}
                                     >
 
@@ -471,13 +454,13 @@ export default function SleepAssessmentPage() {
 
                                         <span
                                             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${isSelected
-                                                ? "border-[#5D9F61]"
+                                                ? "border-[#5b3ea6]"
                                                 : "border-[#D5D5D5]"
                                                 }`}
                                         >
 
                                             {isSelected && (
-                                                <span className="h-3 w-3 rounded-full bg-[#5D9F61]" />
+                                                <span className="h-3 w-3 rounded-full bg-[#5b3ea6]" />
                                             )}
 
                                         </span>
@@ -500,7 +483,7 @@ export default function SleepAssessmentPage() {
                                         {isSelected && (
                                             <Check
                                                 size={21}
-                                                className="shrink-0 text-[#5D9F61]"
+                                                className="shrink-0 text-[#5b3ea6]"
                                             />
                                         )}
 
@@ -520,26 +503,12 @@ export default function SleepAssessmentPage() {
 
                         <button
                             type="button"
-                            onClick={handleBack}
-                            disabled={saving}
-                            className="flex h-14 w-[30%] items-center justify-center gap-2 rounded-2xl border border-[#E2DFDD] bg-white font-semibold text-[#777780] transition hover:bg-[#F8F8F6] disabled:opacity-50"
-                        >
-
-                            <ArrowLeft size={19} />
-
-                            ย้อนกลับ
-
-                        </button>
-
-
-                        <button
-                            type="button"
                             onClick={handleNext}
                             disabled={
                                 saving ||
                                 !selectedAnswer
                             }
-                            className="flex h-14 flex-1 items-center justify-center gap-3 rounded-2xl bg-[#5D9F61] font-semibold text-white transition hover:bg-[#4F8E53] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex h-14 flex-1 items-center justify-center gap-3 rounded-2xl bg-[#5b3ea6] font-semibold text-white transition hover:bg-[#4a3289] disabled:cursor-not-allowed disabled:opacity-40"
                         >
 
                             {saving ? (

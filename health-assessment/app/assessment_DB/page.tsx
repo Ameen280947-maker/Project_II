@@ -9,6 +9,8 @@ import {
 } from "lucide-react";
 
 import { useState } from "react";
+import AssessmentBackLink from "@/app/components/AssessmentBackLink";
+import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 
 type SubmitResponse = {
   success: boolean;
@@ -197,31 +199,33 @@ export default function BloodPressureAssessmentPage() {
 
         {/* Content */}
 
-        <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-12">
+        <section className="flex min-h-screen min-w-0 flex-1 flex-col px-5 py-7 sm:px-8 lg:px-12">
 
-          <header>
+          <header className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
 
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
-              แบบประเมินสุขภาพเบื้องต้น
+            <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2f4fa0]">
+              Blood Pressure Assessment
             </p>
 
-            <h1 className="mt-3 text-4xl font-black">
-              Assessment-
-              <span className="text-[#b91c2b]">
+            <h1 className="mt-3 text-3xl font-black leading-tight sm:text-4xl lg:text-[42px]">
+              แบบประเมิน
+              <span className="text-[#4f6fc0]">
                 ความดันโลหิต
               </span>
             </h1>
 
-            <p className="mt-4 text-[#85858d]">
-              กรอกค่าความดันตัวบนและตัวล่าง
-              เพื่อประเมินระดับความดันโลหิตเบื้องต้น
-            </p>
+            </div>
 
+            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
+            <HealthConsentNotice />
+            <AssessmentBackLink href="/assessment-menu" />
           </header>
 
-          <div className="mt-10">
+          {/* จัดฟอร์มให้อยู่กลางพื้นที่ที่เหลือ (ขยับขึ้นเล็กน้อยให้ดูสมดุล) */}
+          <div className="flex flex-1 items-center py-10 lg:pb-24">
 
-            <div className="mx-auto max-w-2xl space-y-7">
+            <div className="mx-auto w-full max-w-2xl space-y-7">
 
               {/* Input card */}
 
@@ -229,7 +233,7 @@ export default function BloodPressureAssessmentPage() {
 
                 <div className="flex items-center gap-4">
 
-                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#fff0f2] text-[#b91c2b]">
+                  <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#e8edf8] text-[#2f4fa0]">
                     <HeartPulse
                       size={27}
                     />
@@ -287,7 +291,7 @@ export default function BloodPressureAssessmentPage() {
                 onClick={
                   handleAssessment
                 }
-                className="group relative flex h-16 w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#c5162d] to-[#9d1426] text-lg font-bold text-white shadow-[0_18px_40px_rgba(185,28,43,0.3)] transition-all hover:shadow-[0_22px_48px_rgba(185,28,43,0.4)] active:scale-[0.99] disabled:opacity-60 disabled:shadow-none"
+                className="group relative flex h-16 w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-[#4f6fc0] to-[#263f82] text-lg font-bold text-white shadow-[0_18px_40px_rgba(47,79,160,0.3)] transition-all hover:shadow-[0_22px_48px_rgba(47,79,160,0.4)] active:scale-[0.99] disabled:opacity-60 disabled:shadow-none"
               >
 
                 <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/15 to-transparent transition-transform duration-700 group-hover:translate-x-full" />
@@ -340,7 +344,7 @@ function PressureInput({
         {label}
       </span>
 
-      <div className="mt-3 flex h-20 items-center rounded-2xl border border-[#e8dfe0] bg-[#faf8f8] px-5 focus-within:border-[#b91c2b]">
+      <div className="mt-3 flex h-20 items-center rounded-2xl border border-[#e8dfe0] bg-[#faf8f8] px-5 focus-within:border-[#2f4fa0]">
 
         <input
           type="number"
@@ -353,7 +357,7 @@ function PressureInput({
               event.target.value,
             )
           }
-          className="min-w-0 flex-1 bg-transparent text-2xl font-bold text-[#b91c2b] outline-none placeholder:font-normal placeholder:text-[#c9c3c4]"
+          className="min-w-0 flex-1 bg-transparent text-2xl font-bold text-[#2f4fa0] outline-none placeholder:font-normal placeholder:text-[#c9c3c4]"
         />
 
         <span className="ml-3 text-xs font-semibold text-[#8b8c94]">
