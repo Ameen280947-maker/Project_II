@@ -175,6 +175,21 @@ export async function POST(
         0) > 0;
 
     /* =========================
+       บันทึกเวลาเข้าสู่ระบบล่าสุด
+       (ใช้นับ "ใช้งานล่าสุด" ในหน้าผู้ใช้งานของ staff)
+       ไม่ให้การบันทึกล้มเหลวทำให้ล็อกอินไม่ได้
+    ========================= */
+
+    await pool
+      .query(
+        `UPDATE users SET last_login_at = NOW() WHERE user_id = $1`,
+        [user.user_id],
+      )
+      .catch((error) => {
+        console.error("UPDATE last_login_at ERROR:", error);
+      });
+
+    /* =========================
        Login สำเร็จ
     ========================= */
 

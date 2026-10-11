@@ -35,7 +35,7 @@ const SORTS = {
 } as const;
 type SortKey = keyof typeof SORTS;
 
-// ผู้ใช้รายคน พร้อมจำนวนครั้งที่ประเมิน และเวลาใช้งานล่าสุด (สมัคร หรือ ทำแบบประเมินครั้งล่าสุด)
+// ผู้ใช้รายคน พร้อมจำนวนครั้งที่ประเมิน และเวลาใช้งานล่าสุด (สมัคร, ทำแบบประเมิน หรือเข้าสู่ระบบครั้งล่าสุด)
 // $1 = USER_ROLE_ID, $2 = EXCLUDED_TYPES
 const BASE = `
   WITH ac AS (
@@ -52,7 +52,7 @@ const BASE = `
            u.suspended_reason, u.suspended_at,
            ac.last_assessed,
            COALESCE(ac.assessments, 0) AS assessments,
-           GREATEST(ac.last_assessed, u.created_at) AS last_seen
+           GREATEST(ac.last_assessed, u.created_at, u.last_login_at) AS last_seen
       FROM users u
       LEFT JOIN ac ON ac.user_id = u.user_id
      WHERE u.role_id = $1

@@ -149,7 +149,8 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
 
       <ErrorBox message={error} />
 
-      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+      {/* กล่องรายชื่อกว้างขึ้น แผงรายละเอียดด้านขวาแคบลง */}
+      <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         {/* ===== รายชื่อผู้ใช้ ===== */}
         <Card className="!p-4 sm:!p-6">
           <div className="mb-4 flex flex-col gap-3">
@@ -196,14 +197,14 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
           <div className={`transition-opacity ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
             {/* ตารางเลื่อนแนวนอนภายในการ์ดบนจอเล็ก */}
             <div className="-mx-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6">
-              <table className="w-full min-w-[760px] text-sm">
+              <table className="w-full min-w-[680px] text-sm">
                 <thead>
                   <tr className="border-b border-staff-line text-left text-xs text-staff-muted">
                     <th scope="col" className="py-3 pr-3 font-semibold">ผู้ใช้</th>
-                    <th scope="col" className="px-3 font-semibold">สมัครเมื่อ</th>
-                    <th scope="col" className="px-3 font-semibold">ใช้งานล่าสุด</th>
-                    <th scope="col" className="px-3 text-right font-semibold">ประเมิน (ครั้ง)</th>
-                    <th scope="col" className="px-3 font-semibold">สถานะ</th>
+                    <th scope="col" className="px-2 font-semibold">สมัครเมื่อ</th>
+                    <th scope="col" className="px-2 font-semibold">ใช้งานล่าสุด</th>
+                    <th scope="col" className="px-2 text-right font-semibold">ประเมิน</th>
+                    <th scope="col" className="px-2 font-semibold">สถานะ</th>
                     <th scope="col" className="pl-3 text-right font-semibold">
                       <span className="sr-only">จัดการ</span>
                     </th>
@@ -215,23 +216,23 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
                       key={u.userId}
                       className={`border-b border-staff-line/70 last:border-0 ${selectedId === u.userId ? "bg-staff-soft" : ""}`}
                     >
-                      <td className="max-w-[260px] py-3 pr-3">
+                      <td className="py-3 pr-3">
                         <div className="flex min-w-0 items-center gap-3">
                           <Avatar name={u.username} tone={u.status === "suspended" ? "danger" : "brand"} />
                           <div className="min-w-0">
-                            <p className="truncate font-semibold">{u.username}</p>
-                            <p className="truncate text-xs text-staff-muted">{u.email}</p>
+                            <p className="break-all font-semibold">{u.username}</p>
+                            <p className="break-all text-xs text-staff-muted">{u.email}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3">{shortDate(u.createdAt)}</td>
-                      <td className="whitespace-nowrap px-3">{shortDate(u.lastActive)}</td>
-                      <td className="px-3 text-right font-bold tabular-nums">{u.assessments}</td>
-                      <td className="whitespace-nowrap px-3">
+                      <td className="whitespace-nowrap px-2">{shortDate(u.createdAt)}</td>
+                      <td className="whitespace-nowrap px-2">{shortDate(u.lastActive)}</td>
+                      <td className="px-2 text-right font-bold tabular-nums">{u.assessments}</td>
+                      <td className="whitespace-nowrap px-2">
                         <StatusBadge status={u.status} />
                       </td>
                       <td className="whitespace-nowrap py-3 pl-3 text-right">
-                        <div className="inline-flex gap-2">
+                        <div className="inline-flex gap-1.5">
                           <button
                             type="button"
                             onClick={() => view(u.userId)}
@@ -304,7 +305,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
    ชิ้นส่วนย่อย
 ========================================================= */
 
-const smallBtn = "inline-flex h-9 items-center rounded-xl border px-3 text-sm font-semibold transition";
+const smallBtn = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl border px-2.5 text-sm font-semibold transition";
 
 function ActionButton({
   user,
