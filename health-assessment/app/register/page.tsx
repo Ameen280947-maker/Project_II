@@ -245,9 +245,6 @@ export default function RegisterPage() {
                     </span>
                   </label>
                 ))}
-                <p className="text-xs text-[#909199]">
-                  เปลี่ยนความยินยอมได้ภายหลังที่หน้าการตั้งค่า
-                </p>
               </fieldset>
 
               {error && (
