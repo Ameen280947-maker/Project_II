@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
 
 /* =========================================================
    GET /api/admin/system   → ตรวจสอบระบบ
-   คืนค่า: รายการตรวจ (checks) + สถิติ (stats) + ข้อมูลเซิร์ฟเวอร์
+   คืนค่า: รายการตรวจ (checks) + สถิติ (stats)
 ========================================================= */
 
 type CheckStatus = "ok" | "warning" | "error";
@@ -32,6 +32,9 @@ const REQUIRED_TABLES = [
   "backup_history",
 ];
 
+// เริ่มต้นวันนี้ตามเวลาไทย แปลงเป็น UTC (คอลัมน์เวลาเก็บเป็น timestamp UTC)
+const THAI_TODAY_START = `((date_trunc('day', NOW() AT TIME ZONE 'Asia/Bangkok') AT TIME ZONE 'Asia/Bangkok') AT TIME ZONE 'UTC')`;
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -41,20 +44,16 @@ export async function GET(request: NextRequest) {
 
     /* ---------- 1) การเชื่อมต่อฐานข้อมูล ---------- */
     const started = Date.now();
-    const ping = await pool.query(
-      `SELECT version() AS version,
-              pg_database_size(current_database()) AS db_size,
-              current_database() AS db_name,
-              NOW() - pg_postmaster_start_time() AS db_uptime`,
-    );
+    const ping = await pool.query(`SHOW server_version`);
     const latencyMs = Date.now() - started;
-    const db = ping.rows[0];
+    // เช่น "17.6" หรือ "17.6 (Ubuntu ...)" → เอาเฉพาะเลขเวอร์ชัน
+    const dbVersion = String(ping.rows[0]?.server_version ?? "").split(" ")[0];
 
     checks.push({
       key: "db",
       label: "การเชื่อมต่อฐานข้อมูล",
       status: latencyMs > 1000 ? "warning" : "ok",
-      detail: `ตอบสนองใน ${latencyMs} ms`,
+      detail: `PostgreSQL ${dbVersion} · ตอบสนองใน ${latencyMs} ms`,
     });
 
     /* ---------- 2) ตารางที่จำเป็น ---------- */
@@ -85,12 +84,12 @@ export async function GET(request: NextRequest) {
       pool.query(
         `SELECT COUNT(*)::int AS total,
                 COUNT(*) FILTER (WHERE assessed_at >= NOW() - INTERVAL '7 days')::int AS last7,
-                COUNT(*) FILTER (WHERE assessed_at >= NOW() - INTERVAL '1 day')::int AS today
+                COUNT(*) FILTER (WHERE assessed_at >= ${THAI_TODAY_START})::int AS today
          FROM assessment`,
       ),
       pool.query(
         `SELECT COUNT(*) FILTER (WHERE status = 'open')::int AS open,
-                COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '1 day')::int AS last24h
+                COUNT(*) FILTER (WHERE status = 'open' AND created_at >= NOW() - INTERVAL '1 day')::int AS last24h
          FROM system_error_logs`,
       ),
       pool.query(
@@ -120,7 +119,7 @@ export async function GET(request: NextRequest) {
       detail:
         openErrors === 0
           ? "ไม่มีข้อผิดพลาดค้างอยู่"
-          : `ค้างอยู่ ${openErrors} รายการ (24 ชม. ล่าสุด ${errorRes.rows[0].last24h})`,
+          : `ค้างอยู่ ${openErrors} รายการ (เกิดใหม่ใน 24 ชม. ${errorRes.rows[0].last24h})`,
     });
 
     /* ---------- 5) การสำรองข้อมูลล่าสุด ---------- */
@@ -142,24 +141,6 @@ export async function GET(request: NextRequest) {
             : `สำรองล่าสุดเมื่อ ${Math.floor(backupAgeDays)} วันก่อน`,
     });
 
-    /* ---------- 6) Connection pool ---------- */
-    checks.push({
-      key: "pool",
-      label: "Connection Pool",
-      status: pool.waitingCount > 0 ? "warning" : "ok",
-      detail: `ใช้งาน ${pool.totalCount - pool.idleCount} / ว่าง ${pool.idleCount} / รอคิว ${pool.waitingCount}`,
-    });
-
-    /* ---------- 7) หน่วยความจำของ Node ---------- */
-    const mem = process.memoryUsage();
-    const heapPct = Math.round((mem.heapUsed / mem.heapTotal) * 100);
-    checks.push({
-      key: "memory",
-      label: "หน่วยความจำเซิร์ฟเวอร์",
-      status: heapPct > 90 ? "warning" : "ok",
-      detail: `Heap ${formatBytes(mem.heapUsed)} / ${formatBytes(mem.heapTotal)} (${heapPct}%)`,
-    });
-
     const overall: CheckStatus = checks.some((c) => c.status === "error")
       ? "error"
       : checks.some((c) => c.status === "warning")
@@ -178,54 +159,9 @@ export async function GET(request: NextRequest) {
         openErrors,
         lastBackup,
       },
-      server: {
-        dbName: db.db_name,
-        dbVersion: String(db.version).split(",")[0],
-        dbSize: formatBytes(Number(db.db_size)),
-        dbUptime: formatInterval(db.db_uptime),
-        nodeVersion: process.version,
-        serverUptime: formatSeconds(process.uptime()),
-        platform: `${process.platform} ${process.arch}`,
-        rss: formatBytes(mem.rss),
-      },
     });
   } catch (error) {
     console.error("ADMIN SYSTEM CHECK ERROR:", error);
     return serverError("ตรวจสอบระบบไม่สำเร็จ", error);
   }
-}
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-function formatBytes(bytes: number) {
-  if (!Number.isFinite(bytes)) return "-";
-  const units = ["B", "KB", "MB", "GB", "TB"];
-  let i = 0;
-  let value = bytes;
-  while (value >= 1024 && i < units.length - 1) {
-    value /= 1024;
-    i++;
-  }
-  return `${value.toFixed(value < 10 && i > 0 ? 1 : 0)} ${units[i]}`;
-}
-
-function formatSeconds(total: number) {
-  const d = Math.floor(total / 86400);
-  const h = Math.floor((total % 86400) / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  return d > 0 ? `${d} วัน ${h} ชม.` : h > 0 ? `${h} ชม. ${m} นาที` : `${m} นาที`;
-}
-
-// pg คืน INTERVAL เป็น object { days, hours, minutes, ... }
-function formatInterval(value: unknown) {
-  if (!value || typeof value !== "object") return String(value ?? "-");
-  const v = value as Record<string, number>;
-  const seconds =
-    (v.days ?? 0) * 86400 +
-    (v.hours ?? 0) * 3600 +
-    (v.minutes ?? 0) * 60 +
-    (v.seconds ?? 0);
-  return formatSeconds(seconds);
 }

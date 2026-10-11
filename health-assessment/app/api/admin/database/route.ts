@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import {
-  listPublicTables,
   quoteIdent,
   requireAdmin,
   serverError,
@@ -15,12 +14,14 @@ export const dynamic = "force-dynamic";
    ดูแลฐานข้อมูล
 
    GET  /api/admin/database
-        → รายการตาราง (จำนวนแถว, ขนาด, dead rows, vacuum/analyze ล่าสุด)
+        → รายการตาราง (จำนวนแถว, ขนาด)
         → ผลตรวจความถูกต้องของข้อมูล (ข้อมูลกำพร้า)
 
    POST /api/admin/database
-        body: { action: "analyze" | "vacuum", table?: string }
-              { action: "fix_integrity", check: string }
+        body: { action: "fix_integrity", check: string }
+
+   ทุก query รันทีละตัว ไม่แย่ง connection กับผู้ใช้
+   (Supabase session pooler รับได้จำกัด)
 ========================================================= */
 
 /* ข้อมูลกำพร้า = แถวที่อ้างถึงข้อมูลแม่ที่ถูกลบไปแล้ว */
@@ -91,59 +92,46 @@ export async function GET(request: NextRequest) {
       `
       SELECT
         s.relname                                   AS table_name,
-        s.n_live_tup::bigint                        AS row_estimate,
-        s.n_dead_tup::bigint                        AS dead_rows,
-        pg_total_relation_size(s.relid)             AS total_bytes,
-        pg_size_pretty(pg_total_relation_size(s.relid)) AS size,
-        GREATEST(s.last_vacuum, s.last_autovacuum)  AS last_vacuum,
-        GREATEST(s.last_analyze, s.last_autoanalyze) AS last_analyze
+        pg_total_relation_size(s.relid)             AS total_bytes
       FROM pg_stat_user_tables s
       WHERE s.schemaname = 'public'
       ORDER BY pg_total_relation_size(s.relid) DESC
       `,
     );
+    const tableNames: string[] = tablesRes.rows.map((r) => r.table_name);
 
-    // จำนวนแถวจริง (n_live_tup เป็นค่าประมาณ) — นับจริงเฉพาะตารางไม่ใหญ่มาก
-    const tables = await Promise.all(
-      tablesRes.rows.map(async (row) => {
-        let rows = Number(row.row_estimate);
-        if (rows < 200_000) {
-          try {
-            const c = await pool.query(
-              `SELECT COUNT(*)::int AS n FROM ${quoteIdent(row.table_name)}`,
-            );
-            rows = c.rows[0].n;
-          } catch {
-            /* ใช้ค่าประมาณแทน */
-          }
-        }
-        return {
-          table_name: row.table_name as string,
-          rows,
-          dead_rows: Number(row.dead_rows),
-          size: row.size as string,
-          total_bytes: Number(row.total_bytes),
-          last_vacuum: row.last_vacuum,
-          last_analyze: row.last_analyze,
-        };
-      }),
-    );
+    // นับจำนวนแถวจริงทุกตารางใน query เดียว (ใช้ connection เดียว)
+    const counts: number[] = [];
+    if (tableNames.length) {
+      const countRes = await pool.query(
+        tableNames
+          .map((t, i) => `SELECT ${i} AS i, COUNT(*)::int AS n FROM ${quoteIdent(t)}`)
+          .join(" UNION ALL "),
+      );
+      for (const r of countRes.rows) counts[r.i] = r.n;
+    }
 
-    const integrity = await Promise.all(
-      INTEGRITY_CHECKS.map(async (check) => {
-        try {
-          const r = await pool.query(check.countSql);
-          return { key: check.key, label: check.label, count: r.rows[0].n as number, error: null };
-        } catch (error) {
-          return {
-            key: check.key,
-            label: check.label,
-            count: null,
-            error: error instanceof Error ? error.message : "ตรวจไม่ได้",
-          };
-        }
-      }),
-    );
+    const tables = tablesRes.rows.map((row, i) => ({
+      table_name: row.table_name as string,
+      rows: counts[i] ?? 0,
+      total_bytes: Number(row.total_bytes),
+    }));
+
+    // ตรวจข้อมูลกำพร้าทีละรายการ
+    const integrity = [];
+    for (const check of INTEGRITY_CHECKS) {
+      try {
+        const r = await pool.query(check.countSql);
+        integrity.push({ key: check.key, label: check.label, count: r.rows[0].n as number, error: null });
+      } catch (error) {
+        integrity.push({
+          key: check.key,
+          label: check.label,
+          count: null,
+          error: error instanceof Error ? error.message : "ตรวจไม่ได้",
+        });
+      }
+    }
 
     const sizeRes = await pool.query(
       `SELECT pg_size_pretty(pg_database_size(current_database())) AS size`,
@@ -172,47 +160,8 @@ export async function POST(request: NextRequest) {
 
     const body = (await request.json().catch(() => ({}))) as {
       action?: string;
-      table?: string;
       check?: string;
     };
-
-    /* ---------- ANALYZE / VACUUM ---------- */
-    if (body.action === "analyze" || body.action === "vacuum") {
-      const allTables = await listPublicTables();
-      let targets = allTables;
-
-      if (body.table) {
-        if (!allTables.includes(body.table)) {
-          return NextResponse.json(
-            { success: false, message: "ไม่พบตารางนี้" },
-            { status: 400 },
-          );
-        }
-        targets = [body.table];
-      }
-
-      const command = body.action === "vacuum" ? "VACUUM (ANALYZE)" : "ANALYZE";
-      const failed: string[] = [];
-
-      // VACUUM รันใน transaction ไม่ได้ จึงใช้ pool.query ทีละตาราง
-      for (const table of targets) {
-        try {
-          await pool.query(`${command} ${quoteIdent(table)}`);
-        } catch (error) {
-          failed.push(table);
-          await logSystemError(`admin ${command} ${table}`, error, "warning");
-        }
-      }
-
-      const label = body.action === "vacuum" ? "VACUUM" : "ANALYZE";
-      return NextResponse.json({
-        success: failed.length === 0,
-        message:
-          failed.length === 0
-            ? `${label} ${targets.length === 1 ? targets[0] : `ทั้งหมด ${targets.length} ตาราง`} เรียบร้อย`
-            : `${label} ไม่สำเร็จ ${failed.length} ตาราง: ${failed.join(", ")} (อาจไม่มีสิทธิ์ owner)`,
-      });
-    }
 
     /* ---------- แก้ไขข้อมูลกำพร้า ---------- */
     if (body.action === "fix_integrity") {

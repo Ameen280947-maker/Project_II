@@ -9,13 +9,11 @@ export const dynamic = "force-dynamic";
    แก้ไขข้อผิดพลาด
 
    GET    /api/admin/errors?status=open|resolved|ignored|all&q=คำค้น
-   POST   /api/admin/errors   { source, message, level }       → บันทึกปัญหาเอง
    PATCH  /api/admin/errors   { logId, status, note }          → เปลี่ยนสถานะ
-   DELETE /api/admin/errors   { scope: "resolved" }            → ล้างรายการที่แก้แล้ว
+   DELETE /api/admin/errors                                    → ล้างรายการที่แก้แล้วและข้ามไป
 ========================================================= */
 
 const STATUSES = ["open", "resolved", "ignored"] as const;
-const LEVELS = ["error", "warning", "info"] as const;
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,35 +60,6 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error("ADMIN ERRORS GET ERROR:", error);
     return serverError("โหลดรายการข้อผิดพลาดไม่สำเร็จ", error);
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const auth = await requireAdmin(request);
-    if (!auth.ok) return auth.response;
-
-    const body = await request.json().catch(() => ({}));
-    const source = String(body.source ?? "").trim();
-    const message = String(body.message ?? "").trim();
-    const level = (LEVELS as readonly string[]).includes(body.level) ? body.level : "error";
-
-    if (!source || !message) {
-      return NextResponse.json(
-        { success: false, message: "กรุณากรอกตำแหน่งที่พบและรายละเอียดปัญหา" },
-        { status: 400 },
-      );
-    }
-
-    await pool.query(
-      `INSERT INTO system_error_logs (source, message, level) VALUES ($1, $2, $3)`,
-      [source.slice(0, 200), message.slice(0, 5000), level],
-    );
-
-    return NextResponse.json({ success: true, message: "บันทึกปัญหาเรียบร้อย" });
-  } catch (error) {
-    console.error("ADMIN ERRORS POST ERROR:", error);
-    return serverError("บันทึกปัญหาไม่สำเร็จ", error);
   }
 }
 
