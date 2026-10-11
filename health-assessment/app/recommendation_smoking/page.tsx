@@ -22,6 +22,9 @@ const MAX_SCORE = 8;
    TYPES
 ========================================================= */
 
+// คำตอบข้อ 2 (ตลอดชีวิตที่ผ่านมาคุณเคยสูบบุหรี่หรือไม่) ที่แปลว่าไม่เคยสูบ
+const NEVER_SMOKED = "ไม่สูบ";
+
 type Answer = {
   question_id: number;
   question_text: string;
@@ -144,6 +147,11 @@ function SmokingRecommendationContent() {
   const score = Number(assessment.total_score ?? 0);
   const t = RECOMMENDATION_TONES[TONE];
 
+  // สายด่วนเลิกบุหรี่: แสดงเมื่อเคยสูบ (ข้อ 2 ตลอดชีวิต) หรือความเสี่ยงปานกลางขึ้นไป (คะแนน ≥ 1)
+  // ไม่เคยสูบเลยตลอดชีวิตและเสี่ยงต่ำ → ไม่แสดง
+  const lifetime = answers.find((a) => a.display_order === 2)?.choice_text?.trim();
+  const showQuitHelp = score >= 1 || (lifetime !== undefined && lifetime !== NEVER_SMOKED);
+
   /* =======================================================
      MAIN
   ======================================================= */
@@ -232,24 +240,26 @@ function SmokingRecommendationContent() {
           สายด่วนเลิกบุหรี่
       ================================================== */}
 
-      <RecommendationSection
-        icon={<Phone size={27} className={t.eyebrow} />}
-        title="ต้องการความช่วยเหลือในการเลิกบุหรี่"
-      >
-        <div className="flex items-center gap-5 rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
-          <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-full ${t.iconSoft}`}>
-            <Phone size={28} />
+      {showQuitHelp && (
+        <RecommendationSection
+          icon={<Phone size={27} className={t.eyebrow} />}
+          title="ต้องการความช่วยเหลือในการเลิกบุหรี่"
+        >
+          <div className="flex items-center gap-5 rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
+            <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-full ${t.iconSoft}`}>
+              <Phone size={28} />
+            </div>
+            <div>
+              <p className="text-xl font-bold">
+                สายด่วนเลิกบุหรี่ <span className={t.eyebrow}>1600</span>
+              </p>
+              <p className="mt-1 text-sm leading-7 text-[#767880]">
+                โทรฟรี ปรึกษาผู้เชี่ยวชาญเพื่อวางแผนเลิกบุหรี่ หรือขอรับบริการจากคลินิกเลิกบุหรี่ใกล้บ้าน
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xl font-bold">
-              สายด่วนเลิกบุหรี่ <span className={t.eyebrow}>1600</span>
-            </p>
-            <p className="mt-1 text-sm leading-7 text-[#767880]">
-              โทรฟรี ปรึกษาผู้เชี่ยวชาญเพื่อวางแผนเลิกบุหรี่ หรือขอรับบริการจากคลินิกเลิกบุหรี่ใกล้บ้าน
-            </p>
-          </div>
-        </div>
-      </RecommendationSection>
+        </RecommendationSection>
+      )}
     </RecommendationLayout>
   );
 }
