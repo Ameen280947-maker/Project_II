@@ -4,7 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Download, FileText, Lock } from "lucide-react";
 import { downloadCsv, staffFetch } from "@/lib/staff/client";
 import { Card, Empty, ErrorBox, PageHeader, Segmented, StatCard, btnGhost, btnPrimary, inputCls } from "../components/ui";
-import DateRangePicker, { rangeText, useDateRange } from "../components/DateRangePicker";
+import DateRangeField, { QuickRanges, rangeText, useDateRange } from "../components/DateRangePicker";
 import {
   AgeBars,
   BarLegend,
@@ -169,11 +169,11 @@ export default function ReportsPage() {
       />
 
       {/* FILTERS */}
-      <Card className="staff-no-print !py-4">
-        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[auto_repeat(3,minmax(0,1fr))] lg:items-start">
-          <div className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-staff-muted sm:col-span-3 lg:col-span-1 [&>div]:items-start">
+      <Card className="staff-no-print">
+        <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-staff-muted sm:col-span-3 lg:col-span-1">
             ช่วงเวลา
-            <DateRangePicker state={dr} />
+            <DateRangeField state={dr} />
           </div>
           <Filter label="แบบประเมิน" value={type} onChange={setType}>
             <option value="all">ทุกแบบประเมิน</option>
@@ -196,6 +196,21 @@ export default function ReportsPage() {
               </option>
             ))}
           </Filter>
+        </div>
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-staff-line pt-4">
+          <QuickRanges state={dr} />
+          <button
+            type="button"
+            onClick={() => {
+              dr.reset();
+              setType("all");
+              setGender("all");
+              setAge("all");
+            }}
+            className="text-sm font-semibold text-staff-ink underline underline-offset-4 hover:opacity-70"
+          >
+            ล้างตัวกรอง
+          </button>
         </div>
       </Card>
 
