@@ -2,15 +2,16 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { AlertCircle, Check, Plus, Trash2 } from "lucide-react";
+import { AlertCircle, Check, FolderCog, Plus, Trash2 } from "lucide-react";
 import { staffFetch } from "@/lib/staff/client";
 import { Card, Empty, ErrorBox, PageHeader, Switch, btnGhost, btnPrimary, inputCls, thDate } from "../components/ui";
 import { CreateDialog, DeleteDialog } from "../components/assessments/Dialogs";
 import LevelsTab from "../components/assessments/LevelsTab";
 import PreviewTab from "../components/assessments/PreviewTab";
 import HistoryTab from "../components/assessments/HistoryTab";
+import CategoriesDialog from "../components/assessments/CategoriesDialog";
 import QuestionsTab from "../components/assessments/QuestionsTab";
-import { isMissing, toEditable, toSnapshot, type Detail, type EState, type TypeRow } from "../components/assessments/shared";
+import { isMissing, toEditable, toSnapshot, type CategoryOption, type Detail, type EState, type TypeRow } from "../components/assessments/shared";
 
 /* =========================================================
    จัดการแบบประเมิน
@@ -18,6 +19,7 @@ import { isMissing, toEditable, toSnapshot, type Detail, type EState, type TypeR
    - "เผยแพร่" = เขียนลงตารางที่ใช้งานอยู่ + บันทึกเป็นเวอร์ชันใหม่ (v1, v2, …)
    - เปิด/ปิดใช้งานมีผลทันที ไม่ผ่านฉบับร่าง
    - ?type=<id> เลือกแบบประเมินไว้ล่วงหน้า (ลิงก์จากหน้าภาพรวม)
+   - หมวดหมู่ (หน้าที่ผู้ใช้พบแบบประเมิน) เลือกตอนสร้าง และย้ายได้ทันทีในหน้าแก้ไข ไม่ผ่านฉบับร่าง
 ========================================================= */
 
 type Tab = "questions" | "levels" | "preview" | "history";
@@ -33,16 +35,19 @@ export default function StaffAssessmentsPage() {
 function Assessments() {
   const params = useSearchParams();
   const [types, setTypes] = useState<TypeRow[]>([]);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [selected, setSelected] = useState<number | null>(Number(params.get("type")) || null);
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
+  const [managingCategories, setManagingCategories] = useState(false);
   // มีการแก้ไขที่ยังไม่บันทึกในตัวแก้ไขหรือไม่ (ใช้เตือนก่อนเปลี่ยนแบบประเมิน)
   const dirtyRef = useRef(false);
 
   const loadTypes = useCallback(() => {
-    staffFetch<{ types: TypeRow[] }>("/api/staff/assessments")
+    staffFetch<{ types: TypeRow[]; categories: CategoryOption[] }>("/api/staff/assessments")
       .then((d) => {
         setTypes(d.types);
+        setCategories(d.categories);
         setSelected((s) => (s && d.types.some((t) => t.id === s) ? s : d.types.find((t) => t.name === "9Q")?.id ?? d.types[0]?.id ?? null));
       })
       .catch((e) => setError(e.message));
@@ -87,9 +92,14 @@ function Assessments() {
         title="จัดการ"
         highlight="แบบประเมิน"
         actions={
-          <button type="button" onClick={() => setCreating(true)} className={btnPrimary}>
-            <Plus size={18} /> สร้างแบบประเมินใหม่
-          </button>
+          <>
+            <button type="button" onClick={() => setManagingCategories(true)} className={btnGhost}>
+              <FolderCog size={18} /> จัดการหมวดหมู่
+            </button>
+            <button type="button" onClick={() => setCreating(true)} className={btnPrimary}>
+              <Plus size={18} /> สร้างแบบประเมินใหม่
+            </button>
+          </>
         }
       />
       <ErrorBox message={error} />
@@ -109,8 +119,8 @@ function Assessments() {
                 >
                   <button type="button" onClick={() => select(t.id)} className="min-w-0 flex-1 px-3 py-2.5 text-left" aria-current={on ? "true" : undefined}>
                     <span className="block truncate text-sm font-semibold">{t.label}</span>
-                    <span className="block text-xs text-staff-muted">
-                      {t.questions} คำถาม
+                    <span className="block truncate text-xs text-staff-muted">
+                      {t.questions} คำถาม · {categories.find((c) => c.id === t.categoryId)?.name ?? "ยังไม่มีหมวดหมู่"}
                     </span>
                     {t.missing > 0 && <span className="block text-xs font-semibold text-risk-crit">ขาดคำแนะนำ {t.missing} ระดับ</span>}
                     {!t.isActive && <span className="block text-xs font-semibold text-staff-muted">ปิดใช้งาน</span>}
@@ -128,6 +138,8 @@ function Assessments() {
               key={selected}
               typeId={selected}
               isActive={current?.isActive}
+              categoryId={current?.categoryId}
+              categories={categories}
               dirtyRef={dirtyRef}
               onChanged={loadTypes}
               onDeleted={() => {
@@ -141,8 +153,17 @@ function Assessments() {
         </div>
       </div>
 
+      {managingCategories && (
+        <CategoriesDialog
+          categories={categories}
+          onClose={() => setManagingCategories(false)}
+          onChanged={loadTypes}
+        />
+      )}
+
       {creating && (
         <CreateDialog
+          categories={categories}
           onClose={() => setCreating(false)}
           onCreated={(id) => {
             setCreating(false);
@@ -162,12 +183,16 @@ function Assessments() {
 function Editor({
   typeId,
   isActive: listActive,
+  categoryId: listCategoryId,
+  categories,
   dirtyRef,
   onChanged,
   onDeleted,
 }: {
   typeId: number;
   isActive?: boolean;
+  categoryId?: number | null;
+  categories: CategoryOption[];
   dirtyRef: { current: boolean };
   onChanged: () => void;
   onDeleted: () => void;
@@ -179,7 +204,7 @@ function Editor({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
-  const [busy, setBusy] = useState<"" | "save" | "discard" | "publish">("");
+  const [busy, setBusy] = useState<"" | "save" | "discard" | "publish" | "category">("");
 
   const setDirty = useCallback(
     (v: boolean) => {
@@ -219,6 +244,7 @@ function Editor({
   const hasDraft = Boolean(detail.draft);
   const missing = edit.levels.filter(isMissing).length;
   const active = listActive ?? detail.isActive;
+  const categoryId = listCategoryId !== undefined ? listCategoryId : detail.categoryId;
 
   const run = async (kind: typeof busy, fn: () => Promise<void>) => {
     setBusy(kind);
@@ -263,6 +289,14 @@ function Editor({
       flash("เผยแพร่แล้ว · บันทึกในประวัติการแก้ไข");
     });
   };
+
+  // ย้ายหมวดหมู่: มีผลกับหน้าผู้ใช้ทันที (ไม่ผ่านฉบับร่าง)
+  const moveCategory = (id: number) =>
+    run("category", async () => {
+      await staffFetch("/api/staff/assessments", { method: "PATCH", body: JSON.stringify({ typeId, categoryId: id }) });
+      onChanged();
+      flash(`ย้ายไปหมวด "${categories.find((c) => c.id === id)?.name ?? ""}" แล้ว · มีผลกับหน้าผู้ใช้ทันที`);
+    });
 
   const tabs: { key: Tab; label: string; dot?: boolean }[] = [
     { key: "questions", label: "คำถามและคะแนน" },
@@ -314,13 +348,47 @@ function Editor({
         </div>
       </div>
 
-      {detail.generic && !detail.builtIn && !detail.deletable && detail.resultCount > 0 && (
-        <p className="mt-3 text-sm text-staff-muted">
-          มีผลการประเมินของผู้ใช้แล้ว {detail.resultCount.toLocaleString("th-TH")} รายการ จึงลบแบบประเมินนี้ไม่ได้ หากไม่ต้องการใช้แล้ว ให้ปิดใช้งานแทน
-        </p>
+      {deleting && (
+        <DeleteDialog
+          typeId={detail.id}
+          name={detail.name}
+          resultCount={detail.resultCount}
+          onClose={() => setDeleting(false)}
+          onDeleted={onDeleted}
+        />
       )}
 
-      {deleting && <DeleteDialog typeId={detail.id} name={detail.name} onClose={() => setDeleting(false)} onDeleted={onDeleted} />}
+      {/* ===== หมวดหมู่ (มีผลทันที) ===== */}
+      <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+        <span className="font-semibold">หมวดหมู่</span>
+        {detail.builtIn ? (
+          <span className="text-staff-muted">
+            {categories.find((c) => c.id === categoryId)?.name ?? "-"} · แบบประเมินหลักของระบบ ย้ายหมวดไม่ได้
+          </span>
+        ) : (
+          <>
+            <select
+              value={categoryId ?? ""}
+              onChange={(e) => e.target.value && moveCategory(Number(e.target.value))}
+              disabled={!!busy}
+              aria-label="หมวดหมู่ของแบบประเมิน"
+              className={`${inputCls} !w-auto min-w-[220px] !py-2`}
+            >
+              {categoryId === null && (
+                <option value="" disabled>
+                  ยังไม่มีหมวดหมู่ (ผู้ใช้เห็นใน &quot;แบบประเมินเพิ่มเติม&quot;)
+                </option>
+              )}
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+            <span className="text-xs text-staff-muted">{busy === "category" ? "กำลังย้าย…" : "เปลี่ยนแล้วมีผลทันที ไม่ผ่านฉบับร่าง"}</span>
+          </>
+        )}
+      </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex min-w-0 flex-col gap-1.5 text-sm font-semibold">

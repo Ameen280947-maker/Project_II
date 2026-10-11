@@ -16,6 +16,7 @@ import {
 import Sidebar from "@/app/components/Sidebar";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    TYPES
@@ -230,6 +231,7 @@ function Depression9QContent() {
                 แบบประเมินนี้ใช้เพื่อประเมินความรุนแรงของอาการซึมเศร้า กรุณาตอบทุกข้อตามความเป็นจริง
               </p>
             </div>
+            <AssessmentSourceNote typeId={14} className="mt-2" />
           </div>
 
           {/* Progress Bar */}

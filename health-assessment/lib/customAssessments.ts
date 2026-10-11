@@ -51,7 +51,7 @@ export const levelForScore = (levels: GenericLevel[], score: number) =>
 // รายการแบบประเมินทั่วไปที่เปิดใช้งาน (สำหรับเมนูผู้ใช้)
 export async function listGenericTypes(onlyActive = true) {
   const { rows } = await pool.query(
-    `SELECT t.assessment_type_id, t.assessment_name, t.description, t.is_active,
+    `SELECT t.assessment_type_id, t.assessment_name, t.description, t.is_active, t.category_id,
             (SELECT COUNT(*) FROM questions q WHERE q.assessment_type_id = t.assessment_type_id AND q.is_active)::int AS questions
        FROM assessment_types t
       WHERE EXISTS (SELECT 1 FROM recommendation r WHERE r.assessment_type_id = t.assessment_type_id)
@@ -64,7 +64,13 @@ export async function listGenericTypes(onlyActive = true) {
   );
   return rows
     .filter((r) => r.questions > 0)
-    .map((r) => ({ id: r.assessment_type_id as number, name: r.assessment_name as string, description: r.description as string | null, questions: r.questions as number }));
+    .map((r) => ({
+      id: r.assessment_type_id as number,
+      name: r.assessment_name as string,
+      description: r.description as string | null,
+      questions: r.questions as number,
+      categoryId: r.category_id as number | null,
+    }));
 }
 
 // ให้ severityOf รู้จักระดับของแบบประเมินทั่วไป (เรียกก่อนคำนวณในฝั่งเซิร์ฟเวอร์)

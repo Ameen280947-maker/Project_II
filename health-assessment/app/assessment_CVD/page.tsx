@@ -23,6 +23,7 @@ import {
 import Sidebar from "@/app/components/Sidebar";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    TYPES
@@ -1296,6 +1297,8 @@ export default function AssessmentPage() {
             <HealthConsentNotice />
             <AssessmentBackLink href="/assessment-menu" />
           </header>
+          {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
+          <AssessmentSourceNote typeId={3} className="mt-3" />
 
           {/* =================================================
               LOADING

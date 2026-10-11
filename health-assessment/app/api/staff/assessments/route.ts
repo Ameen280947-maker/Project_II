@@ -3,6 +3,8 @@ import pool from "@/lib/db";
 import { logAccess, requireStaff } from "@/lib/staff/auth";
 import { EXCLUDED_TYPES, typeLabel } from "@/lib/staff/riskLevels";
 import { logSystemError } from "@/lib/errorLogger";
+import { listCategories } from "@/lib/assessmentCategoriesDb";
+import { CATEGORY_NAME_MAX, CATEGORY_SUBTITLE_MAX, isCategoryTheme } from "@/lib/assessmentCategories";
 import {
   BUILT_IN,
   applySnapshot,
@@ -16,7 +18,7 @@ import { diffSnapshots, type Change } from "@/lib/staff/assessmentHistory";
 
 /* =========================================================
    /api/staff/assessments
-   GET                      → รายการแบบประเมิน (จำนวนข้อ, เวอร์ชันล่าสุด, ระดับที่ขาดคำแนะนำ)
+   GET                      → รายการแบบประเมิน (จำนวนข้อ, เวอร์ชันล่าสุด, ระดับที่ขาดคำแนะนำ, หมวดหมู่) + categories
    GET ?type=<id>           → เนื้อหาสำหรับแก้ไข (ฉบับร่างถ้ามี ไม่งั้นเนื้อหาที่ใช้งานอยู่) + ข้อมูลเวอร์ชัน
    GET ?type=<id>&changes=1 → ประวัติการแก้ไข (แต่ละครั้งที่เผยแพร่เทียบกับครั้งก่อน + เปิด/ปิดใช้งาน)
    GET ?version=<id>        → snapshot ของเวอร์ชันนั้น (ดูอย่างเดียว)
@@ -24,8 +26,11 @@ import { diffSnapshots, type Change } from "@/lib/staff/assessmentHistory";
    PUT   { typeId, snapshot }               → บันทึกฉบับร่าง
    POST  { action: "discard", typeId }      → ทิ้งฉบับร่าง
    POST  { action: "publish", typeId, snapshot? } → เผยแพร่ (เขียนลงตารางจริง + เวอร์ชันใหม่)
-   POST  { name, description }              → สร้างแบบประเมินใหม่ (เริ่มแบบปิดใช้งาน)
+   POST  { name, description, categoryId }  → สร้างแบบประเมินใหม่ (เริ่มแบบปิดใช้งาน) ในหมวดที่มีอยู่
+   POST  { name, description, newCategory: { name, subtitle?, theme } }
+                                            → สร้างหมวดใหม่ + แบบประเมิน ใน transaction เดียว
    PATCH { typeId, isActive }               → เปิด/ปิดแบบประเมิน (มีผลทันที ไม่ผ่านฉบับร่าง)
+   PATCH { typeId, categoryId }             → ย้ายหมวดหมู่ (มีผลทันที, เฉพาะแบบประเมินที่สร้างเพิ่ม)
    DELETE { typeId, confirmName }           → ลบแบบประเมินที่สร้างใหม่และยังไม่มีใครทำ
 ========================================================= */
 
@@ -50,7 +55,7 @@ export async function GET(request: NextRequest) {
     ]);
     await ensureBaselines(ids.rows.map((r) => r.assessment_type_id));
     const { rows } = await pool.query(
-      `SELECT t.assessment_type_id, t.assessment_name, t.description, t.is_active,
+      `SELECT t.assessment_type_id, t.assessment_name, t.description, t.is_active, t.category_id,
               (SELECT COUNT(*) FROM questions q WHERE q.assessment_type_id = t.assessment_type_id AND q.is_active)::int AS questions,
               (SELECT COUNT(*) FROM recommendation r WHERE r.assessment_type_id = t.assessment_type_id
                   AND COALESCE(TRIM(r.recommendation_text), '') = '')::int AS missing,
@@ -63,8 +68,10 @@ export async function GET(request: NextRequest) {
         ORDER BY t.assessment_type_id`,
       [EXCLUDED_TYPES]
     );
+    const categories = await listCategories();
     return NextResponse.json({
       success: true,
+      categories: categories.map((c) => ({ ...c, types: rows.filter((r) => r.category_id === c.id).length })),
       types: rows.map((r) => ({
         id: r.assessment_type_id,
         name: r.assessment_name,
@@ -75,6 +82,8 @@ export async function GET(request: NextRequest) {
         missing: r.missing,
         versionNo: r.version_no,
         hasDraft: r.has_draft,
+        categoryId: r.category_id,
+        builtIn: BUILT_IN.has(r.assessment_name),
       })),
     });
   } catch (error) {
@@ -85,7 +94,7 @@ export async function GET(request: NextRequest) {
 }
 
 async function getDetail(typeId: number) {
-  const t = await pool.query("SELECT assessment_name, is_active FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
+  const t = await pool.query("SELECT assessment_name, is_active, category_id FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
   const type = t.rows[0];
   if (!type) return fail("ไม่พบแบบประเมิน", 404);
   await ensureBaselines([typeId]);
@@ -130,10 +139,12 @@ async function getDetail(typeId: number) {
       name,
       label: typeLabel(name),
       isActive: type.is_active,
+      categoryId: type.category_id,
       generic: live.generic,
       builtIn: BUILT_IN.has(name),
       resultCount,
-      deletable: live.generic && !BUILT_IN.has(name) && resultCount === 0,
+      // แบบประเมินที่สร้างเพิ่มลบได้เสมอ (ถ้ามีผลประเมิน หน้ายืนยันจะแจ้งว่าผลจะถูกลบด้วย)
+      deletable: live.generic && !BUILT_IN.has(name),
       content: draftOk ? { ...(draft.snapshot as Snapshot), name } : live,
       live,
       draft: draft ? { updatedAt: draft.updated_at, by: draft.username } : null,
@@ -275,6 +286,7 @@ export async function PATCH(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const typeId = Number(body.typeId);
+  if (typeId && "categoryId" in body) return changeCategory(typeId, body.categoryId, auth.staff.userId);
   if (!typeId || typeof body.isActive !== "boolean") return fail("ข้อมูลไม่ถูกต้อง");
   try {
     // เปิดใช้งานได้เมื่อมีคำถามและเกณฑ์แปลผลแล้ว
@@ -299,6 +311,33 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+/* ---------- ย้ายหมวดหมู่ (มีผลทันที) ---------- */
+
+async function changeCategory(typeId: number, rawCategoryId: unknown, staffId: number) {
+  const categoryId = Number(rawCategoryId);
+  if (!Number.isInteger(categoryId) || categoryId <= 0) return fail("กรุณาเลือกหมวดหมู่");
+  try {
+    const [t, c] = await Promise.all([
+      pool.query("SELECT assessment_name, category_id FROM assessment_types WHERE assessment_type_id = $1", [typeId]),
+      pool.query("SELECT name FROM assessment_categories WHERE category_id = $1", [categoryId]),
+    ]);
+    const type = t.rows[0];
+    if (!type) return fail("ไม่พบแบบประเมิน", 404);
+    if (!c.rows[0]) return fail("ไม่พบหมวดหมู่นี้", 404);
+    // แบบประเมินหลักของระบบมีการ์ดเขียนไว้ในหน้าเมนูของหมวดเดิม ย้ายหมวดไม่ได้
+    if (BUILT_IN.has(type.assessment_name)) return fail("แบบประเมินหลักของระบบย้ายหมวดหมู่ไม่ได้");
+    if (type.category_id === categoryId) return NextResponse.json({ success: true });
+
+    await pool.query("UPDATE assessment_types SET category_id = $2, updated_at = NOW() WHERE assessment_type_id = $1", [typeId, categoryId]);
+    await logAccess(staffId, null, "change_assessment_category", `type ${typeId} · ${type.assessment_name} · หมวด ${c.rows[0].name}`);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    void logSystemError("PATCH category /api/staff/assessments", error);
+    console.error("PATCH category /api/staff/assessments error:", error);
+    return fail("ย้ายหมวดหมู่ไม่สำเร็จ", 500);
+  }
+}
+
 /* ---------- สร้างใหม่ / ทิ้งฉบับร่าง / เผยแพร่ ---------- */
 
 export async function POST(request: NextRequest) {
@@ -312,21 +351,75 @@ export async function POST(request: NextRequest) {
   const description = typeof body.description === "string" ? body.description.trim().slice(0, 500) : "";
   if (!name) return fail("กรุณากรอกชื่อแบบประเมิน");
 
-  try {
-    const dup = await pool.query("SELECT 1 FROM assessment_types WHERE LOWER(assessment_name) = LOWER($1)", [name]);
-    if (dup.rowCount) return fail("มีแบบประเมินชื่อนี้แล้ว", 409);
+  /* ===== หมวดหมู่: เลือกหมวดที่มีอยู่ หรือสร้างหมวดใหม่ (ต้องมีอย่างใดอย่างหนึ่ง) ===== */
+  const nc = body.newCategory && typeof body.newCategory === "object" ? body.newCategory : null;
+  const newCat = nc
+    ? {
+        name: typeof nc.name === "string" ? nc.name.trim() : "",
+        subtitle: typeof nc.subtitle === "string" ? nc.subtitle.trim() : "",
+        theme: nc.theme,
+      }
+    : null;
+  const categoryId = newCat ? null : Number(body.categoryId);
+  if (newCat) {
+    if (!newCat.name) return fail("กรุณากรอกชื่อหมวดหมู่");
+    if (newCat.name.length > CATEGORY_NAME_MAX) return fail(`ชื่อหมวดหมู่ยาวได้ไม่เกิน ${CATEGORY_NAME_MAX} ตัวอักษร`);
+    if (newCat.subtitle.length > CATEGORY_SUBTITLE_MAX) return fail(`คำอธิบายสั้นยาวได้ไม่เกิน ${CATEGORY_SUBTITLE_MAX} ตัวอักษร`);
+    if (!isCategoryTheme(newCat.theme)) return fail("กรุณาเลือกสีของหมวดหมู่");
+  } else if (!Number.isInteger(categoryId) || !categoryId || categoryId <= 0) {
+    return fail("กรุณาเลือกหมวดหมู่");
+  }
 
-    const { rows } = await pool.query(
-      `INSERT INTO assessment_types (assessment_name, description, is_active, created_at, updated_at)
-       VALUES ($1, $2, FALSE, NOW(), NOW()) RETURNING assessment_type_id`,
-      [name, description || null]
+  const staffId = auth.staff.userId;
+  const client = await pool.connect();
+  const refuse = async (message: string, status = 400) => {
+    await client.query("ROLLBACK");
+    return fail(message, status);
+  };
+  try {
+    await client.query("BEGIN");
+    const dup = await client.query("SELECT 1 FROM assessment_types WHERE LOWER(assessment_name) = LOWER($1)", [name]);
+    if (dup.rowCount) return await refuse("มีแบบประเมินชื่อนี้แล้ว", 409);
+
+    let catId: number;
+    let catName: string;
+    if (newCat) {
+      const catDup = await client.query("SELECT 1 FROM assessment_categories WHERE LOWER(name) = LOWER($1)", [newCat.name]);
+      if (catDup.rowCount) return await refuse("มีหมวดหมู่ชื่อนี้แล้ว เลือกจากรายการแทนได้", 409);
+      const ins = await client.query(
+        `INSERT INTO assessment_categories (name, subtitle, theme, route_path, is_builtin, display_order, created_by)
+         SELECT $1, $2, $3, NULL, FALSE, GREATEST(COALESCE(MAX(display_order), 0), 100) + 1, $4 FROM assessment_categories
+         RETURNING category_id, name`,
+        [newCat.name, newCat.subtitle || null, newCat.theme, staffId]
+      );
+      catId = ins.rows[0].category_id;
+      catName = ins.rows[0].name;
+    } else {
+      const c = await client.query("SELECT category_id, name FROM assessment_categories WHERE category_id = $1", [categoryId]);
+      if (!c.rows[0]) return await refuse("ไม่พบหมวดหมู่ที่เลือก กรุณาเลือกใหม่", 404);
+      catId = c.rows[0].category_id;
+      catName = c.rows[0].name;
+    }
+
+    const { rows } = await client.query(
+      `INSERT INTO assessment_types (assessment_name, description, is_active, category_id, created_at, updated_at)
+       VALUES ($1, $2, FALSE, $3, NOW(), NOW()) RETURNING assessment_type_id`,
+      [name, description || null, catId]
     );
-    await logAccess(auth.staff.userId, null, "create_assessment", name);
-    return NextResponse.json({ success: true, id: rows[0].assessment_type_id });
+    await client.query("COMMIT");
+
+    if (newCat) await logAccess(staffId, null, "create_assessment_category", `category ${catId} · ${catName}`);
+    await logAccess(staffId, null, "create_assessment", name);
+    return NextResponse.json({ success: true, id: rows[0].assessment_type_id, categoryId: catId });
   } catch (error) {
+    await client.query("ROLLBACK").catch(() => {});
+    // ชื่อหมวดชนกับที่เพิ่งสร้างพร้อมกัน (unique index LOWER(name))
+    if ((error as { code?: string }).code === "23505") return fail("มีหมวดหมู่ชื่อนี้แล้ว เลือกจากรายการแทนได้", 409);
     void logSystemError("POST /api/staff/assessments", error);
     console.error("POST /api/staff/assessments error:", error);
     return fail("สร้างแบบประเมินไม่สำเร็จ", 500);
+  } finally {
+    client.release();
   }
 }
 
@@ -436,10 +529,18 @@ export async function DELETE(request: NextRequest) {
     );
     if (legacy.rowCount) return refuse("แบบประเมินนี้แปลผลด้วยสูตรในระบบ ลบไม่ได้");
 
+    // ผลประเมินของผู้ใช้ในแบบนี้ถูกลบไปด้วย (หน้ายืนยันแจ้งจำนวนไว้แล้ว)
+    // ลบตารางที่อ้างถึงก่อน: การแจ้งเตือน / เคสเดิม (notes ลบตาม cascade) / log แดชบอร์ด แล้วจึงลบผล (คำตอบลบตาม cascade)
     const used = await client.query("SELECT COUNT(*)::int AS n FROM assessment WHERE assessment_type_id = $1", [typeId]);
-    if (used.rows[0].n > 0) {
-      return refuse(`มีผลการประเมินของผู้ใช้แล้ว ${used.rows[0].n} รายการ จึงลบไม่ได้ ใช้การปิดใช้งานแทน`, 409);
-    }
+    const results: number = used.rows[0].n;
+    await client.query("DELETE FROM user_notifications WHERE assessment_type_id = $1", [typeId]);
+    await client.query("DELETE FROM follow_up_cases WHERE assessment_type_id = $1", [typeId]);
+    await client.query(
+      "DELETE FROM log_dashboard WHERE assessment_id IN (SELECT assessment_id FROM assessment WHERE assessment_type_id = $1)",
+      [typeId]
+    );
+    await client.query("DELETE FROM assessment WHERE assessment_type_id = $1", [typeId]);
+    await client.query("DELETE FROM recommendation_history WHERE assessment_type_id = $1", [typeId]);
 
     await client.query(
       "DELETE FROM question_choices WHERE question_id IN (SELECT question_id FROM questions WHERE assessment_type_id = $1)",
@@ -451,7 +552,7 @@ export async function DELETE(request: NextRequest) {
     await client.query("DELETE FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
     await client.query("COMMIT");
 
-    await logAccess(auth.staff.userId, null, "delete_assessment", `type ${typeId} · ${name}`);
+    await logAccess(auth.staff.userId, null, "delete_assessment", `type ${typeId} · ${name}${results ? ` · ลบผลประเมิน ${results} รายการ` : ""}`);
     return NextResponse.json({ success: true });
   } catch (error) {
     void logSystemError("DELETE /api/staff/assessments", error);

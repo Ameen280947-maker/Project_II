@@ -13,6 +13,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    TYPES
@@ -529,6 +530,8 @@ export default function AlcoholAssessmentPage() {
               <HealthConsentNotice />
               <AssessmentBackLink href="/assessment-menu-behavior" />
             </header>
+            {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
+            <AssessmentSourceNote typeId={7} className="mt-3" />
 
             {/* PROGRESS */}
 

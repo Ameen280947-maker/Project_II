@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getGenericLevels, levelForScore, listGenericTypes } from "@/lib/customAssessments";
 import { requireUser } from "@/lib/session";
+import { categoryHref } from "@/lib/assessmentCategories";
 import {
   badRequest,
   loadActiveChoices,
@@ -17,7 +18,7 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 /* =========================================================
    /api/assessments/custom  (แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม)
    GET                                  → รายการแบบประเมินที่เปิดใช้งาน
-   GET ?type=<id>                       → คำถาม + ตัวเลือก (id ไม่ใช่ตัวเลข/ไม่มีจริง = 404)
+   GET ?type=<id>                       → คำถาม + ตัวเลือก + menuHref (id ไม่ใช่ตัวเลข/ไม่มีจริง = 404)
    GET ?assessmentId=<id>&userId=<id>   → ผลการประเมินของผู้ใช้ใน session เท่านั้น
    POST { userId, typeId, answers: [{ questionId, choiceId }] }
    - คะแนนคิดจากฐานข้อมูลเสมอ ไม่เชื่อคะแนนที่ส่งมาจากเบราว์เซอร์
@@ -44,7 +45,12 @@ export async function GET(request: NextRequest) {
     }
 
     const levels = await getGenericLevels(typeId);
-    const t = await pool.query("SELECT assessment_name, description, is_active FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
+    const t = await pool.query(
+      `SELECT t.assessment_name, t.description, t.is_active, c.category_id, c.route_path
+         FROM assessment_types t LEFT JOIN assessment_categories c USING (category_id)
+        WHERE t.assessment_type_id = $1`,
+      [typeId]
+    );
     if (!levels || !t.rows[0]?.is_active) {
       return NextResponse.json({ success: false, message: "ไม่พบแบบประเมินนี้ หรือยังไม่เปิดให้ใช้งาน" }, { status: 404 });
     }
@@ -66,7 +72,16 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      assessment: { id: typeId, name: t.rows[0].assessment_name, description: t.rows[0].description, questions },
+      assessment: {
+        id: typeId,
+        name: t.rows[0].assessment_name,
+        description: t.rows[0].description,
+        questions,
+        // หน้าเมนูของหมวดที่แบบประเมินนี้อยู่ (ใช้กับปุ่มย้อนกลับ) ไม่มีหมวด = หน้าเลือกหมวด
+        menuHref: t.rows[0].category_id
+          ? categoryHref({ id: t.rows[0].category_id, routePath: t.rows[0].route_path })
+          : "/assessment-type",
+      },
     });
   } catch (error) {
     void logSystemError("GET /api/assessments/custom", error);

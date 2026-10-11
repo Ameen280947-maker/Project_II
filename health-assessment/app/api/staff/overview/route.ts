@@ -423,8 +423,16 @@ function describeLog(r: LogRow) {
       return `${who} ปิดใช้งานแบบประเมิน${q(typeName)}`;
     case "create_assessment":
       return `${who} สร้างแบบประเมินใหม่${q(r.type_name ? typeLabel(r.type_name) : detail)}`;
+    case "create_assessment_category":
+      return `${who} สร้างหมวดหมู่แบบประเมินใหม่${q(afterDot || detail)}`;
+    case "update_assessment_category":
+      return `${who} แก้ไขหมวดหมู่แบบประเมิน${q(afterDot || detail)}`;
+    case "delete_assessment_category":
+      return `${who} ลบหมวดหมู่แบบประเมิน${q(detail.split("·")[1]?.trim() || detail)}`;
+    case "change_assessment_category":
+      return `${who} ย้ายแบบประเมิน${q(r.type_name ? typeLabel(r.type_name) : detail.split("·")[1]?.trim())} ไปหมวด${q(detail.match(/หมวด (.+)$/)?.[1])}`;
     case "delete_assessment":
-      return `${who} ลบแบบประเมิน${q(afterDot || typeName)}`;
+      return `${who} ลบแบบประเมิน${q(detail.split("·")[1]?.trim() || typeName)}`;
     case "save_assessment_levels":
       return `${who} แก้ไขเกณฑ์ระดับผลของแบบประเมิน${q(typeName)}`;
     case "edit_recommendation":

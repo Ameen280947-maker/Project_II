@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import type { SnapLevel, SnapQuestion, Snapshot } from "@/lib/staff/assessmentVersions";
+import type { CategoryTheme } from "@/lib/assessmentCategories";
 
 /* =========================================================
    ชนิดข้อมูลและตัวช่วยของหน้าจัดการแบบประเมิน (ตรงกับ /api/staff/assessments)
@@ -19,6 +20,19 @@ export type TypeRow = {
   missing: number;
   versionNo: number | null;
   hasDraft: boolean;
+  categoryId: number | null;
+  builtIn: boolean;
+};
+
+// หมวดหมู่แบบประเมิน (types = จำนวนแบบประเมินในหมวด)
+export type CategoryOption = {
+  id: number;
+  name: string;
+  subtitle: string | null;
+  theme: CategoryTheme;
+  routePath: string | null;
+  builtIn: boolean;
+  types: number;
 };
 
 export type Detail = {
@@ -26,6 +40,7 @@ export type Detail = {
   name: string;
   label: string;
   isActive: boolean;
+  categoryId: number | null;
   generic: boolean;
   builtIn: boolean;
   resultCount: number;

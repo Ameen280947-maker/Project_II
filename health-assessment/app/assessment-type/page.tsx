@@ -7,30 +7,36 @@ import {
   ArrowRight,
   Brain,
   Cigarette,
+  ClipboardList,
   Dumbbell,
   Heart,
+  Stethoscope,
   Wine,
 } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 
 import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
+import type { AssessmentCategory, CategoryAssessment, CategoryTheme } from "@/lib/assessmentCategories";
 
-const assessmentTypes = [
-  {
-    title: "โรคไม่ติดต่อเรื้อรัง",
-    subtitle: "(NCDs)",
+/* =========================================================
+   เนื้อหาของหมวดเดิม 3 หมวด (หัวข้อย่อย + ภาพ) — ผูกกับ route_path ในตาราง assessment_categories
+   แบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดเหล่านี้จะต่อท้ายรายการหัวข้อย่อย
+========================================================= */
+
+type Illustration = "ncd" | "behavior" | "mental" | "generic";
+
+const BUILTIN_CONTENT: Record<string, { descriptionItems: string[]; illustration: Illustration }> = {
+  "/assessment-menu": {
     descriptionItems: [
       "โรคหัวใจและหลอดเลือด",
       "โรคเบาหวาน",
       "ความดันโลหิตสูง",
       "ภาวะน้ำหนักเกิน",
     ],
-    href: "/assessment-menu",
-    theme: "red" as const,
+    illustration: "ncd",
   },
-  {
-    title: "ความเสี่ยงด้านพฤติกรรม",
+  "/assessment-menu-behavior": {
     descriptionItems: [
       "การสูบบุหรี่",
       "แอลกอฮอล์",
@@ -38,29 +44,38 @@ const assessmentTypes = [
       "การนอนหลับ",
       "การรับประทานอาหาร",
     ],
-    href: "/assessment-menu-behavior",
-    theme: "green" as const,
+    illustration: "behavior",
   },
-  {
-    title: "ความเสี่ยงด้านสุขภาพจิต",
+  "/assessment-menu-mental-health": {
     descriptionItems: [
       "ความเครียดสะสม",
       "ภาวะซึมเศร้า",
     ],
-    href: "/assessment-menu-mental-health",
-    theme: "blue" as const,
+    illustration: "mental",
   },
+};
+
+// แสดงระหว่างรอโหลดหมวดจากฐานข้อมูล (และกรณีโหลดไม่สำเร็จ) = หมวดเดิม 3 หมวด
+const FALLBACK_CATEGORIES: AssessmentCategory[] = [
+  { id: 1, name: "โรคไม่ติดต่อเรื้อรัง", subtitle: "(NCDs)", theme: "red", routePath: "/assessment-menu", builtIn: true, href: "/assessment-menu", assessments: [] },
+  { id: 2, name: "ความเสี่ยงด้านพฤติกรรม", subtitle: null, theme: "green", routePath: "/assessment-menu-behavior", builtIn: true, href: "/assessment-menu-behavior", assessments: [] },
+  { id: 3, name: "ความเสี่ยงด้านสุขภาพจิต", subtitle: null, theme: "blue", routePath: "/assessment-menu-mental-health", builtIn: true, href: "/assessment-menu-mental-health", assessments: [] },
 ];
 
-type ExtraAssessment = { id: number; name: string; description: string | null; questions: number };
-
 export default function AssessmentTypePage() {
-  // แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม (ไม่มีจะไม่แสดงหัวข้อนี้)
-  const [extra, setExtra] = useState<ExtraAssessment[]>([]);
+  // หมวดหมู่จากฐานข้อมูล + แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
+  // (หมวดที่ staff สร้างแต่ยังไม่มีแบบประเมินที่เปิดใช้งาน API จะไม่ส่งมา)
+  const [categories, setCategories] = useState<AssessmentCategory[]>(FALLBACK_CATEGORIES);
+  // แบบประเมินที่ยังไม่มีหมวด (ไม่มีจะไม่แสดงหัวข้อ "แบบประเมินเพิ่มเติม")
+  const [extra, setExtra] = useState<CategoryAssessment[]>([]);
   useEffect(() => {
-    fetch("/api/assessments/custom", { cache: "no-store" })
+    fetch("/api/assessments/categories", { cache: "no-store" })
       .then((r) => r.json())
-      .then((d) => d.success && setExtra(d.types))
+      .then((d) => {
+        if (!d.success) return;
+        setCategories(d.categories);
+        setExtra(d.uncategorized);
+      })
       .catch(() => {});
   }, []);
 
@@ -107,18 +122,23 @@ export default function AssessmentTypePage() {
 
           <div className="mt-6 grid gap-5 xl:grid-cols-3">
 
-            {assessmentTypes.map((type) => (
-              <AssessmentTypeCard
-                key={type.title}
-                title={type.title}
-                subtitle={type.subtitle}
-                descriptionItems={
-                  type.descriptionItems
-                }
-                href={type.href}
-                theme={type.theme}
-              />
-            ))}
+            {categories.map((category) => {
+              const builtin = category.routePath ? BUILTIN_CONTENT[category.routePath] : undefined;
+              return (
+                <AssessmentTypeCard
+                  key={category.id}
+                  title={category.name}
+                  subtitle={category.subtitle ?? undefined}
+                  descriptionItems={[
+                    ...(builtin?.descriptionItems ?? []),
+                    ...category.assessments.map((a) => a.name),
+                  ]}
+                  href={category.href}
+                  theme={category.theme}
+                  illustration={builtin?.illustration ?? "generic"}
+                />
+              );
+            })}
 
           </div>
 
@@ -167,10 +187,9 @@ type AssessmentTypeCardProps = {
 
   href: string;
 
-  theme:
-  | "red"
-  | "green"
-  | "blue";
+  theme: CategoryTheme;
+
+  illustration: Illustration;
 };
 
 function AssessmentTypeCard({
@@ -179,6 +198,7 @@ function AssessmentTypeCard({
   descriptionItems,
   href,
   theme,
+  illustration,
 }: AssessmentTypeCardProps) {
   const themeStyles = {
     red: {
@@ -231,6 +251,76 @@ function AssessmentTypeCard({
       accent:
         "text-[#6594c8]",
     },
+
+    /* ===== สีของหมวดที่เจ้าหน้าที่สร้างเพิ่ม ===== */
+
+    amber: {
+      imageArea:
+        "bg-[#fdf5e4]",
+
+      icon:
+        "text-[#d0961f]",
+
+      bullet:
+        "bg-[#d0961f]",
+
+      button:
+        "bg-gradient-to-r from-[#fdf3dc] to-[#f8e6bf] text-[#a87414]",
+
+      accent:
+        "text-[#d0961f]",
+    },
+
+    violet: {
+      imageArea:
+        "bg-[#f3effc]",
+
+      icon:
+        "text-[#8b6fd0]",
+
+      bullet:
+        "bg-[#8b6fd0]",
+
+      button:
+        "bg-gradient-to-r from-[#f3effc] to-[#e5dcf7] text-[#6e52b5]",
+
+      accent:
+        "text-[#8b6fd0]",
+    },
+
+    teal: {
+      imageArea:
+        "bg-[#eaf6f3]",
+
+      icon:
+        "text-[#3aa898]",
+
+      bullet:
+        "bg-[#3aa898]",
+
+      button:
+        "bg-gradient-to-r from-[#eaf6f3] to-[#d5ede7] text-[#2a8676]",
+
+      accent:
+        "text-[#3aa898]",
+    },
+
+    pink: {
+      imageArea:
+        "bg-[#fdf0f5]",
+
+      icon:
+        "text-[#e0679a]",
+
+      bullet:
+        "bg-[#e0679a]",
+
+      button:
+        "bg-gradient-to-r from-[#fdeef4] to-[#f9dbe7] text-[#c24f80]",
+
+      accent:
+        "text-[#e0679a]",
+    },
   }[theme];
 
   return (
@@ -242,7 +332,9 @@ function AssessmentTypeCard({
         className={`relative flex h-[170px] items-center justify-center overflow-hidden rounded-[22px] ${themeStyles.imageArea}`}
       >
         <AssessmentIllustration
-          theme={theme}
+          kind={illustration}
+          iconClass={themeStyles.icon}
+          softBg={themeStyles.imageArea}
         />
       </div>
 
@@ -265,9 +357,9 @@ function AssessmentTypeCard({
         <div className="mt-5 space-y-3">
 
           {descriptionItems.map(
-            (item) => (
+            (item, i) => (
               <div
-                key={item}
+                key={`${i}-${item}`}
                 className="flex items-start gap-3 text-sm text-[#5f6068]"
               >
 
@@ -309,16 +401,41 @@ function AssessmentTypeCard({
 ========================================================= */
 
 function AssessmentIllustration({
-  theme,
+  kind,
+  iconClass,
+  softBg,
 }: {
-  theme:
-  | "red"
-  | "green"
-  | "blue";
+  kind: Illustration;
+  // สีไอคอน/พื้นของหมวด (ใช้กับภาพของหมวดที่เจ้าหน้าที่สร้างเพิ่ม)
+  iconClass: string;
+  softBg: string;
 }) {
+  /* ================= หมวดที่เจ้าหน้าที่สร้างเพิ่ม ================= */
+
+  if (kind === "generic") {
+    return (
+      <div className={`relative grid h-36 w-36 place-items-center rounded-full bg-white/75 shadow-[0_14px_34px_rgba(35,25,30,0.08)] ${iconClass}`}>
+
+        <ClipboardList
+          size={76}
+          strokeWidth={1.4}
+        />
+
+        <div className={`absolute bottom-2 right-2 grid h-11 w-11 place-items-center rounded-full ${softBg}`}>
+
+          <Stethoscope
+            size={24}
+          />
+
+        </div>
+
+      </div>
+    );
+  }
+
   /* ================= NCD ================= */
 
-  if (theme === "red") {
+  if (kind === "ncd") {
     return (
       <div className="relative grid h-32 w-32 place-items-center rounded-full bg-white/75 text-[#ef4962] shadow-[0_14px_34px_rgba(239,73,98,0.1)]">
 
@@ -340,7 +457,7 @@ function AssessmentIllustration({
 
   /* ================= Behavior ================= */
 
-  if (theme === "green") {
+  if (kind === "behavior") {
     return (
       <div className="grid grid-cols-2 gap-3">
 
