@@ -69,6 +69,7 @@ type TypeConfig = {
   goal: string;
   seeDoctor?: string; // ใส่เฉพาะเมื่อเอกสารระบุ
   weeklyGoals: string[];
+  source?: string; // แหล่งอ้างอิงของเนื้อหาคำแนะนำ
 };
 
 /* =========================================================
@@ -127,6 +128,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["9q", "แบบประเมินโรคซึมเศร้า 9q"],
     thaiName: "ภาวะซึมเศร้า (9Q)",
+    source: "กรมสุขภาพจิต · แนวทางการดูแลเฝ้าระวังโรคซึมเศร้าระดับจังหวัด (2557)",
     icon: ClipboardList,
     category: "mind",
     max: 27,
@@ -146,6 +148,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["phq-2", "2q", "คัดกรองภาวะซึมเศร้า 2q"],
     thaiName: "คัดกรองภาวะซึมเศร้า (2Q)",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: MessageCircle,
     category: "mind",
     max: 2,
@@ -163,6 +166,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["stress", "ความเครียด", "st-5"],
     thaiName: "ความเครียด",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Zap,
     category: "mind",
     max: 15,
@@ -184,6 +188,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["sleep", "การนอนหลับ"],
     thaiName: "การนอนหลับ",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Moon,
     category: "behavior",
     detailHref: "/recommendation_sleep",
@@ -201,6 +206,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["bmi", "ภาวะน้ำหนักเกิน", "ดัชนีมวลกาย"],
     thaiName: "ดัชนีมวลกาย",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Ruler,
     category: "body",
     unit: "kg/m²",
@@ -220,6 +226,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["blood pressure", "ความดันโลหิต"],
     thaiName: "ความดันโลหิต",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: HeartPulse,
     category: "body",
     unit: "mmHg",
@@ -240,6 +247,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["thai cvd", "cvd", "โรคหัวใจและหลอดเลือด"],
     thaiName: "ความเสี่ยงโรคหัวใจและหลอดเลือด",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: HeartPulse,
     category: "body",
     unit: "%",
@@ -260,6 +268,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["diabetes tds", "diabetes", "เบาหวาน", "ความเสี่ยงโรคเบาหวาน"],
     thaiName: "ความเสี่ยงโรคเบาหวาน",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Droplet,
     category: "body",
     unit: "%",
@@ -279,6 +288,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["diet", "พฤติกรรมการรับประทานอาหาร", "อาหาร"],
     thaiName: "พฤติกรรมการรับประทานอาหาร",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Salad,
     category: "behavior",
     detailHref: "/recommendation_diet",
@@ -296,6 +306,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["physical activity", "กิจกรรมทางกาย"],
     thaiName: "กิจกรรมทางกาย",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Footprints,
     category: "behavior",
     detailHref: "/recommendation_physical_activity",
@@ -313,6 +324,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["alcohol", "การดื่มแอลกอฮอล์", "แอลกอฮอล์"],
     thaiName: "การดื่มแอลกอฮอล์",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Wine,
     category: "behavior",
     detailHref: "/recommendation_alcohol",
@@ -330,6 +342,7 @@ const TYPE_CONFIGS: TypeConfig[] = [
   {
     match: ["smoking", "การสูบบุหรี่", "บุหรี่"],
     thaiName: "การสูบบุหรี่",
+    source: "กรมควบคุมโรค · แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยงโรคไม่ติดต่อ",
     icon: Cigarette,
     category: "behavior",
     detailHref: "/recommendation_smoking",
@@ -966,6 +979,10 @@ function PlanCard({
               ดูผลการประเมินครั้งล่าสุด
             </button>
           </div>
+
+          {cfg.source && (
+            <p className="-mt-2 text-right text-[11px] leading-snug text-gray-400">อ้างอิง: {cfg.source}</p>
+          )}
         </div>
       )}
     </article>

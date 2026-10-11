@@ -575,7 +575,7 @@ function DashboardContent({
           </section>
 
           {/* ---------- Trend (กราฟแมงมุม) ---------- */}
-          <section className="flex flex-col gap-4">
+          <section className="bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-4">
             <SectionHead
               eyebrow="TREND"
               title="แนวโน้มคะแนน"
@@ -714,12 +714,14 @@ const TREND_GROUPS: { key: string; label: string; categoryId: number; names: str
   { key: "mental", label: "สุขภาพจิต", categoryId: 3, names: ["stress", "phq-2", "9q"] },
 ];
 
-// checklist เลือกแบบประเมินที่จะแสดง (ค่าเริ่มต้น = เลือกทุกแบบ)
-// - เลือก 1 แบบ → กราฟรายละเอียดของแบบนั้น
-// - เลือกหลายแบบ → กราฟแมงมุมเฉพาะแบบที่เลือก
+// เลือกมุมมองกราฟ (ค่าเริ่มต้น = ทั้งหมด)
+// - "ทั้งหมด" → กราฟแมงมุมรวมทุกแบบ
+// - กดชื่อกลุ่ม → กราฟแมงมุมเฉพาะกลุ่มนั้น
+// - กดแบบประเมิน → กราฟรายละเอียดของแบบนั้นแบบเดียว
+type TrendView = { kind: "all" } | { kind: "group"; key: string } | { kind: "type"; id: number };
+
 function TrendCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
-  // เก็บแบบที่ "ไม่เลือก" ไว้ แบบประเมินใหม่ที่เพิ่งทำจึงถูกเลือกให้อัตโนมัติ
-  const [unchecked, setUnchecked] = useState<number[]>([]);
+  const [view, setView] = useState<TrendView>({ kind: "all" });
   // หมวดของแบบประเมินที่เจ้าหน้าที่สร้างเอง: assessment id → { categoryId, name }
   const [customCats, setCustomCats] = useState<Map<number, { id: number; name: string }>>(new Map());
   useEffect(() => {
@@ -746,7 +748,6 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
       .slice(-8);
   // ทุกแบบประเมินที่มีผล (กราฟแมงมุมใช้ระดับผล ไม่จำเป็นต้องมีคะแนนตัวเลข)
   const types = items;
-  const chosen = types.filter((a) => !unchecked.includes(a.assessment_type_id));
 
   // จัดกลุ่มตามหมวด (เรียงตามลำดับใน TREND_GROUPS) ที่เหลือเป็นหมวดของเจ้าหน้าที่หรือ "อื่น ๆ"
   const groups: { key: string; label: string; items: Assessment[] }[] = TREND_GROUPS.map((g) => ({ key: g.key, label: g.label, items: [] as Assessment[] }));
@@ -775,65 +776,64 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
   }
   const visibleGroups = groups.filter((g) => g.items.length > 0);
 
-  const toggleGroup = (ids: number[], allOn: boolean) =>
-    setUnchecked((list) => (allOn ? [...new Set([...list, ...ids])] : list.filter((x) => !ids.includes(x))));
+  // แบบประเมินที่อยู่ในมุมมองปัจจุบัน (ถ้าแบบ/กลุ่มที่เลือกหายไป กลับไปทั้งหมด)
+  const chosen =
+    view.kind === "type"
+      ? types.filter((a) => a.assessment_type_id === view.id)
+      : view.kind === "group"
+        ? visibleGroups.find((g) => g.key === view.key)?.items ?? []
+        : types;
+  const shown = chosen.length > 0 ? chosen : types;
+  const isAll = view.kind === "all" || chosen.length === 0;
 
-  const toggle = (id: number) =>
-    setUnchecked((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
+  const chipCls = (on: boolean) =>
+    `min-h-9 rounded-full border px-4 text-sm font-semibold transition ${
+      on
+        ? "border-[#16181D] bg-[#16181D] text-white"
+        : "border-[#E2DED5] bg-white text-[#4A4F59] hover:border-[#B9B3A6] hover:text-[#16181D]"
+    }`;
 
   return (
-    <div className="bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-5">
+    <div className="flex flex-col gap-5">
       <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm font-bold text-[#16181D]">
-            แบบประเมินที่แสดง{" "}
-            <span className="font-normal text-[#5E6470]">
-              {chosen.length}/{types.length}
-            </span>
-          </p>
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
-            onClick={() => setUnchecked(chosen.length > 0 ? types.map((a) => a.assessment_type_id) : [])}
-            className="text-sm font-semibold text-[#16181D] underline underline-offset-4 hover:opacity-70"
+            aria-pressed={isAll}
+            onClick={() => setView({ kind: "all" })}
+            className={chipCls(isAll)}
           >
-            {chosen.length > 0 ? "ล้างทั้งหมด" : "เลือกทั้งหมด"}
+            ดูทั้งหมด <span className="font-normal opacity-70">({types.length})</span>
           </button>
         </div>
 
         <div className="flex flex-col gap-3">
           {visibleGroups.map((g) => {
-            const ids = g.items.map((a) => a.assessment_type_id);
-            const onCount = ids.filter((id) => !unchecked.includes(id)).length;
-            const allOn = onCount === ids.length;
+            const groupOn = view.kind === "group" && view.key === g.key;
             return (
               <div key={g.key} className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                {/* กดชื่อกลุ่ม = เลือก/ยกเลิกทั้งกลุ่ม */}
+                {/* กดชื่อกลุ่ม = ดูกราฟรวมเฉพาะกลุ่มนี้ */}
                 <button
                   type="button"
-                  onClick={() => toggleGroup(ids, allOn)}
-                  aria-label={`${allOn ? "ยกเลิก" : "เลือก"}ทั้งกลุ่ม${g.label}`}
-                  className="shrink-0 self-start rounded-md text-left text-[13px] text-[#4A4F59] hover:text-[#16181D] sm:w-28 sm:pt-2"
+                  aria-pressed={groupOn}
+                  onClick={() => setView({ kind: "group", key: g.key })}
+                  className={`shrink-0 self-start rounded-md text-left text-[13px] sm:w-28 sm:pt-2 ${
+                    groupOn ? "text-[#16181D] underline underline-offset-4" : "text-[#4A4F59] hover:text-[#16181D]"
+                  }`}
                 >
                   <span className="font-semibold">{g.label}</span>{" "}
-                  <span className="text-[#8A8F99]">
-                    {onCount}/{ids.length}
-                  </span>
+                  <span className="text-[#8A8F99]">{g.items.length}</span>
                 </button>
                 <div role="group" aria-label={`แบบประเมินกลุ่ม${g.label}`} className="flex flex-wrap gap-2">
                   {g.items.map((a) => {
-                    const on = !unchecked.includes(a.assessment_type_id);
+                    const on = view.kind === "type" && view.id === a.assessment_type_id;
                     return (
                       <button
                         key={a.assessment_type_id}
                         type="button"
-                        role="checkbox"
-                        aria-checked={on}
-                        onClick={() => toggle(a.assessment_type_id)}
-                        className={`min-h-9 rounded-full border px-4 text-sm font-semibold transition ${
-                          on
-                            ? "border-[#16181D] bg-[#16181D] text-white"
-                            : "border-[#E2DED5] bg-white text-[#4A4F59] hover:border-[#B9B3A6] hover:text-[#16181D]"
-                        }`}
+                        aria-pressed={on}
+                        onClick={() => setView({ kind: "type", id: a.assessment_type_id })}
+                        className={chipCls(on)}
                       >
                         {thName(a.assessment_name)}
                       </button>
@@ -844,26 +844,19 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
             );
           })}
         </div>
-
-        <p className="text-xs text-[#5E6470]">กดชื่อกลุ่มเพื่อเลือก/ยกเลิกทั้งกลุ่ม เช่น ดูเฉพาะสุขภาพจิต</p>
       </div>
 
-      {chosen.length === 0 ? (
-        <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-sm text-[#4A4F59]">
-          <Info size={18} />
-          เลือกอย่างน้อย 1 แบบประเมินเพื่อแสดงกราฟ
-        </div>
-      ) : chosen.length === 1 ? (
+      {view.kind === "type" && chosen.length === 1 ? (
         history(chosen[0].assessment_type_id).length > 0 ? (
           <TypeTrend key={chosen[0].assessment_type_id} list={history(chosen[0].assessment_type_id)} />
         ) : (
           <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-sm text-[#4A4F59]">
             <Info size={18} />
-            แบบประเมินนี้ไม่มีคะแนนที่แสดงเป็นกราฟได้ เลือกหลายแบบเพื่อดูในกราฟรวมแทน
+            แบบประเมินนี้ไม่มีคะแนนที่แสดงเป็นกราฟได้ กด &quot;ดูทั้งหมด&quot; เพื่อดูในกราฟรวมแทน
           </div>
         )
       ) : (
-        <RadarCard items={chosen} assessments={assessments} />
+        <RadarCard items={shown} assessments={assessments} />
       )}
     </div>
   );
@@ -1456,7 +1449,7 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
         title="คำแนะนำจากผลประเมินของคุณ"
         aside={
           onToggle && (
-            <ToggleButton open={open} onClick={onToggle} controls="recommendation-list" showLabel={`แสดง (${tips.length})`} />
+            <ToggleButton open={open} onClick={onToggle} controls="recommendation-list" />
           )
         }
       />
