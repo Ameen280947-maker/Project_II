@@ -193,6 +193,7 @@ function PhysicalActivityResultContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="physical activity"
       title={
         <>
           ระดับ<span className={t.accent}>กิจกรรมทางกาย</span>

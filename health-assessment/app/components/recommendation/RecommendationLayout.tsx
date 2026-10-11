@@ -5,6 +5,7 @@ import type { CardTone } from "@/app/components/AssessmentMenuCard";
 import Sidebar from "@/app/components/Sidebar";
 import AnswerReview from "@/app/components/AnswerReview";
 import ResultActions from "@/app/components/ResultActions";
+import FollowUpActions from "@/app/components/recommendation/FollowUpActions";
 
 /* =========================================================
    โครงหน้าคำแนะนำ ใช้รูปแบบเดียวกันทุกแบบประเมิน (อิงหน้าโรคหัวใจ)
@@ -289,6 +290,7 @@ export function RecommendationError({
 
 export default function RecommendationLayout({
   tone,
+  assessmentKey,
   title,
   score,
   riskLevel,
@@ -303,6 +305,8 @@ export default function RecommendationLayout({
   disclaimer = "ผลนี้เป็นการประเมินความเสี่ยงเบื้องต้น ไม่ใช่การวินิจฉัยโรค หากมีความผิดปกติหรือมีความกังวล ควรปรึกษาบุคลากรทางการแพทย์",
 }: {
   tone: CardTone;
+  /* assessment_name (ตัวพิมพ์เล็ก) ใช้เลือกแบบประเมินที่ควรทำต่อเมื่อผลเสี่ยงสูง */
+  assessmentKey?: string;
   /* ชื่อผลประเมิน (หัวข้อใหญ่ใต้ "คำแนะนำ") */
   title: ReactNode;
   /* วงกลมคะแนนด้านขวา (ใช้ ScoreCircle) */
@@ -376,7 +380,17 @@ export default function RecommendationLayout({
             <p>{disclaimer}</p>
           </div>
 
-          <ResultActions tone={tone} editHref={editHref} menuHref={menuHref} onMenuClick={onMenuClick} />
+          {onMenuClick ? (
+            <ResultActions tone={tone} editHref={editHref} menuHref={menuHref} onMenuClick={onMenuClick} />
+          ) : (
+            <FollowUpActions
+              assessmentKey={assessmentKey}
+              riskLevel={riskLevel}
+              tone={tone}
+              editHref={editHref}
+              menuHref={menuHref}
+            />
+          )}
         </div>
       </div>
     </Shell>

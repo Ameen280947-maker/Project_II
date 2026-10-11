@@ -137,6 +137,7 @@ function BmiResultContent() {
     return (
         <RecommendationLayout
             tone={TONE}
+            assessmentKey="bmi"
             title={
                 <>
                     ค่าดัชนีมวลกาย <span className={t.accent}>(BMI)</span> ของคุณ

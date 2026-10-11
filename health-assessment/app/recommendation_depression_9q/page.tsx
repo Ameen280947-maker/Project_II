@@ -145,6 +145,7 @@ function Depression9QRecommendationContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="9q"
       title="การประเมินโรคซึมเศร้า (9Q)"
       score={
         <ScoreCircle

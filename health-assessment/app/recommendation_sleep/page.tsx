@@ -169,6 +169,7 @@ export default function RecommendationSleepPage() {
     return (
         <RecommendationLayout
             tone={TONE}
+            assessmentKey="sleep"
             title={
                 <>
                     ผลการประเมิน<span className={t.accent}>การนอนหลับ</span>

@@ -319,23 +319,6 @@ const getLevel = (a: Assessment): Level => {
   return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
-// หน้าผลและคำแนะนำของแต่ละแบบประเมิน (key = assessment_name ตัวพิมพ์เล็ก)
-const RESULT_PAGE: Record<string, string> = {
-  "thai cvd": "/recommendation-CVD",
-  "diabetes tds": "/recommendation_diabetes",
-  "blood pressure": "/recommendation_DB",
-  bmi: "/recommendation_BMI",
-  "phq-2": "/recommendation_depression_2q",
-  "9q": "/recommendation_depression_9q",
-  stress: "/recommendation_stress",
-  sleep: "/recommendation_sleep",
-  diet: "/recommendation_diet",
-  alcohol: "/recommendation_alcohol",
-  smoking: "/recommendation_smoking",
-  "physical activity": "/recommendation_physical_activity",
-  กิจกรรมทางกาย: "/recommendation_physical_activity",
-};
-
 const formatShortDate = (date: string) =>
   new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
@@ -395,10 +378,9 @@ export default function DashboardPage() {
     loadDashboard();
   }, [router]);
 
-  // ไปหน้าผลและคำแนะนำของแบบประเมินนั้น (ไม่มีหน้าเฉพาะ → หน้าประวัติ)
+  // ไปหน้าประวัติการประเมิน โดยเลือกหมวดของแบบประเมินนั้นไว้
   const openResult = (assessment: Assessment) => {
-    const page = RESULT_PAGE[assessment.assessment_name?.toLowerCase().trim() ?? ""];
-    router.push(`${page ?? "/history"}?assessmentId=${assessment.assessment_id}`);
+    router.push(`/history?type=${encodeURIComponent(assessment.assessment_name ?? "")}`);
   };
 
   return (

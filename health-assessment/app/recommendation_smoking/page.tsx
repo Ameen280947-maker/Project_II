@@ -151,6 +151,7 @@ function SmokingRecommendationContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="smoking"
       title={
         <>
           ผลการประเมิน<span className={t.accent}>การสูบบุหรี่</span>

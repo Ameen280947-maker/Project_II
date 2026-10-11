@@ -108,3 +108,63 @@ export const riskLevelOf = (
   const table = BY_TYPE[String(assessmentName ?? "").toLowerCase().trim()];
   return table?.[risk] ?? fromKeywords(risk.toLowerCase());
 };
+
+/* =========================================================
+   สีตามเอกสารอ้างอิงกรมควบคุมโรค (4 สี: เขียว เหลือง ส้ม แดง)
+   ใช้ในหน้าประวัติการประเมิน
+   ค่าที่ไม่อยู่ใน DOC_COLOR ใช้ระดับจาก riskLevelOf
+   (ok = เขียว, mid = เหลือง, high = แดง)
+========================================================= */
+
+export type DocColor = "green" | "yellow" | "orange" | "red" | "unknown";
+
+const DOC_COLOR: Record<string, Record<string, DocColor>> = {
+  // ตารางที่ 12: เอกสารให้ ผอม = เขียว, ปกติ = เหลือง
+  bmi: {
+    "ผอม": "green",
+    "ปกติ": "yellow",
+    "น้ำหนักเกิน": "orange",
+  },
+  // ตารางที่ 4
+  "blood pressure": {
+    "อาจเป็นโรคความดันโลหิตสูง": "orange",
+    "น่าจะเป็นโรคความดันโลหิตสูง": "orange",
+  },
+  // ตารางที่ 7
+  "diabetes tds": {
+    high: "orange",
+    "เสี่ยงสูง": "orange",
+  },
+  // ตารางที่ 16
+  alcohol: {
+    "ความเสี่ยงปานกลาง": "orange",
+  },
+  // ตารางที่ 24 (4 ระดับ)
+  diet: {
+    "ควรปรับพฤติกรรม": "orange",
+  },
+  // ตารางที่ 30: 1-2 คะแนน = แดง
+  "phq-2": {
+    "มีความเสี่ยงหรือมีแนวโน้มเป็นโรคซึมเศร้า": "red",
+  },
+  // ไม่อยู่ในเอกสาร ใช้สีตามเกณฑ์ 9Q ของกรมสุขภาพจิต
+  "9q": {
+    "มีอาการซึมเศร้าระดับปานกลาง": "orange",
+  },
+};
+
+const LEVEL_TO_DOC: Record<Level, DocColor> = {
+  ok: "green",
+  mid: "yellow",
+  high: "red",
+  unknown: "unknown",
+};
+
+export const docColorOf = (
+  assessmentName?: string | null,
+  riskLevel?: string | null
+): DocColor => {
+  const risk = String(riskLevel ?? "").trim();
+  const table = DOC_COLOR[String(assessmentName ?? "").toLowerCase().trim()];
+  return table?.[risk] ?? LEVEL_TO_DOC[riskLevelOf(assessmentName, riskLevel)];
+};

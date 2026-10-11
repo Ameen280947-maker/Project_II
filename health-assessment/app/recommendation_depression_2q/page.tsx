@@ -108,6 +108,7 @@ function Depression2QRecommendationContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="phq-2"
       title="การคัดกรองโรคซึมเศร้า (2Q)"
       score={
         <ScoreCircle

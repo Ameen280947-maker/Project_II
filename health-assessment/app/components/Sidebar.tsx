@@ -214,17 +214,12 @@ export default function Sidebar() {
     pathname === "/profile" ||
     pathname.startsWith("/profile/");
 
+  // แบบประเมินทุกแบบ และหน้าผลของแต่ละแบบ (/recommendation_xxx, /recommendation-CVD) อยู่ในเมนู "แบบประเมินสุขภาพ"
   const isAssessmentActive =
-    pathname === "/assessment-type" ||
-    pathname.startsWith("/assessment-type/") ||
-    pathname.startsWith("/assessment-menu") ||
-    pathname.startsWith("/assessment_CVD") ||
-    pathname.startsWith("/assessment_DB") ||
-    pathname.startsWith("/assessment_diabetes") ||
-    pathname.startsWith("/assessment_smoking") ||
-    pathname.startsWith("/assessment_depression_2q") ||
-    pathname.startsWith("/assessment_depression_9q") ||
-    pathname.startsWith("/assessment/");
+    pathname.startsWith("/assessment") ||
+    pathname.startsWith("/sleep-assessment") ||
+    pathname.startsWith("/recommendation_") ||
+    pathname.startsWith("/recommendation-CVD");
 
   const isResultActive =
     pathname === "/dashboard" ||
@@ -243,10 +238,7 @@ export default function Sidebar() {
   const isRecommendationActive =
     pathname === "/recommendation-health" ||
     pathname === "/recommendation" ||
-    pathname.startsWith("/recommendation/") ||
-    pathname.startsWith("/recommendation-CVD") ||
-    pathname.startsWith("/recommendation_DB") ||
-    pathname.startsWith("/recommendation_diabetes");
+    pathname.startsWith("/recommendation/");
 
   const isSettingsActive =
     pathname === "/settings" ||

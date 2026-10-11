@@ -183,6 +183,7 @@ function DietRecommendationContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="diet"
       title={
         <>
           พฤติกรรม<span className={RECOMMENDATION_TONES[TONE].accent}>การรับประทานอาหาร</span>

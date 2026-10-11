@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/Sidebar";
+import { docColorOf, type DocColor } from "@/lib/riskLevel";
 
 import {
   Activity,
@@ -128,9 +129,13 @@ export default function HistoryPage() {
           );
         }
 
-        setHistory(
-          data.history ?? [],
-        );
+        const items = data.history ?? [];
+        setHistory(items);
+
+        // มาจากปุ่ม "ดูผล" ในแดชบอร์ด (?type=ชื่อแบบประเมิน) → เลือกหมวดนั้นไว้
+        const type = new URLSearchParams(window.location.search).get("type")?.toLowerCase().trim();
+        const match = type && items.find((item) => item.assessment_name?.toLowerCase().trim() === type);
+        if (match) setFilter(match.assessment_name);
       } catch (loadError) {
         console.error(
           "LOAD HISTORY ERROR:",
@@ -561,375 +566,36 @@ function HistoryCard({
 
 /* =====================================================
    RESULT STYLE
+   สีตามเอกสารอ้างอิงกรมควบคุมโรค (เขียว เหลือง ส้ม แดง)
 ===================================================== */
+
+const RESULT_STYLE: Record<DocColor, ReturnType<typeof makeStyle>> = {
+  green: makeStyle("bg-[#eef8e9]", "text-[#57965c]", "hover:bg-[#e0f2dc]"),
+  yellow: makeStyle("bg-[#fff8e1]", "text-[#a8860b]", "hover:bg-[#fff0c2]"),
+  orange: makeStyle("bg-[#fff1e6]", "text-[#d9730d]", "hover:bg-[#ffe3cc]"),
+  red: makeStyle("bg-[#fff0f2]", "text-[#b91c2b]", "hover:bg-[#ffe4e8]"),
+  unknown: makeStyle("bg-[#f4f4f5]", "text-[#74757d]", "hover:bg-[#ebebed]"),
+};
+
+function makeStyle(bg: string, text: string, hover: string) {
+  return {
+    icon: `${bg} ${text}`,
+    badge: `${bg} ${text}`,
+    box: bg,
+    text,
+    button: `${bg} ${text} ${hover}`,
+  };
+}
 
 function getResultStyle(
   item: HistoryItem,
 ) {
-  const risk =
-    String(
-      item.risk_level ?? "",
-    ).toLowerCase();
-
-  const name =
-    item.assessment_name;
-
-  /* =====================================================
-     BLOOD PRESSURE
-  ===================================================== */
-
-  if (
-    name === "Blood Pressure"
-  ) {
-    if (
-      risk.includes("สูง") ||
-      risk.includes("high") ||
-      risk.includes("severe") ||
-      risk.includes("รุนแรง")
-    ) {
-      return {
-        icon:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        badge:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        box:
-          "bg-[#fff0f2]",
-        text:
-          "text-[#b91c2b]",
-        button:
-          "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
-      };
-    }
-
-    if (
-      risk.includes("ปานกลาง") ||
-      risk.includes("moderate") ||
-      risk.includes("เริ่มสูง") ||
-      risk.includes("elevated")
-    ) {
-      return {
-        icon:
-          "bg-[#fff8e8] text-[#a77723]",
-        badge:
-          "bg-[#fff8e8] text-[#a77723]",
-        box:
-          "bg-[#fff8e8]",
-        text:
-          "text-[#a77723]",
-        button:
-          "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
-      };
-    }
-
-    return {
-      icon:
-        "bg-[#eef8e9] text-[#57965c]",
-      badge:
-        "bg-[#eef8e9] text-[#57965c]",
-      box:
-        "bg-[#eef8e9]",
-      text:
-        "text-[#57965c]",
-      button:
-        "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
-    };
-  }
-
-  /* =====================================================
-     DIABETES
-  ===================================================== */
-
-  if (
-    name === "Diabetes TDS" ||
-    name === "Diabetes Risk"
-  ) {
-    if (
-      risk.includes("very_high") ||
-      risk.includes("very high") ||
-      risk.includes("สูงมาก") ||
-      risk.includes("รุนแรง")
-    ) {
-      return {
-        icon:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        badge:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        box:
-          "bg-[#fff0f2]",
-        text:
-          "text-[#b91c2b]",
-        button:
-          "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
-      };
-    }
-
-    if (
-      risk.includes("high") ||
-      risk.includes("สูง")
-    ) {
-      return {
-        icon:
-          "bg-[#fff0f2] text-[#d64b37]",
-        badge:
-          "bg-[#fff0f2] text-[#d64b37]",
-        box:
-          "bg-[#fff0f2]",
-        text:
-          "text-[#d64b37]",
-        button:
-          "bg-[#fff0f2] text-[#d64b37] hover:bg-[#ffe4e8]",
-      };
-    }
-
-    if (
-      risk.includes("moderate") ||
-      risk.includes("ปานกลาง")
-    ) {
-      return {
-        icon:
-          "bg-[#fff8e8] text-[#a77723]",
-        badge:
-          "bg-[#fff8e8] text-[#a77723]",
-        box:
-          "bg-[#fff8e8]",
-        text:
-          "text-[#a77723]",
-        button:
-          "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
-      };
-    }
-
-    return {
-      icon:
-        "bg-[#eef8e9] text-[#57965c]",
-      badge:
-        "bg-[#eef8e9] text-[#57965c]",
-      box:
-        "bg-[#eef8e9]",
-      text:
-        "text-[#57965c]",
-      button:
-        "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
-    };
-  }
-
-  /* =====================================================
-     CVD
-  ===================================================== */
-
-  if (
-    name === "Thai CVD"
-  ) {
-    if (
-      risk.includes("สูง") ||
-      risk.includes("high") ||
-      risk.includes("มาก")
-    ) {
-      return {
-        icon:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        badge:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        box:
-          "bg-[#fff0f2]",
-        text:
-          "text-[#b91c2b]",
-        button:
-          "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
-      };
-    }
-
-    if (
-      risk.includes("ปานกลาง") ||
-      risk.includes("moderate")
-    ) {
-      return {
-        icon:
-          "bg-[#fff8e8] text-[#a77723]",
-        badge:
-          "bg-[#fff8e8] text-[#a77723]",
-        box:
-          "bg-[#fff8e8]",
-        text:
-          "text-[#a77723]",
-        button:
-          "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
-      };
-    }
-
-    return {
-      icon:
-        "bg-[#eef8e9] text-[#57965c]",
-      badge:
-        "bg-[#eef8e9] text-[#57965c]",
-      box:
-        "bg-[#eef8e9]",
-      text:
-        "text-[#57965c]",
-      button:
-        "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
-    };
-  }
-
-  /* =====================================================
-     BMI
-  ===================================================== */
-
-  if (
-    name === "BMI"
-  ) {
-    const score =
-      Number(item.total_score);
-
-    if (
-      Number.isFinite(score) &&
-      score >= 25
-    ) {
-      return {
-        icon:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        badge:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        box:
-          "bg-[#fff0f2]",
-        text:
-          "text-[#b91c2b]",
-        button:
-          "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
-      };
-    }
-
-    return {
-      icon:
-        "bg-[#eef8e9] text-[#57965c]",
-      badge:
-        "bg-[#eef8e9] text-[#57965c]",
-      box:
-        "bg-[#eef8e9]",
-      text:
-        "text-[#57965c]",
-      button:
-        "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
-    };
-  }
-
-  /* =====================================================
-     SMOKING
-  ===================================================== */
-
-  if (
-    name === "Smoking"
-  ) {
-    if (
-      risk.includes("สูง") ||
-      risk.includes("high") ||
-      risk.includes("มาก") ||
-      risk.includes("รุนแรง")
-    ) {
-      return {
-        icon:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        badge:
-          "bg-[#fff0f2] text-[#b91c2b]",
-        box:
-          "bg-[#fff0f2]",
-        text:
-          "text-[#b91c2b]",
-        button:
-          "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
-      };
-    }
-
-    if (
-      risk.includes("ปานกลาง") ||
-      risk.includes("moderate")
-    ) {
-      return {
-        icon:
-          "bg-[#fff8e8] text-[#a77723]",
-        badge:
-          "bg-[#fff8e8] text-[#a77723]",
-        box:
-          "bg-[#fff8e8]",
-        text:
-          "text-[#a77723]",
-        button:
-          "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
-      };
-    }
-
-    return {
-      icon:
-        "bg-[#eef8e9] text-[#57965c]",
-      badge:
-        "bg-[#eef8e9] text-[#57965c]",
-      box:
-        "bg-[#eef8e9]",
-      text:
-        "text-[#57965c]",
-      button:
-        "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
-    };
-  }
-
-  /* =====================================================
-     DEFAULT
-  ===================================================== */
-
-  const dangerous =
-    risk.includes("สูง") ||
-    risk.includes("high") ||
-    risk.includes("อันตราย") ||
-    risk.includes("รุนแรง");
-
-  const warning =
-    risk.includes("ปานกลาง") ||
-    risk.includes("moderate") ||
-    risk.includes("เริ่มสูง") ||
-    risk.includes("elevated");
-
-  if (dangerous) {
-    return {
-      icon:
-        "bg-[#fff0f2] text-[#b91c2b]",
-      badge:
-        "bg-[#fff0f2] text-[#b91c2b]",
-      box:
-        "bg-[#fff0f2]",
-      text:
-        "text-[#b91c2b]",
-      button:
-        "bg-[#fff0f2] text-[#b91c2b] hover:bg-[#ffe4e8]",
-    };
-  }
-
-  if (warning) {
-    return {
-      icon:
-        "bg-[#fff8e8] text-[#a77723]",
-      badge:
-        "bg-[#fff8e8] text-[#a77723]",
-      box:
-        "bg-[#fff8e8]",
-      text:
-        "text-[#a77723]",
-      button:
-        "bg-[#fff8e8] text-[#a77723] hover:bg-[#fff1cf]",
-    };
-  }
-
-  return {
-    icon:
-      "bg-[#eef8e9] text-[#57965c]",
-    badge:
-      "bg-[#eef8e9] text-[#57965c]",
-    box:
-      "bg-[#eef8e9]",
-    text:
-      "text-[#57965c]",
-    button:
-      "bg-[#eef8e9] text-[#57965c] hover:bg-[#e0f2dc]",
-  };
+  return RESULT_STYLE[
+    docColorOf(
+      item.assessment_name,
+      item.risk_level,
+    )
+  ];
 }
 
 /* =====================================================
