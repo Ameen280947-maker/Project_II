@@ -116,27 +116,6 @@ export const severityOf = (assessmentName: string, riskLevel: string | null | un
   return exact ?? fromText(risk);
 };
 
-// ระดับที่ต้องสร้างเคสติดตามอัตโนมัติ (เฉพาะแบบประเมินทางคลินิก)
-export const FOLLOW_UP_AT: Record<string, Severity> = {
-  "9Q": 2,
-  Stress: 3,
-  "Blood Pressure": 2,
-  "Thai CVD": 2,
-  "Diabetes TDS": 2,
-  BMI: 3,
-};
-
-// เกณฑ์สร้างเคสของแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม: ระดับสูงสุดของแบบนั้น (ถ้าอยู่ในระดับ "สูง" ขึ้นไป)
-export const customTypeNames = () => Object.keys(CUSTOM);
-
-export function followUpThreshold(assessmentName: string): Severity | undefined {
-  if (FOLLOW_UP_AT[assessmentName] !== undefined) return FOLLOW_UP_AT[assessmentName];
-  const levels = CUSTOM[assessmentName];
-  if (!levels) return undefined;
-  const top = Math.max(...Object.values(levels)) as Severity;
-  return top >= 2 ? top : undefined;
-}
-
 export const SEVERITY_LABEL: Record<Severity, string> = {
   0: "ปกติ",
   1: "ควรระวัง",

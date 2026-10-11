@@ -1,41 +1,73 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Download, FileText, Lock } from "lucide-react";
 import { downloadCsv, staffFetch } from "@/lib/staff/client";
-import { Card, Empty, ErrorBox, PageHeader, Segmented, btnGhost, btnPrimary, inputCls } from "../components/ui";
+import { Card, Empty, ErrorBox, PageHeader, Segmented, StatCard, btnGhost, btnPrimary, inputCls } from "../components/ui";
+import DateRangePicker, { rangeText, useDateRange } from "../components/DateRangePicker";
+import {
+  AgeBars,
+  BarLegend,
+  C_BAR,
+  Funnel,
+  HATCH,
+  RankedBars,
+  TrendBars,
+  fmt,
+  type AgePoint,
+  type FunnelStep,
+  type TrendPoint,
+} from "../components/reports/ReportCharts";
 
 /* =========================================================
    TYPES (ตรงกับ /api/staff/reports)
    ค่า null = กลุ่มเล็กกว่าเกณฑ์ ไม่แสดงตัวเลขเพื่อป้องกันการระบุตัวบุคคล
 ========================================================= */
 
+type Bucket = "day" | "week" | "month";
+
 type Report = {
   minGroup: number;
+  range: { from: string; to: string; prevFrom: string; prevTo: string; days: number; bucket: Bucket; current: boolean };
   filters: { types: { id: number; label: string }[]; ageGroups: { key: string; label: string }[] };
-  totals: { assessments: number; users: number };
-  trend: { label: string; total: number; highPct: number | null; partial: boolean }[];
-  byAge: { label: string; physical: { pct: number | null; n: number }; mental: { pct: number | null; n: number } }[];
+  kpi: {
+    assessments: { cur: number; prev: number; changePct: number | null };
+    users: { cur: number; perUser: number | null };
+    high: { pct: number | null; n: number | null };
+    onTime: { pct: number | null; change: number | null };
+  };
+  trend: TrendPoint[];
+  usage: {
+    newUsers: { cur: number; prev: number; changePct: number | null };
+    improved: { repeaters: number; pct: number | null };
+    funnel: FunnelStep[];
+  };
+  byAge: AgePoint[];
   topIssues: { label: string; pct: number }[];
   summary: { label: string; count: number; users: number | null; highPct: number | null; change: number | null; onTime: number | null }[];
 };
 
 type Metric = "total" | "highPct";
 
-// สีชุดข้อมูลกราฟ (ผ่านการตรวจความต่างสี/ตาบอดสีแล้ว)
-// กราฟช่วงอายุ: แยกกาย/จิตด้วยลวดลาย (ทึบ / เส้นทแยง) แทนสี ให้เข้ากับโทนเทา-ดำ
-// และมีตัวเลขกำกับทุกแท่ง จึงไม่ต้องพึ่งสีในการแยก
-const C_BAR = "#2b2a28";
-const BAR_FILL = { physical: C_BAR, mental: `repeating-linear-gradient(135deg, ${C_BAR} 0 2px, #ffffff 2px 6px)` };
+const BUCKET_TEXT: Record<Bucket, { title: string; unit: string; partial: string }> = {
+  month: { title: "แนวโน้มรายเดือน", unit: "เดือน", partial: "เดือนปัจจุบันซึ่งยังไม่ครบเดือน" },
+  week: { title: "แนวโน้มรายสัปดาห์", unit: "สัปดาห์", partial: "สัปดาห์ปัจจุบันซึ่งยังไม่ครบสัปดาห์" },
+  day: { title: "แนวโน้มรายวัน", unit: "วัน", partial: "วันนี้ซึ่งยังไม่สิ้นสุดวัน" },
+};
 
-const fmt = (v: number | null, suffix = "%") => (v === null ? "–" : `${v.toLocaleString("th-TH")}${suffix}`);
+const num = (n: number) => n.toLocaleString("th-TH");
+
+// ▲ +12.5% / ▼ 3% / 0% · suffix เช่น "%" หรือ " จุด"
+const delta = (v: number | null, suffix = "%") =>
+  v === null ? null : v > 0 ? `▲ +${num(v)}${suffix}` : v < 0 ? `▼ ${num(Math.abs(v))}${suffix}` : `0${suffix}`;
 
 /* =========================================================
    PAGE
 ========================================================= */
 
 export default function ReportsPage() {
-  const [months, setMonths] = useState("6");
+  const dr = useDateRange();
+  const { range } = dr;
   const [type, setType] = useState("all");
   const [gender, setGender] = useState("all");
   const [age, setAge] = useState("all");
@@ -44,10 +76,11 @@ export default function ReportsPage() {
   const [loadedKey, setLoadedKey] = useState("");
   const [error, setError] = useState("");
 
-  const qs = new URLSearchParams({ months, type, gender, age }).toString();
-  const loading = loadedKey !== qs;
+  const qs = new URLSearchParams({ from: range.from, to: range.to, type, gender, age }).toString();
+  const loading = !range.invalid && loadedKey !== qs;
 
   useEffect(() => {
+    if (range.invalid) return;
     let cancelled = false;
     staffFetch<Report>(`/api/staff/reports?${qs}`)
       .then((d) => {
@@ -60,63 +93,88 @@ export default function ReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, [qs]);
+  }, [qs, range.invalid]);
+
+  const typeText = type === "all" ? "ทุกแบบประเมิน" : (data?.filters.types.find((t) => String(t.id) === type)?.label ?? "-");
+  const genderText = { all: "ทุกเพศ", male: "ชาย", female: "หญิง" }[gender] ?? "-";
+  const ageText = age === "all" ? "ทุกช่วงอายุ" : (data?.filters.ageGroups.find((g) => g.key === age)?.label ?? "-");
+  const periodText = data ? rangeText(data.range.from, data.range.to) : rangeText(range.from, range.to);
+  const prevText = data ? rangeText(data.range.prevFrom, data.range.prevTo) : "";
 
   const exportCsv = () => {
     if (!data) return;
-    const stamp = new Date().toISOString().slice(0, 10);
-    downloadCsv(`staff-report-${stamp}.csv`, [
-      ["สรุปรายแบบประเมิน", `ช่วง ${months} เดือนล่าสุด`],
-      ["แบบประเมิน", "จำนวนครั้ง", "ผู้ใช้", "ความเสี่ยงสูง (%)", "เทียบช่วงก่อน (จุด%)", "ประเมินซ้ำตามรอบ (%)"],
-      ...data.summary.map((s) => [s.label, s.count, s.users ?? "–", s.highPct ?? "–", s.change ?? "–", s.onTime ?? "–"]),
+    const { kpi, usage, range: r } = data;
+    const bt = BUCKET_TEXT[r.bucket];
+    const dash = (v: number | null | undefined) => (v === null || v === undefined ? "–" : v);
+    downloadCsv(`report_${r.from}_${r.to}.csv`, [
+      [`ช่วงข้อมูล ${rangeText(r.from, r.to)} (${r.from} ถึง ${r.to})`],
+      ["รายงานและสถิติ (ไม่ระบุตัวตน)"],
+      ["ช่วงเวลา", `${r.from} ถึง ${r.to}`, "ช่วงก่อน (เทียบ)", `${r.prevFrom} ถึง ${r.prevTo}`],
+      ["แบบประเมิน", typeText, "เพศ", genderText, "ช่วงอายุ", ageText],
       [],
-      ["แนวโน้มรายเดือน"],
-      ["เดือน", "จำนวนการประเมิน", "ความเสี่ยงสูง (%)"],
-      ...data.trend.map((t) => [t.label, t.total, t.highPct ?? "–"]),
+      ["ตัวชี้วัดหลัก", "ค่า", "ช่วงก่อน", "เปลี่ยนแปลง"],
+      ["การประเมินทั้งหมด (ครั้ง)", kpi.assessments.cur, kpi.assessments.prev, kpi.assessments.changePct === null ? "–" : `${kpi.assessments.changePct}%`],
+      ["ผู้ใช้ที่ประเมิน (คน)", kpi.users.cur, "", ""],
+      ["เฉลี่ยครั้งต่อคน", dash(kpi.users.perUser), "", ""],
+      ["ผลล่าสุดอยู่ระดับสูง (%)", dash(kpi.high.pct), "", ""],
+      ["ผลล่าสุดอยู่ระดับสูง (คน)", dash(kpi.high.n), "", ""],
+      ["ประเมินซ้ำตามรอบที่แนะนำ (%)", dash(kpi.onTime.pct), "", kpi.onTime.change === null ? "–" : `${kpi.onTime.change} จุด`],
       [],
-      ["สัดส่วนผู้มีความเสี่ยงสูงแยกตามช่วงอายุ"],
-      ["ช่วงอายุ", "สุขภาพกาย (%)", "สุขภาพจิต (%)"],
-      ...data.byAge.map((a) => [a.label, a.physical.pct ?? "–", a.mental.pct ?? "–"]),
+      [bt.title],
+      [bt.unit, "จำนวนการประเมิน", "ความเสี่ยงสูง (%)", "หมายเหตุ"],
+      ...data.trend.map((t) => [t.key, t.total, dash(t.highPct), t.partial ? "ยังไม่ครบช่วง" : ""]),
+      [],
+      ["การใช้งานของผู้ใช้", "ค่า", "ช่วงก่อน", "เปลี่ยนแปลง"],
+      ["ผู้ใช้ใหม่ในช่วงนี้ (คน)", usage.newUsers.cur, usage.newUsers.prev, usage.newUsers.changePct === null ? "–" : `${usage.newUsers.changePct}%`],
+      ["ผลดีขึ้นเมื่อประเมินซ้ำ (% ของผู้ที่ทำซ้ำ)", dash(usage.improved.pct), "", ""],
+      [],
+      ["เส้นทางผู้ใช้ (ช่วงที่เลือก)", "จำนวน (คน)", "ร้อยละของผู้สมัคร"],
+      ...usage.funnel.map((f) => [f.label, f.n, dash(f.pct)]),
+      [],
+      ["ความเสี่ยงสูง แยกตามช่วงอายุ", "สุขภาพกาย (%)", "สุขภาพจิต (%)"],
+      ...data.byAge.map((a) => [a.label, dash(a.physical.pct), dash(a.mental.pct)]),
       [],
       ["ปัญหาสุขภาพที่พบมากที่สุด", "% ผู้ใช้ที่ผลล่าสุดระดับควรระวังขึ้นไป"],
       ...data.topIssues.map((t) => [t.label, t.pct]),
       [],
-      [`นับเฉพาะผู้ใช้ที่อนุญาตให้ใช้ข้อมูลเพื่อการศึกษา · กลุ่มที่มีผู้ใช้น้อยกว่า ${data.minGroup} คนแสดงเป็น –`],
+      ["สรุปรายแบบประเมิน"],
+      ["แบบประเมิน", "จำนวนครั้ง", "ผู้ใช้", "ความเสี่ยงสูง (%)", "เทียบช่วงก่อน (จุด%)", "ประเมินซ้ำตามรอบ (%)"],
+      ...data.summary.map((s) => [s.label, s.count, dash(s.users), dash(s.highPct), dash(s.change), dash(s.onTime)]),
+      [],
+      [`นับเฉพาะผู้ใช้ที่ยินยอมให้ประมวลผลข้อมูลสุขภาพ · กลุ่มที่มีผู้ใช้น้อยกว่า ${data.minGroup} คนแสดงเป็น –`],
     ]);
   };
 
-  // เดือนที่มีการประเมินมากที่สุด (นับเดือนปัจจุบันด้วย แม้ยังไม่ครบเดือน)
-  const peak = useMemo(() => {
-    const all = data?.trend ?? [];
-    return all.length ? all.reduce((a, b) => (b.total > a.total ? b : a)) : null;
-  }, [data]);
+  const bt = BUCKET_TEXT[data?.range.bucket ?? "month"];
+  const trendEmpty = !!data && data.trend.every((t) => (metric === "total" ? t.total === 0 : t.highPct === null));
+  const hasPartial = !!data?.trend.some((t) => t.partial);
 
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        eyebrow="Reports"
+        eyebrow="REPORTS"
         title="รายงานและ"
         highlight="สถิติ"
         desc="สรุปผลภาพรวมแบบไม่ระบุตัวตน สำหรับวางแผนและรายงานผู้บริหาร"
         actions={
           <>
-            <button type="button" onClick={() => window.print()} disabled={!data} className={btnPrimary}>
-              <FileText size={17} /> PDF
-            </button>
             <button type="button" onClick={exportCsv} disabled={!data} className={btnGhost} title="เปิดใน Excel ได้ทันที">
-              <Download size={17} /> Excel / CSV
+              <Download size={17} /> ส่งออก CSV
+            </button>
+            <button type="button" onClick={() => window.print()} disabled={!data} className={btnPrimary}>
+              <FileText size={17} /> พิมพ์ / บันทึก PDF
             </button>
           </>
         }
       />
 
+      {/* FILTERS */}
       <Card className="staff-no-print !py-4">
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Filter label="ช่วงเวลา" value={months} onChange={setMonths}>
-            <option value="3">3 เดือนล่าสุด</option>
-            <option value="6">6 เดือนล่าสุด</option>
-            <option value="12">12 เดือนล่าสุด</option>
-          </Filter>
+        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-[auto_repeat(3,minmax(0,1fr))] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-staff-muted sm:col-span-3 lg:col-span-1 [&>div]:items-start">
+            ช่วงเวลา
+            <DateRangePicker state={dr} />
+          </div>
           <Filter label="แบบประเมิน" value={type} onChange={setType}>
             <option value="all">ทุกแบบประเมิน</option>
             {data?.filters.types.map((t) => (
@@ -141,14 +199,49 @@ export default function ReportsPage() {
         </div>
       </Card>
 
+      {/* ตัวกรองที่ใช้ (แสดงเฉพาะตอนพิมพ์) */}
+      <p className="hidden text-sm text-staff-muted print:block">
+        ช่วงเวลา {periodText} (เทียบกับ {prevText}) · {typeText} · {genderText} · {ageText}
+      </p>
+
       <ErrorBox message={error} />
 
-      <div className={`flex flex-col gap-4 ${loading ? "opacity-60" : ""}`}>
+      <div className={`flex flex-col gap-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
+        {/* KPI */}
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            label="การประเมินทั้งหมด"
+            value={data ? num(data.kpi.assessments.cur) : undefined}
+            note={data ? <DeltaNote text={delta(data.kpi.assessments.changePct)} fallback="ไม่มีข้อมูลช่วงก่อนให้เทียบ" /> : null}
+          />
+          <StatCard
+            label="ผู้ใช้ที่ประเมิน"
+            value={data ? num(data.kpi.users.cur) : undefined}
+            note={data ? (data.kpi.users.perUser === null ? "ยังไม่มีการประเมิน" : `เฉลี่ย ${num(data.kpi.users.perUser)} ครั้งต่อคน`) : null}
+          />
+          <StatCard
+            label="ผลล่าสุดอยู่ระดับสูง"
+            tone="danger"
+            value={data ? fmt(data.kpi.high.pct) : undefined}
+            note={data ? (data.kpi.high.n === null ? `ผู้ใช้น้อยกว่า ${data.minGroup} คน` : `${num(data.kpi.high.n)} คน`) : null}
+          />
+          <StatCard
+            label="ประเมินซ้ำตามรอบที่แนะนำ"
+            value={data ? fmt(data.kpi.onTime.pct) : undefined}
+            note={data ? <DeltaNote text={delta(data.kpi.onTime.change, " จุด")} fallback="ยังไม่มีข้อมูลพอสำหรับเทียบ" /> : null}
+          />
+        </div>
+
         {/* TREND */}
         <Card>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-bold">แนวโน้มรายเดือน</h2>
-            <div className="staff-no-print">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">{bt.title}</h2>
+              <p className="text-xs text-staff-muted">
+                {rangeText(range.from, range.to)} · {metric === "total" ? "จำนวนการประเมิน (ครั้ง)" : "% ผู้ใช้ที่ผลล่าสุดอยู่ระดับสูง"}
+              </p>
+            </div>
+            <div className="staff-no-print max-w-full overflow-x-auto">
               <Segmented
                 label="ตัวชี้วัด"
                 value={metric}
@@ -160,48 +253,76 @@ export default function ReportsPage() {
               />
             </div>
           </div>
-          {data && <TrendChart data={data.trend} metric={metric} />}
-          {data && (
-            <p className="mt-2 text-sm text-staff-muted">
-              รวม {data.totals.assessments.toLocaleString("th-TH")} ครั้ง จากผู้ใช้ {data.totals.users.toLocaleString("th-TH")} คน
-              {peak && peak.total > 0 ? ` · สูงสุดในเดือน ${peak.label} (${peak.total} ครั้ง${peak.partial ? " แม้ยังไม่ครบเดือน" : ""})` : ""} · ข้อมูลเดือนล่าสุดยังไม่ครบเดือน
-            </p>
+          {/* ระหว่างโหลดช่วงใหม่ ไม่แสดงแท่งของช่วงเดิม (กันกราฟไม่ตรงกับช่วงที่เลือก) */}
+          {loading ? (
+            <div className="h-56 animate-pulse rounded-2xl bg-staff-soft" />
+          ) : (
+            data && (trendEmpty ? <Empty>ยังไม่มีข้อมูลในช่วงเวลานี้</Empty> : <TrendBars data={data.trend} metric={metric} />)
           )}
+          {data && !loading && !trendEmpty && (
+            <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-xs text-staff-muted">
+              {hasPartial && (
+                <span className="flex items-center gap-1.5">
+                  <span className="h-3 w-3 rounded-[3px]" style={{ background: HATCH, boxShadow: `inset 0 0 0 1.5px ${C_BAR}` }} />
+                  แท่งลายเส้น ={" "}
+                  {data.range.bucket === "month"
+                    ? "เดือนที่ข้อมูลไม่ครบเดือน (ถูกตัดตามช่วงวันที่ที่เลือก หรือเป็นเดือนปัจจุบัน)"
+                    : data.range.current
+                      ? bt.partial
+                      : `${bt.unit}ที่ถูกตัดตามวันที่เลือก (ไม่ครบ${bt.unit})`}
+                </span>
+              )}
+              {metric === "highPct" && <span>– = ผู้ใช้น้อยกว่า {data.minGroup} คน จึงไม่แสดงตัวเลข</span>}
+            </div>
+          )}
+        </Card>
+
+        {/* USAGE */}
+        <Card>
+          <h2 className="mb-4 text-lg font-bold">การใช้งานของผู้ใช้</h2>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <MiniStat
+              label="ผู้ใช้ใหม่ในช่วงนี้"
+              value={data ? `${num(data.usage.newUsers.cur)} คน` : "–"}
+              note={data ? <DeltaNote text={delta(data.usage.newUsers.changePct)} fallback="ไม่มีข้อมูลช่วงก่อนให้เทียบ" /> : null}
+            />
+            <MiniStat
+              label="ผลดีขึ้นเมื่อประเมินซ้ำ"
+              value={!data ? "–" : data.usage.improved.repeaters === 0 ? null : fmt(data.usage.improved.pct)}
+              note="ของผู้ที่ทำซ้ำ (ภาพรวม)"
+            />
+          </div>
+
+          <h3 className="mb-3 mt-6 text-sm font-bold">เส้นทางผู้ใช้ (ช่วงที่เลือก)</h3>
+          {data &&
+            (data.usage.funnel[0]?.n ? (
+              <Funnel steps={data.usage.funnel} />
+            ) : (
+              <Empty>ยังไม่มีผู้สมัครสมาชิกใหม่ในช่วงเวลานี้</Empty>
+            ))}
+          <p className="mt-3 text-xs text-staff-muted">
+            นับจากผู้ที่สมัครสมาชิกในช่วงนี้ · ร้อยละเทียบกับจำนวนผู้สมัคร · ทำซ้ำตามรอบ = กลับมาทำแบบเดิมภายในรอบที่แนะนำ (ผ่อนผัน 7 วัน) อย่างน้อย 1 ครั้ง
+          </p>
         </Card>
 
         <div className="flex flex-wrap gap-4">
           {/* BY AGE */}
           <Card className="flex-[3_1_480px]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <h2 className="text-lg font-bold">สัดส่วนผู้มีความเสี่ยงสูง แยกตามช่วงอายุ</h2>
+              <h2 className="text-lg font-bold">ความเสี่ยงสูง แยกตามช่วงอายุ</h2>
               <div className="flex gap-4 text-sm text-staff-muted">
-                <BarLegend fill={BAR_FILL.physical} label="สุขภาพกาย" />
-                <BarLegend fill={BAR_FILL.mental} label="สุขภาพจิต" />
+                <BarLegend fill={C_BAR} label="สุขภาพกาย" />
+                <BarLegend fill={HATCH} label="สุขภาพจิต" />
               </div>
             </div>
-            {data && <AgeChart data={data.byAge} />}
+            {data && <AgeBars data={data.byAge} />}
+            <p className="mt-3 text-xs text-staff-muted">ร้อยละของผู้ใช้ในแต่ละช่วงอายุที่ผลล่าสุดอยู่ระดับสูง · – = ผู้ใช้น้อยกว่า {data?.minGroup ?? 5} คน</p>
           </Card>
 
           {/* TOP ISSUES */}
           <Card className="flex-[2_1_320px]">
             <h2 className="mb-4 text-lg font-bold">ปัญหาสุขภาพที่พบมากที่สุด</h2>
-            <ol className="flex flex-col gap-3.5">
-              {data?.topIssues.map((t, i) => (
-                <li key={t.label} className="flex items-center gap-3">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-staff-100 text-sm font-bold text-staff-700">{i + 1}</span>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex justify-between gap-2 text-sm">
-                      <span className="truncate font-semibold">{t.label}</span>
-                      <span className="font-semibold">{t.pct}%</span>
-                    </div>
-                    <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-staff-bg">
-                      <div className="h-full rounded-full bg-staff-500" style={{ width: `${t.pct}%` }} />
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ol>
-            {data && data.topIssues.length === 0 && <Empty>ข้อมูลยังไม่พอสำหรับสรุป</Empty>}
+            {data && (data.topIssues.length ? <RankedBars items={data.topIssues} /> : <Empty>ข้อมูลยังไม่พอสำหรับสรุป</Empty>)}
             <p className="mt-4 text-xs text-staff-muted">ร้อยละของผู้ใช้ที่ผลล่าสุดอยู่ในระดับควรระวังขึ้นไป</p>
           </Card>
         </div>
@@ -209,14 +330,16 @@ export default function ReportsPage() {
         {/* SUMMARY TABLE */}
         <Card>
           <h2 className="mb-3 text-lg font-bold">สรุปรายแบบประเมิน</h2>
-          <div className="overflow-x-auto">
+          <div className="-mx-2 overflow-x-auto px-2">
             <table className="w-full min-w-[720px] text-sm">
               <thead>
                 <tr className="border-b border-staff-line text-xs text-staff-muted">
                   <th className="py-3 pr-3 text-left font-semibold">แบบประเมิน</th>
                   <th className="px-3 text-right font-semibold">จำนวนครั้ง</th>
                   <th className="px-3 text-right font-semibold">ผู้ใช้</th>
-                  <th className="px-3 text-right font-semibold" title="ร้อยละของผู้ใช้ที่ผลล่าสุดในช่วงนี้อยู่ระดับสูง">ความเสี่ยงสูง*</th>
+                  <th className="px-3 text-right font-semibold" title="ร้อยละของผู้ใช้ที่ผลล่าสุดในช่วงนี้อยู่ระดับสูง">
+                    ความเสี่ยงสูง*
+                  </th>
                   <th className="px-3 text-right font-semibold">เทียบช่วงก่อน</th>
                   <th className="pl-3 text-right font-semibold">ประเมินซ้ำตามรอบ</th>
                 </tr>
@@ -225,23 +348,29 @@ export default function ReportsPage() {
                 {data?.summary.map((s) => (
                   <tr key={s.label} className="border-b border-staff-line/70 last:border-0">
                     <td className="py-3 pr-3 font-semibold">{s.label}</td>
-                    <td className="px-3 text-right">{s.count.toLocaleString("th-TH")}</td>
-                    <td className="px-3 text-right">{fmt(s.users, "")}</td>
-                    <td className="px-3 text-right font-bold">{fmt(s.highPct)}</td>
-                    <td className={`px-3 text-right font-semibold ${s.change === null || s.change === 0 ? "text-staff-muted" : s.change > 0 ? "text-risk-crit" : "text-staff-700"}`}>
-                      {s.change === null ? "–" : `${s.change > 0 ? "▲ +" : s.change < 0 ? "▼ " : ""}${s.change}%`}
+                    <td className="px-3 text-right tabular-nums">{num(s.count)}</td>
+                    <td className="px-3 text-right tabular-nums">{fmt(s.users, "")}</td>
+                    <td className="px-3 text-right font-bold tabular-nums">{fmt(s.highPct)}</td>
+                    <td
+                      className={`px-3 text-right font-semibold tabular-nums ${
+                        s.change === null || s.change === 0 ? "text-staff-muted" : s.change > 0 ? "text-risk-crit" : "text-[#21733f]"
+                      }`}
+                      title="ส่วนต่างจุดร้อยละของความเสี่ยงสูง เทียบช่วงก่อน"
+                    >
+                      {s.change === null ? "–" : delta(s.change)}
                     </td>
-                    <td className="pl-3 text-right">{fmt(s.onTime)}</td>
+                    <td className="pl-3 text-right tabular-nums">{fmt(s.onTime)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <p className="mt-4 flex items-center gap-1.5 text-xs text-staff-muted">
-            * ร้อยละของผู้ใช้ที่ผลล่าสุดในช่วงเวลานี้อยู่ระดับสูง · เทียบช่วงก่อนเป็นส่วนต่างจุดร้อยละ
+          <p className="mt-4 text-xs text-staff-muted">
+            * ร้อยละของผู้ใช้ที่ผลล่าสุดในช่วงนี้อยู่ระดับสูง · กลุ่มที่มีผู้ใช้น้อยกว่า {data?.minGroup ?? 5} คนแสดงเป็น “–” เพื่อป้องกันการระบุตัวบุคคล
           </p>
           <p className="mt-1 flex items-center gap-1.5 text-xs text-staff-muted">
-            <Lock size={13} /> รายงานนับเฉพาะผู้ใช้ที่อนุญาตให้ใช้ข้อมูลเพื่อการศึกษา และแสดงเฉพาะข้อมูลรวม กลุ่มที่มีผู้ใช้น้อยกว่า {data?.minGroup ?? 5} คนจะไม่แสดงตัวเลข (–) เพื่อป้องกันการระบุตัวบุคคล
+            <Lock size={13} className="shrink-0" /> รายงานนับเฉพาะผู้ใช้ที่ยินยอมให้ประมวลผลข้อมูลสุขภาพ และแสดงเฉพาะข้อมูลรวม
+            {prevText && ` · ช่วงก่อนที่ใช้เทียบ: ${prevText}`}
           </p>
         </Card>
       </div>
@@ -251,256 +380,36 @@ export default function ReportsPage() {
 
 function Filter({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: ReactNode }) {
   return (
-    <label className="flex flex-col gap-1 text-xs font-semibold text-staff-muted">
+    <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-staff-muted">
       {label}
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} font-medium`}>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className={`${inputCls} h-12 font-medium`}>
         {children}
       </select>
     </label>
   );
 }
 
-/* =========================================================
-   กราฟเส้นแนวโน้ม
-   - แต่ละช่วงระหว่างเดือนมีสีตามทิศทาง: ดำ = ทิศทางที่ดี, สีดินเผา = ทิศทางที่ควรระวัง
-     (จำนวนการประเมิน: เพิ่ม = ดี / % ความเสี่ยงสูง: ลด = ดี)
-   - มีป้าย ▲/▼ และตัวเลขกำกับทุกช่วง ไม่ได้สื่อด้วยสีอย่างเดียว (ผ่านการตรวจสีสำหรับคนตาบอดสีแล้ว)
-   - ช่วงที่ไปถึงเดือนที่ยังไม่ครบ หรือข้ามเดือนที่ไม่แสดงค่า (ผู้ใช้ < 5 คน) เป็นเส้นประ
-========================================================= */
-
-const C_GOOD = "#1d1d1b";
-const C_WATCH = "#b5532f";
-const C_FLAT = "#bdbab3";
-
-function TrendChart({ data, metric }: { data: Report["trend"]; metric: Metric }) {
-  const [hover, setHover] = useState<number | null>(null);
-  const W = 720;
-  const H = 260;
-  const pad = { l: 40, r: 24, t: 34, b: 30 };
-  const vals = data.map((d) => (metric === "total" ? d.total : d.highPct));
-  const maxRaw = Math.max(1, ...vals.map((v) => v ?? 0));
-  const step = niceStep(maxRaw);
-  const max = Math.ceil(maxRaw / step) * step;
-  const ticks = Array.from({ length: Math.round(max / step) + 1 }, (_, i) => i * step);
-  const x = (i: number) => pad.l + (data.length === 1 ? (W - pad.l - pad.r) / 2 : (i * (W - pad.l - pad.r)) / (data.length - 1));
-  const y = (v: number) => pad.t + (1 - v / max) * (H - pad.t - pad.b);
-  const unit = metric === "total" ? " ครั้ง" : "%";
-  const upIsGood = metric === "total";
-
-  // ช่วงระหว่างจุดที่มีค่าติดกัน (ข้ามเดือนที่ไม่แสดงค่าได้) · i = จุดต้น, j = จุดปลาย
-  const shown = vals.flatMap((v, i) => (v === null ? [] : [i]));
-  const segments = shown.slice(1).map((j, n) => {
-    const i = shown[n];
-    const a = vals[i] as number;
-    const b = vals[j] as number;
-    const diff = Math.round((b - a) * 10) / 10;
-    const color = diff === 0 ? C_FLAT : diff > 0 === upIsGood ? C_GOOD : C_WATCH;
-    return { i, j, a, b, diff, color, gap: j - i > 1, partial: data[j].partial };
-  });
-  const hidden = vals.some((v) => v === null);
-
-  const fmtDiff = (n: number) => `${n > 0 ? "▲ +" : n < 0 ? "▼ −" : "■ "}${Math.abs(n).toLocaleString("th-TH")}${metric === "total" ? "" : " จุด"}`;
-
+// ป้ายเปลี่ยนแปลงเทียบช่วงก่อน (ตัวอักษรสีเข้ม ใช้ลูกศรบอกทิศ)
+function DeltaNote({ text, fallback }: { text: string | null; fallback: string }) {
+  if (!text) return <>{fallback}</>;
   return (
-    <div>
-      <div className="mb-1 flex flex-wrap gap-x-5 gap-y-1 text-xs text-staff-muted">
-        <span className="flex items-center gap-1.5">
-          <span className="h-[3px] w-5 rounded-full" style={{ background: C_GOOD }} />
-          {upIsGood ? "▲ เพิ่มขึ้น" : "▼ ลดลง (ดีขึ้น)"}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="h-[3px] w-5 rounded-full" style={{ background: C_WATCH }} />
-          {upIsGood ? "▼ ลดลง" : "▲ เพิ่มขึ้น (ควรระวัง)"}
-        </span>
-        <span className="flex items-center gap-1.5">
-          <svg width="20" height="4" aria-hidden>
-            <line x1="0" y1="2" x2="20" y2="2" stroke="#6f6d67" strokeWidth="2" strokeDasharray="4 3" />
-          </svg>
-          {hidden ? "เดือนที่ยังไม่ครบ / ข้ามเดือนที่ไม่แสดงค่า" : "เดือนที่ยังไม่ครบ"}
-        </span>
-        {hidden && <span>– = ผู้ใช้น้อยกว่า 5 คน จึงไม่แสดงตัวเลข</span>}
-      </div>
-
-      <div className="overflow-x-auto">
-        <div className="relative min-w-[560px]">
-          <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="กราฟแนวโน้มรายเดือน" onMouseLeave={() => setHover(null)}>
-            {ticks.map((t) => (
-              <g key={t}>
-                <line x1={pad.l} x2={W - pad.r} y1={y(t)} y2={y(t)} stroke="#ebe9e4" strokeDasharray={t ? "3 4" : undefined} />
-                <text x={pad.l - 8} y={y(t) + 4} textAnchor="end" fontSize="11" fill="#6f6d67">
-                  {t}
-                </text>
-              </g>
-            ))}
-
-            {/* พื้นที่ใต้เส้นแต่ละช่วง ใช้สีเดียวกับเส้น */}
-            {segments.map((s) => (
-              <path
-                key={`a${s.i}`}
-                d={`M${x(s.i)},${y(s.a)} L${x(s.j)},${y(s.b)} L${x(s.j)},${y(0)} L${x(s.i)},${y(0)} Z`}
-                fill={s.color}
-                opacity={s.partial || s.gap ? 0.07 : 0.13}
-              />
-            ))}
-
-            {/* เส้นแต่ละช่วง */}
-            {segments.map((s) => (
-              <line
-                key={`l${s.i}`}
-                x1={x(s.i)}
-                y1={y(s.a)}
-                x2={x(s.j)}
-                y2={y(s.b)}
-                stroke={s.color}
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeDasharray={s.partial || s.gap ? "6 5" : undefined}
-              />
-            ))}
-
-            {/* ป้ายส่วนต่างกลางช่วง (ตัวอักษรสีเข้ม จุดสีบอกทิศ) */}
-            {segments
-              .filter((s) => s.diff !== 0)
-              .map((s) => {
-                const mx = (x(s.i) + x(s.j)) / 2;
-                const my = (y(s.a) + y(s.b)) / 2 - 12;
-                const label = fmtDiff(s.diff);
-                const w = label.length * 6.4 + 18;
-                return (
-                  <g key={`d${s.i}`}>
-                    <rect x={mx - w / 2} y={my - 11} width={w} height={20} rx={10} fill="white" stroke={s.color} strokeWidth="1.5" />
-                    <circle cx={mx - w / 2 + 10} cy={my - 1} r={3.5} fill={s.color} />
-                    <text x={mx + 5} y={my + 3} textAnchor="middle" fontSize="11" fontWeight="700" fill="#141413">
-                      {label}
-                    </text>
-                  </g>
-                );
-              })}
-
-            {hover !== null && <line x1={x(hover)} x2={x(hover)} y1={pad.t - 10} y2={y(0)} stroke="#cfccc5" strokeWidth="1.5" />}
-
-            {/* จุดและค่าของแต่ละเดือน (เดือนที่ไม่แสดงค่า แสดง "–" ที่ฐาน) */}
-            {vals.map((v, i) =>
-              v === null ? (
-                <text key={`n${i}`} x={x(i)} y={y(0) - 8} textAnchor="middle" fontSize="13" fontWeight="700" fill="#9fb5b2">
-                  –
-                </text>
-              ) : (
-                <g key={`p${i}`}>
-                  <circle
-                    cx={x(i)}
-                    cy={y(v)}
-                    r={hover === i ? 6.5 : 5}
-                    fill="white"
-                    stroke="#141413"
-                    strokeWidth="2"
-                    strokeDasharray={data[i].partial ? "2 2" : undefined}
-                  />
-                  <text x={x(i)} y={y(v) - 11} textAnchor="middle" fontSize="11" fontWeight="600" fill="#6f6d67">
-                    {v.toLocaleString("th-TH")}
-                  </text>
-                </g>
-              )
-            )}
-
-            {data.map((d, i) => (
-              <text key={i} x={x(i)} y={H - 8} textAnchor="middle" fontSize="11" fill="#6f6d67">
-                {d.label}
-                {d.partial ? "*" : ""}
-              </text>
-            ))}
-
-            {/* พื้นที่รับการชี้ (กว้างกว่าจุด) */}
-            {data.map((_, i) => (
-              <rect
-                key={i}
-                x={x(i) - (W - pad.l - pad.r) / Math.max(1, data.length - 1) / 2}
-                y={0}
-                width={(W - pad.l - pad.r) / Math.max(1, data.length - 1)}
-                height={H}
-                fill="transparent"
-                onMouseEnter={() => setHover(i)}
-              />
-            ))}
-          </svg>
-
-          {hover !== null && (
-            <div
-              className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-xl border border-staff-line bg-white px-3 py-2 text-xs shadow-lg"
-              style={{ left: `${Math.min(88, Math.max(12, (x(hover) / W) * 100))}%` }}
-            >
-              <p className="font-bold">
-                {data[hover].label}
-                {data[hover].partial ? " (ยังไม่ครบเดือน)" : ""}
-              </p>
-              <p className="text-staff-muted">
-                {metric === "total" ? "จำนวนการประเมิน" : "ความเสี่ยงสูง"}: <b className="text-staff-ink">{fmt(vals[hover], unit)}</b>
-              </p>
-              {(() => {
-                const s = segments.find((g) => g.j === hover);
-                return s ? (
-                  <p className="mt-0.5 flex items-center gap-1.5 text-staff-muted">
-                    <span className="h-2 w-2 rounded-full" style={{ background: s.color }} />
-                    เทียบ{s.gap ? `เดือน ${data[s.i].label}` : "เดือนก่อน"}: <b className="text-staff-ink">{fmtDiff(s.diff)}</b>
-                  </p>
-                ) : null;
-              })()}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+    <>
+      <b className="font-semibold text-staff-ink">{text}</b> เทียบช่วงก่อน
+    </>
   );
 }
 
-function niceStep(max: number) {
-  const raw = max / 4;
-  const mag = 10 ** Math.floor(Math.log10(raw));
-  const n = raw / mag;
-  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
-}
-
-/* =========================================================
-   กราฟแท่งช่วงอายุ (กาย / จิต)
-========================================================= */
-
-function AgeChart({ data }: { data: Report["byAge"] }) {
-  const max = Math.max(10, ...data.flatMap((d) => [d.physical.pct ?? 0, d.mental.pct ?? 0]));
-  const bar = (v: { pct: number | null; n: number }, fill: string, kind: string, group: string) => (
-    <div className="flex h-full w-full max-w-[44px] flex-col items-center justify-end gap-1" title={`${group} · ${kind}: ${fmt(v.pct)} (ผู้ใช้ ${v.n} คน)`}>
-      <span className="text-xs font-semibold text-staff-ink">{fmt(v.pct)}</span>
-      <div
-        className="w-full rounded-t-[4px]"
-        style={{ height: v.pct === null ? 2 : `${Math.max(2, (v.pct / max) * 80)}%`, background: v.pct === null ? "#e6e4df" : fill, boxShadow: v.pct === null ? undefined : `inset 0 0 0 1.5px ${C_BAR}` }}
-      />
-    </div>
-  );
+// value = null → ยังไม่มีข้อมูล (เช่น ข้อมูลการเปิดทำแบบประเมินเพิ่งเริ่มเก็บ)
+function MiniStat({ label, value, note }: { label: string; value: string | null; note: ReactNode }) {
   return (
-    <div>
-      <div className="flex h-52 items-end gap-4 border-b border-staff-line">
-        {data.map((d) => (
-          <div key={d.label} className="flex h-full flex-1 items-end justify-center gap-[2px]">
-            {bar(d.physical, BAR_FILL.physical, "สุขภาพกาย", d.label)}
-            {bar(d.mental, BAR_FILL.mental, "สุขภาพจิต", d.label)}
-          </div>
-        ))}
-      </div>
-      <div className="mt-2 flex gap-4">
-        {data.map((d) => (
-          <span key={d.label} className="flex-1 text-center text-xs text-staff-muted">
-            {d.label}
-          </span>
-        ))}
-      </div>
+    <div className="flex min-w-0 flex-col gap-1 rounded-2xl border border-staff-line bg-staff-soft px-4 py-3.5">
+      <span className="text-sm font-medium text-staff-muted">{label}</span>
+      {value === null ? (
+        <span className="py-1 text-base font-bold text-staff-400">ยังไม่มีข้อมูล</span>
+      ) : (
+        <span className="text-2xl font-extrabold leading-tight">{value}</span>
+      )}
+      <span className="text-xs text-staff-muted">{note}</span>
     </div>
-  );
-}
-
-function BarLegend({ fill, label }: { fill: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="h-3 w-3 rounded-[3px]" style={{ background: fill, boxShadow: `inset 0 0 0 1.5px ${C_BAR}` }} />
-      {label}
-    </span>
   );
 }

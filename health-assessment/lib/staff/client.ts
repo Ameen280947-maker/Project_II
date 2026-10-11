@@ -40,9 +40,6 @@ export const relativeTime = (iso: string) => {
   return new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 };
 
-// แจ้ง Sidebar ให้โหลดจำนวนเคสรอติดตามใหม่ หลังบันทึกการติดตาม
-export const FOLLOW_UP_UPDATED_EVENT = "staff-follow-up-updated";
-
 // ดาวน์โหลดตารางเป็น CSV (มี BOM ให้ Excel อ่านภาษาไทยได้)
 export function downloadCsv(filename: string, rows: (string | number)[][]) {
   const esc = (v: string | number) => {

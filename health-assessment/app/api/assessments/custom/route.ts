@@ -12,6 +12,7 @@ import {
 } from "../_lib/validate";
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
+import { markAssessmentSaved } from "../_lib/assessmentVersion";
 
 /* =========================================================
    /api/assessments/custom  (แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม)
@@ -171,6 +172,9 @@ export async function POST(request: NextRequest) {
       );
     }
     await client.query("COMMIT");
+
+    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
+    await markAssessmentSaved(client, { userId, typeId: typeId, assessmentId: assessmentId });
 
     return NextResponse.json({ success: true, assessmentId, totalScore: total, riskLevel: level.riskLevel });
   } catch (error) {

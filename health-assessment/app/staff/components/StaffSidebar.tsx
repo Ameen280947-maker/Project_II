@@ -4,30 +4,28 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
-  Activity,
   BarChart3,
   ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
-  MessageSquareText,
   ShieldPlus,
   Users,
   X,
 } from "lucide-react";
-import { clearStaffSession, staffFetch, FOLLOW_UP_UPDATED_EVENT } from "@/lib/staff/client";
+import { clearStaffSession } from "@/lib/staff/client";
 
 /* =========================================================
-   SIDEBAR ฝั่ง Staff (โทนเทอร์ควอยซ์)
+   SIDEBAR ฝั่ง Staff
    - จอใหญ่: แถบด้านซ้าย / จอเล็ก: แถบบน + เมนูเลื่อนออก
+   - ระบบเป็นการประเมินเบื้องต้น ไม่มีการติดตามผู้ใช้รายบุคคล
+     คำแนะนำแก้ได้ในหน้าแบบประเมิน (แท็บเกณฑ์ผลและคำแนะนำ)
 ========================================================= */
 
-const MENU: { href: string; label: string; icon: ReactNode; badge?: boolean }[] = [
-  { href: "/staff", label: "ภาพรวม", icon: <LayoutDashboard size={21} /> },
-  { href: "/staff/follow-up", label: "ติดตามผู้มีความเสี่ยง", icon: <Activity size={21} />, badge: true },
+const MENU: { href: string; label: string; icon: ReactNode }[] = [
+  { href: "/staff", label: "ภาพรวมระบบ", icon: <LayoutDashboard size={21} /> },
   { href: "/staff/users", label: "ผู้ใช้งาน", icon: <Users size={21} /> },
   { href: "/staff/assessments", label: "แบบประเมิน", icon: <ClipboardList size={21} /> },
-  { href: "/staff/recommendations", label: "คำแนะนำสุขภาพ", icon: <MessageSquareText size={21} /> },
   { href: "/staff/reports", label: "รายงานและสถิติ", icon: <BarChart3 size={21} /> },
 ];
 
@@ -35,22 +33,10 @@ export default function StaffSidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [name, setName] = useState("");
-  const [waiting, setWaiting] = useState(0);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
     setName(localStorage.getItem("staffUsername") || "เจ้าหน้าที่");
-  }, []);
-
-  // จำนวนเคสรอติดตาม (ตัวเลขแดงข้างเมนู)
-  useEffect(() => {
-    const load = () =>
-      staffFetch<{ waiting: number }>("/api/staff/follow-up?summary=1")
-        .then((d) => setWaiting(d.waiting))
-        .catch(() => {});
-    load();
-    window.addEventListener(FOLLOW_UP_UPDATED_EVENT, load);
-    return () => window.removeEventListener(FOLLOW_UP_UPDATED_EVENT, load);
   }, []);
 
   const isActive = (href: string) =>
@@ -93,11 +79,6 @@ export default function StaffSidebar() {
           >
             <span className={`shrink-0 ${active ? "text-white" : ""}`}>{m.icon}</span>
             <span className="min-w-0 flex-1 truncate">{m.label}</span>
-            {m.badge && waiting > 0 && (
-              <span className="rounded-full bg-risk-high px-2 py-0.5 text-xs font-bold text-white" aria-label={`รอติดตาม ${waiting} ราย`}>
-                {waiting}
-              </span>
-            )}
           </Link>
         );
       })}
@@ -136,7 +117,6 @@ export default function StaffSidebar() {
           className="relative grid h-11 w-11 place-items-center rounded-xl border border-staff-line text-staff-ink"
         >
           <Menu size={20} />
-          {waiting > 0 && <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-risk-high" />}
         </button>
       </header>
       {open && (

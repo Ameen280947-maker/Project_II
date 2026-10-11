@@ -44,10 +44,6 @@ type Settings = {
   emergency_phone: string | null;
   consent_health: boolean;
   consent_health_at: string | null;
-  consent_research: boolean;
-  consent_research_at: string | null;
-  consent_staff: boolean;
-  consent_staff_at: string | null;
 };
 
 type Profile = {
@@ -710,6 +706,7 @@ export default function SettingsPage() {
                 >
                   <Row
                     title={CONSENT_TEXT.health.title}
+                    last
                     desc={`${CONSENT_TEXT.health.desc} · อัปเดตเมื่อ ${formatDate(settings.consent_health_at)}`}
                   >
                     <Toggle
@@ -719,31 +716,6 @@ export default function SettingsPage() {
                         if (!v && !window.confirm("หากถอนความยินยอม ระบบจะไม่สามารถประเมินและให้คำแนะนำได้ ต้องการดำเนินการต่อหรือไม่?")) return;
                         save({ consent_health: v });
                       }}
-                    />
-                  </Row>
-                  <Row
-                    title={CONSENT_TEXT.staff.title}
-                    desc={
-                      settings.consent_staff
-                        ? `เมื่อผลอยู่ในระดับเสี่ยงสูง เจ้าหน้าที่จะติดต่อเพื่อให้คำแนะนำ · ยินยอมเมื่อ ${formatDate(settings.consent_staff_at)}`
-                        : CONSENT_TEXT.staff.desc
-                    }
-                  >
-                    <Toggle
-                      label="ยินยอมให้เจ้าหน้าที่ติดตามดูแล"
-                      checked={settings.consent_staff}
-                      onChange={(v) => save({ consent_staff: v })}
-                    />
-                  </Row>
-                  <Row
-                    title={CONSENT_TEXT.research.title}
-                    desc={CONSENT_TEXT.research.desc}
-                    last
-                  >
-                    <Toggle
-                      label="อนุญาตให้ใช้ข้อมูลเพื่อการศึกษา"
-                      checked={settings.consent_research}
-                      onChange={(v) => save({ consent_research: v })}
                     />
                   </Row>
 

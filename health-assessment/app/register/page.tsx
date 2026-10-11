@@ -20,8 +20,6 @@ import { CONSENT_TEXT } from "@/lib/consents";
 // ช่องความยินยอม เรียงและใช้ข้อความเดียวกับหน้าการตั้งค่า
 const CONSENTS = [
   { name: "consentHealth", required: true, ...CONSENT_TEXT.health },
-  { name: "consentStaff", required: false, ...CONSENT_TEXT.staff },
-  { name: "consentResearch", required: false, ...CONSENT_TEXT.research },
 ];
 
 export default function RegisterPage() {
@@ -52,11 +50,8 @@ export default function RegisterPage() {
       formData.get("password") || ""
     );
 
-    // ความยินยอม 3 ข้อ ตรงกับหน้าการตั้งค่า > ความเป็นส่วนตัวและข้อมูลของฉัน
-    // ข้อมูลสุขภาพจำเป็นต้องยินยอม ส่วนอีก 2 ข้อไม่บังคับ
+    // ความยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ (จำเป็น) ตรงกับหน้าการตั้งค่า > ความเป็นส่วนตัวและข้อมูลของฉัน
     const consentHealth = formData.get("consentHealth") === "on";
-    const consentStaff = formData.get("consentStaff") === "on";
-    const consentResearch = formData.get("consentResearch") === "on";
     const confirmPassword = String(
       formData.get("confirmPassword") || ""
     );
@@ -116,8 +111,6 @@ export default function RegisterPage() {
           email,
           password,
           consentHealth,
-          consentStaff,
-          consentResearch,
         }),
       });
 

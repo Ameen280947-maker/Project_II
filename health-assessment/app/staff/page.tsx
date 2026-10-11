@@ -2,330 +2,300 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Download } from "lucide-react";
+import { BarChart3, ClipboardList, Download, Info, Users } from "lucide-react";
 import { relativeTime, staffFetch } from "@/lib/staff/client";
-import { ErrorBox, Legend, PageHeader, Segmented, StatCard, btnPrimary, inputCls } from "./components/ui";
-import OverviewDetail, { type DetailKind } from "./components/OverviewDetail";
+import { Card, ErrorBox, StatCard, PageHeader, btnPrimary } from "./components/ui";
+import { formatThaiDate, rangeText, shiftDate, todayInBangkok } from "./components/DateRangePicker";
+import {
+  HBars,
+  MiniStat,
+  MonthlyBars,
+  OutcomeBreakdown,
+  SystemCard,
+  TaskItem,
+  UsageChart,
+  UsageLegend,
+} from "./components/overview/OverviewParts";
+import type { Overview } from "./components/overview/types";
 
 /* =========================================================
-   TYPES (ตรงกับ /api/staff/overview)
+   หน้า "ภาพรวมระบบ" ของ Staff
+   - ระบบประเมินสุขภาพเบื้องต้นด้วยตนเอง: ไม่มีการติดตามรายบุคคล
+     และเจ้าหน้าที่ไม่เห็นผลประเมินของใครรายคน (มีแต่ตัวเลขรวม)
+   - ไม่มีตัวเลือกช่วงเวลา: ตัวเลขรายช่วงใช้ "30 วันล่าสุดรวมวันนี้" ตามเวลาไทยเสมอ
+     ยอดสะสมแสดงเป็น "ณ วันนี้" (ต้องการเลือกช่วงเอง → หน้ารายงานและสถิติ)
 ========================================================= */
 
-type Overview = {
-  from: string;
-  to: string;
-  bucket: "hour" | "day" | "week" | "month";
-  kpi: {
-    totalUsers: number;
-    newUsers: number;
-    assessments: number;
-    highRisk: number;
-    activeUsers: number;
-    waiting: number;
-    overdue: number;
-  };
-  chart: { label: string; total: number; high: number }[];
-  urgent: {
-    caseId: number;
-    username: string;
-    assessment: string;
-    riskLevel: string;
-    severity: number;
-    createdAt: string;
-  }[];
-  distribution: { name: string; total: number; ok: number; mid: number; high: number }[];
-  activity: { type: "assessment" | "high" | "note"; text: string; at: string }[];
-};
+const RANGE_DAYS = 30;
+const AS_OF = "ณ วันนี้";
+const IN_RANGE = "30 วันล่าสุด";
+const CONSENT_NOTE = "นับเฉพาะผู้ใช้ที่ยินยอมให้ประมวลผลข้อมูลสุขภาพ";
 
-/* ---------- ช่วงเวลา (ตามเวลาไทย) ---------- */
+const fmt = (n: number | null | undefined) => (n === null || n === undefined ? "–" : n.toLocaleString("th-TH"));
 
-type RangeKey = "today" | "week" | "month" | "quarter" | "year" | "custom";
-
-// days = จำนวนวันย้อนหลังรวมวันนี้
-const RANGES: { key: RangeKey; label: string; noun: string; days?: number }[] = [
-  { key: "today", label: "วันนี้", noun: "วันนี้", days: 1 },
-  { key: "week", label: "7 วัน", noun: "7 วันที่ผ่านมา", days: 7 },
-  { key: "month", label: "30 วัน", noun: "30 วันที่ผ่านมา", days: 30 },
-  { key: "quarter", label: "3 เดือน", noun: "3 เดือนที่ผ่านมา", days: 90 },
-  { key: "year", label: "1 ปี", noun: "1 ปีที่ผ่านมา", days: 365 },
-  { key: "custom", label: "กำหนดเอง", noun: "ช่วงที่เลือก" },
-];
-
-const todayInBangkok = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
-
-const shiftDate = (ymd: string, days: number) => {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
-};
-
-const formatThaiDate = (ymd: string) => {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
-};
-
-const daysSince = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-
-/* =========================================================
-   PAGE
-========================================================= */
+function Delta({ cur, prev }: { cur: number; prev: number }) {
+  if (prev === 0) return <>{cur > 0 ? "ช่วงก่อนไม่มีการประเมิน" : "ไม่มีการประเมินทั้งสองช่วง"}</>;
+  const pct = Math.round(((cur - prev) / prev) * 100);
+  if (pct === 0) return <>เท่ากับ 30 วันก่อนหน้า</>;
+  return (
+    <span className={pct > 0 ? "font-semibold text-[#21733f]" : "font-semibold text-risk-crit"}>
+      {pct > 0 ? "▲" : "▼"} {Math.abs(pct).toLocaleString("th-TH")}% <span className="font-normal text-staff-muted">จาก 30 วันก่อนหน้า</span>
+    </span>
+  );
+}
 
 export default function StaffOverviewPage() {
+  // ช่วงตายตัว 30 วันล่าสุดรวมวันนี้ (วันที่ตามเวลาไทย ไม่ใช้ toISOString กับเวลาปัจจุบัน)
   const today = todayInBangkok();
-  const [range, setRange] = useState<RangeKey>("week");
-  // ช่วงที่กำหนดเอง (ค่าเริ่มต้น 7 วันล่าสุด)
-  const [customFrom, setCustomFrom] = useState(() => shiftDate(todayInBangkok(), -6));
-  const [customTo, setCustomTo] = useState(() => todayInBangkok());
+  const from = shiftDate(today, -(RANGE_DAYS - 1));
+  const to = today;
+  const reqKey = `${from}|${to}`;
+  // ผลของคำขอล่าสุด (key บอกว่าเป็นของช่วงไหน → ถ้าไม่ตรงกับช่วงที่เลือกอยู่ = กำลังโหลด)
+  const [result, setResult] = useState<{ key: string; error?: string } | null>(null);
   const [data, setData] = useState<Overview | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [name, setName] = useState("");
-  // กล่องที่กดดูรายละเอียดอยู่
-  const [detail, setDetail] = useState<DetailKind | null>(null);
 
   useEffect(() => {
-    setName(localStorage.getItem("staffUsername") || "");
-  }, []);
-
-  const preset = RANGES.find((r) => r.key === range);
-  const from = range === "custom" ? customFrom : shiftDate(today, -((preset?.days ?? 7) - 1));
-  const to = range === "custom" ? customTo : today;
-  const customInvalid = range === "custom" && (!customFrom || !customTo || customFrom > customTo);
-
-  useEffect(() => {
-    if (customInvalid) return;
     let cancelled = false;
-    setLoading(true);
-    setError("");
     staffFetch<Overview>(`/api/staff/overview?from=${from}&to=${to}`)
-      .then((d) => !cancelled && setData(d))
-      .catch((e) => !cancelled && setError(e.message))
-      .finally(() => !cancelled && setLoading(false));
+      .then((d) => {
+        if (cancelled) return;
+        setData(d);
+        setResult({ key: `${from}|${to}` });
+      })
+      .catch((e) => !cancelled && setResult({ key: `${from}|${to}`, error: e.message }));
     return () => {
       cancelled = true;
     };
-  }, [from, to, customInvalid]);
+  }, [from, to]);
 
-  const rangeNoun = preset?.noun ?? "";
-  const rangeText = from === to ? formatThaiDate(from) : `${formatThaiDate(from)} – ${formatThaiDate(to)}`;
-  const maxBar = Math.max(1, ...(data?.chart.map((c) => c.total) ?? [1]));
-  // แท่งเยอะ (เช่น 30 วัน / รายชั่วโมง) แสดงป้ายเว้นช่วง ไม่ให้ตัวหนังสือซ้อนกัน
-  const chartLen = data?.chart.length ?? 0;
-  const labelStep = Math.max(1, Math.ceil(chartLen / 12));
+  const loading = result?.key !== reqKey;
+  const period = rangeText(from, to);
+  const error = result?.key === reqKey ? result.error ?? "" : "";
+
+  const k = data?.kpi;
+  const acc = data?.accounts;
+  const rep = data?.reports;
+  const tasks = data?.tasks;
+  const accountTotal = (acc?.active30 ?? 0) + (acc?.inactive30 ?? 0);
+  const taskCount = (tasks?.missing.length ?? 0) + (tasks?.drafts.length ?? 0) + (tasks?.suspended ?? 0);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className={`flex flex-col gap-6 transition-opacity ${loading && data ? "opacity-60" : ""}`}>
       <PageHeader
         eyebrow="Staff Dashboard"
         title="ภาพรวม"
         highlight="ระบบ"
-        desc={`สวัสดี ${name} · ข้อมูลช่วง ${rangeText}`}
+        desc={`ข้อมูล ณ ${formatThaiDate(today)} · ตัวเลขรายช่วงใช้ ${IN_RANGE} (${period})`}
         actions={
-          <>
-            <Segmented label="ช่วงเวลา" items={RANGES} value={range} onChange={setRange} />
-            <Link href="/staff/reports" className={btnPrimary}>
-              <Download size={18} />
-              ส่งออกรายงาน
-            </Link>
-          </>
+          <Link href="/staff/reports" className={btnPrimary}>
+            <Download size={18} />
+            ส่งออกรายงาน
+          </Link>
         }
       />
 
-      {range === "custom" && (
-        <div className="flex flex-wrap items-end gap-3 rounded-[22px] border border-staff-line bg-white p-4">
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            ตั้งแต่วันที่
-            <input
-              type="date"
-              className={inputCls}
-              value={customFrom}
-              max={customTo || today}
-              onChange={(e) => setCustomFrom(e.target.value)}
-            />
-          </label>
-          <label className="flex flex-col gap-1 text-sm font-semibold">
-            ถึงวันที่
-            <input
-              type="date"
-              className={inputCls}
-              value={customTo}
-              min={customFrom}
-              max={today}
-              onChange={(e) => setCustomTo(e.target.value)}
-            />
-          </label>
-          {customInvalid && <p className="pb-2.5 text-sm text-risk-crit">กรุณาเลือกวันเริ่มต้นที่ไม่อยู่หลังวันสิ้นสุด</p>}
-        </div>
-      )}
-
       <ErrorBox message={error} />
 
-      {/* KPI */}
-      <section className={`grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4 ${loading ? "opacity-60" : ""}`}>
+      {/* ---------- KPI ---------- */}
+      <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
-          label="ผู้ใช้งานทั้งหมด"
-          value={data?.kpi.totalUsers}
-          note={`+${data?.kpi.newUsers ?? 0} คน ใน ${rangeNoun}`}
-          onClick={() => setDetail("users")}
+          label={`ผู้ใช้งานทั้งหมด · ${AS_OF}`}
+          value={fmt(k?.totalUsers)}
+          note={<span className="font-semibold text-[#21733f]">+{fmt(k?.newUsers ?? 0)} คนใหม่ใน {IN_RANGE}</span>}
         />
         <StatCard
-          label={`การประเมินใน ${rangeNoun}`}
-          value={data?.kpi.assessments}
-          note={`ผลความเสี่ยงสูง ${data?.kpi.highRisk ?? 0} ครั้ง`}
-          onClick={() => setDetail("assessments")}
+          label={`การประเมิน · ${IN_RANGE}`}
+          value={fmt(k?.assessments)}
+          note={k ? <Delta cur={k.assessments} prev={k.prevAssessments} /> : undefined}
         />
         <StatCard
-          label="ผู้มีความเสี่ยงสูงรอติดตาม (ปัจจุบัน)"
-          value={data?.kpi.waiting}
-          note={data?.kpi.overdue ? `${data.kpi.overdue} รายรอเกิน 3 วัน` : "ไม่มีเคสค้างเกิน 3 วัน"}
-          tone={data?.kpi.waiting ? "danger" : "brand"}
-          onClick={() => setDetail("waiting")}
+          label={`ผู้ใช้ที่ใช้งาน · ${IN_RANGE}`}
+          value={fmt(k?.activeUsers)}
+          note={k ? `${k.totalUsers ? Math.round((k.activeUsers / k.totalUsers) * 100) : 0}% ของผู้ใช้ทั้งหมด` : undefined}
         />
         <StatCard
-          label={`ผู้ใช้ที่ประเมินใน ${rangeNoun}`}
-          value={data?.kpi.activeUsers}
-          note={`จาก ${data?.kpi.totalUsers ?? 0} คน`}
-          onClick={() => setDetail("active")}
+          label={`แบบประเมินที่เปิดใช้งาน · ${AS_OF}`}
+          value={k ? `${k.activeTypes} / ${k.totalTypes}` : "–"}
+          note={k ? (k.totalTypes > k.activeTypes ? `ปิดใช้งาน ${k.totalTypes - k.activeTypes} แบบ` : "เปิดใช้งานครบทุกแบบ") : undefined}
         />
       </section>
 
-      {/* CHART + URGENT */}
-      <section className="flex flex-wrap gap-4">
-        <div className="min-w-0 flex-[3_1_520px] rounded-[22px] border border-staff-line bg-white p-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold">
-              จำนวนการประเมิน
-              <span className="ml-2 text-sm font-medium text-staff-muted">
-                {data?.bucket === "hour" ? "รายชั่วโมง" : data?.bucket === "week" ? "รายสัปดาห์" : data?.bucket === "month" ? "รายเดือน" : "รายวัน"}
-              </span>
-            </h2>
-            <div className="flex gap-4 text-sm text-staff-muted">
-              <Legend color="bg-staff-200" label="ทั้งหมด" />
-              <Legend color="bg-risk-high" label="ผลความเสี่ยงสูง" />
+      {/* ---------- การใช้งาน + ผลโดยรวม ---------- */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-bold">การใช้งานระบบ</h2>
+              <p className="text-sm text-staff-muted">จำนวนการประเมิน · {period}</p>
             </div>
+            <UsageLegend />
           </div>
-          <div className={`flex h-56 items-end border-b border-staff-line px-1 ${chartLen > 14 ? "gap-1" : "gap-3"}`}>
-            {(data?.chart ?? []).map((c, i) => (
-              <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
-                {(chartLen <= 14 || c.total > 0) && (
-                  <span className="text-[11px] font-semibold text-staff-muted">{c.total}</span>
+          {data ? <UsageChart chart={data.chart} /> : <div className="h-60 animate-pulse rounded-2xl bg-staff-soft" />}
+        </Card>
+
+        <Card className="flex flex-col lg:col-span-2">
+          <h2 className="text-lg font-bold">ผลการประเมินโดยรวม</h2>
+          <p className="mb-5 text-sm text-staff-muted">
+            สัดส่วนผลจากการประเมิน {data?.outcome.counts ? fmt(data.outcome.total) : "–"} ครั้งใน {IN_RANGE} (ไม่ระบุตัวบุคคล)
+          </p>
+          {data && <OutcomeBreakdown outcome={data.outcome} minGroup={data.minGroup} />}
+          <p className="mt-3 text-xs text-staff-muted">
+            {CONSENT_NOTE} · กลุ่มที่น้อยกว่า {data?.minGroup ?? 5} คนจะไม่แสดงผล
+          </p>
+          <div className="mt-auto flex gap-2.5 rounded-2xl bg-staff-soft p-3.5 text-[13px] text-staff-muted">
+            <Info size={16} className="mt-0.5 shrink-0" />
+            ผู้ที่ได้ผลเสี่ยงสูงจะเห็นคำแนะนำให้พบแพทย์และสายด่วนบนหน้าผลของตนเอง
+          </div>
+        </Card>
+      </section>
+
+      {/* ---------- ส่วนต่าง ๆ ของระบบ ---------- */}
+      <section className="flex flex-col gap-3">
+        <h2 className="text-lg font-bold">ส่วนต่าง ๆ ของระบบ</h2>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <SystemCard
+            icon={<Users size={20} />}
+            title="ผู้ใช้งาน"
+            subtitle="บัญชีและสถานะการใช้งาน"
+            href="/staff/users"
+            linkText="จัดการผู้ใช้งาน"
+          >
+            <div className="grid grid-cols-3 gap-2">
+              <MiniStat label="สมัครใหม่" value={fmt(acc?.newUsers)} note={IN_RANGE} />
+              <MiniStat label="ใช้งาน 30 วัน" value={fmt(acc?.active30)} note={AS_OF} />
+              <MiniStat label="ถูกระงับ" value={fmt(acc?.suspended)} note={AS_OF} />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-semibold">สถานะบัญชี · {AS_OF}</p>
+              <div className="flex h-3 gap-[2px] overflow-hidden rounded-full bg-staff-bg">
+                {accountTotal > 0 && (
+                  <>
+                    <span className="bg-staff-600" style={{ width: `${((acc?.active30 ?? 0) / accountTotal) * 100}%` }} />
+                    <span className="bg-staff-300" style={{ width: `${((acc?.inactive30 ?? 0) / accountTotal) * 100}%` }} />
+                  </>
                 )}
-                <div
-                  className="flex w-full max-w-[44px] flex-col justify-end overflow-hidden rounded-t-lg bg-staff-200 transition-all"
-                  style={{ height: `${(c.total / maxBar) * 85}%` }}
-                  title={`${c.label}: ทั้งหมด ${c.total} · ความเสี่ยงสูง ${c.high}`}
-                >
-                  <div className="bg-risk-high" style={{ height: c.total ? `${(c.high / c.total) * 100}%` : 0 }} />
-                </div>
               </div>
-            ))}
-          </div>
-          <div className={`mt-2 flex px-1 ${chartLen > 14 ? "gap-1" : "gap-3"}`}>
-            {(data?.chart ?? []).map((c, i) => (
-              <span key={i} className="flex-1 whitespace-nowrap text-center text-xs text-staff-muted">
-                {i % labelStep === 0 ? c.label : ""}
-              </span>
-            ))}
-          </div>
-        </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-staff-muted">
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-[3px] bg-staff-600" />
+                  ใช้งานอยู่ {fmt(acc?.active30)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 rounded-[3px] bg-staff-300" />
+                  ไม่ได้ใช้งานเกิน 30 วัน {fmt(acc?.inactive30)}
+                </span>
+                <span>ถูกระงับ {fmt(acc?.suspended)} บัญชี</span>
+              </div>
+            </div>
+          </SystemCard>
 
-        <div className="flex min-w-0 flex-[2_1_340px] flex-col gap-2.5 rounded-[22px] border border-staff-line bg-white p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-bold">ต้องติดตามด่วน</h2>
-            <Link href="/staff/follow-up" className="py-2 text-sm font-semibold text-staff-600 hover:underline">
-              ดูทั้งหมด →
-            </Link>
-          </div>
-          {data && data.urgent.length === 0 && (
-            <p className="py-8 text-center text-sm text-staff-muted">ไม่มีเคสรอติดตาม</p>
-          )}
-          {data?.urgent.map((u) => {
-            const wait = daysSince(u.createdAt);
-            return (
-              <Link
-                key={u.caseId}
-                href={`/staff/follow-up?case=${u.caseId}`}
-                className="flex items-center gap-3 rounded-2xl border border-staff-bg bg-staff-soft px-3 py-2.5 transition hover:border-staff-200"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[#fde6e7] text-sm font-bold text-risk-crit">
-                  {u.username.charAt(0).toUpperCase()}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-semibold">{u.username}</span>
-                  <span className="block truncate text-[13px] text-staff-muted">
-                    {u.assessment} · {u.riskLevel}
-                  </span>
-                </span>
-                <span className={`whitespace-nowrap text-xs font-semibold ${wait >= 3 ? "text-risk-high" : "text-staff-muted"}`}>
-                  {wait === 0 ? "วันนี้" : `รอ ${wait} วัน`}
-                </span>
-              </Link>
-            );
-          })}
+          <SystemCard
+            icon={<ClipboardList size={20} />}
+            title="แบบประเมิน"
+            subtitle="เนื้อหา เกณฑ์ และคำแนะนำ"
+            href="/staff/assessments"
+            linkText="จัดการแบบประเมิน"
+          >
+            {data && data.topAssessments.length === 0 ? (
+              <p className="py-4 text-center text-sm text-staff-muted">ยังไม่มีการทำแบบประเมินใน {IN_RANGE}</p>
+            ) : (
+              <HBars items={(data?.topAssessments ?? []).map((t) => ({ key: t.id, label: t.label, value: t.count }))} />
+            )}
+            <p className="mt-auto text-xs text-staff-muted">
+              จำนวนครั้งที่ถูกทำใน {IN_RANGE} · เปิดใช้งาน {fmt(k?.activeTypes)} จาก {fmt(k?.totalTypes)} แบบ ({AS_OF})
+            </p>
+          </SystemCard>
+
+          <SystemCard
+            icon={<BarChart3 size={20} />}
+            title="รายงานและสถิติ"
+            subtitle="ภาพรวมแบบไม่ระบุตัวตน"
+            href="/staff/reports"
+            linkText="ดูรายงานฉบับเต็ม / ส่งออก"
+          >
+            <div className="grid grid-cols-2 gap-2">
+              <MiniStat
+                label="ปัญหาที่พบมากที่สุด"
+                value={rep?.topIssue ? <span className="block truncate text-base" title={rep.topIssue.label}>{rep.topIssue.label}</span> : "–"}
+                note={rep?.topIssue ? `${rep.topIssue.pct.toLocaleString("th-TH")}% ของผู้ใช้ · ${IN_RANGE}` : "ข้อมูลยังไม่พอ"}
+              />
+              <MiniStat
+                label="ประเมินซ้ำตามรอบ"
+                value={rep?.onTime !== null && rep?.onTime !== undefined ? `${rep.onTime.toLocaleString("th-TH")}%` : "–"}
+                note={
+                  rep?.onTimeChange !== null && rep?.onTimeChange !== undefined
+                    ? `${rep.onTimeChange >= 0 ? "▲" : "▼"} ${Math.abs(rep.onTimeChange).toLocaleString("th-TH")} จุด จาก 30 วันก่อน`
+                    : rep?.onTime !== null && rep?.onTime !== undefined
+                      ? "30 วันล่าสุด"
+                      : "ข้อมูลยังไม่พอ"
+                }
+              />
+            </div>
+            <div>
+              <p className="mb-2 text-sm font-semibold">การประเมินรายเดือน (6 เดือน)</p>
+              {rep ? <MonthlyBars months={rep.monthly} /> : <div className="h-28 animate-pulse rounded-2xl bg-staff-soft" />}
+            </div>
+            <p className="mt-auto text-xs text-staff-muted">
+              สถิติผลและการประเมินซ้ำ{CONSENT_NOTE} · จำนวนครั้งนับทุกคน
+            </p>
+          </SystemCard>
         </div>
       </section>
 
-      {/* DISTRIBUTION + ACTIVITY */}
-      <section className="flex flex-wrap gap-4">
-        <div className="min-w-0 flex-[3_1_520px] rounded-[22px] border border-staff-line bg-white p-6">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-lg font-bold">สัดส่วนระดับความเสี่ยงตามแบบประเมิน</h2>
-            <div className="flex gap-4 text-sm text-staff-muted">
-              <Legend color="bg-risk-ok" label="ปกติ" />
-              <Legend color="bg-risk-mid" label="ควรระวัง" />
-              <Legend color="bg-risk-high" label="สูง" />
-            </div>
-          </div>
-          <p className="-mt-2 mb-4 text-xs text-staff-muted">คิดจากผลล่าสุดของผู้ใช้แต่ละคนใน{rangeNoun}</p>
-          <div className="flex flex-col gap-3">
-            {(data?.distribution ?? []).map((d) => (
-              <div key={d.name} className="flex items-center gap-3">
-                <span className="w-44 shrink-0 truncate text-sm font-medium" title={d.name}>
-                  {d.name}
-                </span>
-                <div className="flex h-3.5 flex-1 overflow-hidden rounded-full bg-staff-bg" title={`${d.total} คน`}>
-                  <span className="bg-risk-ok" style={{ width: `${d.ok}%` }} />
-                  <span className="bg-risk-mid" style={{ width: `${d.mid}%` }} />
-                  <span className="bg-risk-high" style={{ width: `${d.high}%` }} />
-                </div>
-                <span className="w-20 shrink-0 text-right text-xs font-semibold text-risk-crit">สูง {d.high}%</span>
-              </div>
-            ))}
-            {data && data.distribution.length === 0 && (
-              <p className="py-6 text-center text-sm text-staff-muted">ไม่มีผลการประเมินในช่วงนี้</p>
+      {/* ---------- งานค้าง + กิจกรรมล่าสุด ---------- */}
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        <Card className="lg:col-span-3">
+          <h2 className="text-lg font-bold">สิ่งที่ต้องดูแลในระบบ</h2>
+          <p className="mb-4 text-sm text-staff-muted">งานด้านเนื้อหาและบัญชีที่ยังค้างอยู่ · {AS_OF}</p>
+          <div className="flex flex-col gap-2.5">
+            {tasks && tasks.missing.length > 0 && (
+              <TaskItem title="ระดับผลที่ยังไม่มีข้อความคำแนะนำ" count={tasks.missing.length} href={`/staff/assessments?type=${tasks.missing[0].typeId}`}>
+                {tasks.missing.slice(0, 2).map((m, i) => (
+                  <span key={i} className="block truncate">
+                    {m.assessment} · ระดับ {m.level} — ผู้ใช้จะไม่เห็นคำแนะนำ
+                  </span>
+                ))}
+                {tasks.missing.length > 2 && <span className="block">และอีก {tasks.missing.length - 2} ระดับ</span>}
+              </TaskItem>
             )}
+            {tasks && tasks.drafts.length > 0 && (
+              <TaskItem title="ฉบับร่างที่ยังไม่เผยแพร่" count={tasks.drafts.length} href={`/staff/assessments?type=${tasks.drafts[0].typeId}`}>
+                {tasks.drafts.slice(0, 2).map((d) => (
+                  <span key={d.typeId} className="block truncate">
+                    {d.assessment} · แก้ไขล่าสุด {relativeTime(d.updatedAt)}
+                    {d.updatedBy ? ` โดย ${d.updatedBy}` : ""}
+                  </span>
+                ))}
+                {tasks.drafts.length > 2 && <span className="block">และอีก {tasks.drafts.length - 2} ฉบับ</span>}
+              </TaskItem>
+            )}
+            {tasks && tasks.suspended > 0 && (
+              <TaskItem title="บัญชีที่ถูกระงับ" count={tasks.suspended} href="/staff/users?status=suspended">
+                ตรวจสอบว่าควรเปิดใช้งานคืนหรือไม่
+              </TaskItem>
+            )}
+            {tasks && taskCount === 0 && <p className="py-8 text-center text-sm text-staff-muted">ไม่มีงานค้าง</p>}
           </div>
-        </div>
+        </Card>
 
-        <div className="min-w-0 flex-[2_1_340px] rounded-[22px] border border-staff-line bg-white p-6">
-          <h2 className="mb-2 text-lg font-bold">กิจกรรมล่าสุด</h2>
-          {data && data.activity.length === 0 && (
-            <p className="py-6 text-center text-sm text-staff-muted">ไม่มีกิจกรรมในช่วงนี้</p>
-          )}
-          <div className="divide-y divide-staff-bg">
-            {(data?.activity ?? []).map((a, i) => (
-              <div key={i} className="flex gap-3 py-2.5">
-                <span
-                  className={`mt-2 h-2 w-2 shrink-0 rounded-full ${
-                    a.type === "high" ? "bg-risk-high" : a.type === "note" ? "bg-staff-600" : "bg-staff-300"
-                  }`}
-                />
+        <Card className="lg:col-span-2">
+          <h2 className="text-lg font-bold">กิจกรรมล่าสุดในระบบ</h2>
+          <p className="mb-3 text-sm text-staff-muted">{IN_RANGE} ({period})</p>
+          {data && data.activity.length === 0 && <p className="py-8 text-center text-sm text-staff-muted">ไม่มีกิจกรรมใน {IN_RANGE}</p>}
+          <ol className="relative">
+            {(data?.activity ?? []).map((a, i, all) => (
+              <li key={i} className="relative flex gap-3 pb-4 last:pb-0">
+                {i < all.length - 1 && <span aria-hidden className="absolute left-[4.5px] top-4 h-full w-px bg-staff-line" />}
+                <span className={`relative mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${a.kind === "signup" ? "bg-risk-ok" : "bg-staff-600"}`} />
                 <div className="min-w-0">
-                  <p className="text-sm">{a.text}</p>
+                  <p className="text-sm [overflow-wrap:anywhere]">{a.text}</p>
                   <p className="text-xs text-staff-muted">{relativeTime(a.at)}</p>
                 </div>
-              </div>
+              </li>
             ))}
-          </div>
-          {data && data.activity.length > 0 && (
-            <Link href="/staff/follow-up" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-staff-600">
-              ไปหน้าติดตาม <ArrowRight size={15} />
-            </Link>
-          )}
-        </div>
+          </ol>
+        </Card>
       </section>
-      {detail && !customInvalid && (
-        <OverviewDetail kind={detail} from={from} to={to} rangeText={rangeText} onClose={() => setDetail(null)} />
-      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 /* =========================================================
-   ช่วงเวลาของหน้า "ภาพรวม" Staff (ใช้ร่วมกันระหว่าง overview และ overview/details)
+   ช่วงเวลาของหน้า "ภาพรวม" Staff (ใช้ใน /api/staff/overview)
    - from / to เป็นวันที่ตามเวลาไทย (รวมทั้งสองวัน)
 ========================================================= */
 
@@ -32,7 +32,7 @@ function toUtcDate(s: string) {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? date : null;
 }
 
-function addDays(s: string, days: number) {
+export function addDays(s: string, days: number) {
   const d = toUtcDate(s)!;
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);

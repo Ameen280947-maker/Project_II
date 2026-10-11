@@ -11,6 +11,7 @@ import {
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
 import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
+import { markAssessmentSaved } from "../_lib/assessmentVersion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -442,6 +443,9 @@ export async function POST(request: NextRequest) {
       await client.query("COMMIT");
       inTransaction = false;
 
+      /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
+      await markAssessmentSaved(client, { userId: numericUserId, typeId: TYPE_2Q, assessmentId: assessmentId });
+
       /* ถ้า 2Q เสี่ยง → แนะนำให้ทำ 9Q ต่อ */
       if (isRisk) {
         return NextResponse.json({
@@ -590,6 +594,9 @@ export async function POST(request: NextRequest) {
 
       await client.query("COMMIT");
       inTransaction = false;
+
+      /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
+      await markAssessmentSaved(client, { userId: numericUserId, typeId: TYPE_9Q, assessmentId: assessmentId });
 
       /* ตรวจข้อ 9 คิดทำร้ายตนเอง หรือคิดว่าถ้าตายไปคงจะดี */
       const needsUrgentAttention = validatedAnswers.some((answer) => {
