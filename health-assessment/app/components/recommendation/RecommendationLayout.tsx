@@ -1,5 +1,7 @@
+"use client";
+
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { ArrowLeft, CheckCircle2, Info } from "lucide-react";
 import type { CardTone } from "@/app/components/AssessmentMenuCard";
 import Sidebar from "@/app/components/Sidebar";
@@ -131,6 +133,18 @@ const RISK_BADGE: Record<RiskColor, string> = {
   gray: "bg-[#f3f3f4] text-[#6b6c74]",
 };
 
+/* สีวงกลมคะแนนตามระดับความรุนแรง (ชุดเดียวกับป้ายระดับ) — ring = เส้น, track = พื้น, text = ตัวเลข */
+const RISK_RING: Record<RiskColor, { ring: string; track: string; text: string }> = {
+  green: { ring: "#5aa864", track: "#e2f2df", text: "#3f8a4a" },
+  yellow: { ring: "#d9a300", track: "#fbefc4", text: "#9a7300" },
+  orange: { ring: "#e07a1f", track: "#fde4cc", text: "#c2620c" },
+  red: { ring: "#d72f4b", track: "#f9d9de", text: "#c81e3a" },
+  gray: { ring: "#a3a4ab", track: "#ececee", text: "#6b6c74" },
+};
+
+// RecommendationLayout ส่งระดับผลลงมา → วงกลมคะแนนทุกแบบประเมินใช้สีตามความรุนแรงเหมือนกัน
+const RiskColorContext = createContext<RiskColor | null>(null);
+
 /* =========================================================
    วงกลมคะแนน
    progress 0-1 (สัดส่วนที่เติมสี), value = ตัวเลขกลางวง, unit = หน่วย/คะแนนเต็ม
@@ -149,24 +163,27 @@ export function ScoreCircle({
   unit?: string;
   caption?: string;
 }) {
+  const risk = useContext(RiskColorContext);
   const t = RECOMMENDATION_TONES[tone];
+  // อยู่ในหน้าคำแนะนำ → สีตามระดับความรุนแรง / ใช้เดี่ยว ๆ → สีตามโทนของแบบประเมิน
+  const c = risk ? RISK_RING[risk] : { ring: t.ring, track: t.ringTrack, text: t.ring };
   const deg = Math.min(Math.max(progress, 0), 1) * 360;
 
   return (
     <div
       className="grid h-44 w-44 place-items-center rounded-full"
       style={{
-        background: `conic-gradient(${t.ring} 0deg ${deg}deg, ${t.ringTrack} ${deg}deg 360deg)`,
+        background: `conic-gradient(${c.ring} 0deg ${deg}deg, ${c.track} ${deg}deg 360deg)`,
       }}
     >
       <div className="grid h-36 w-36 place-items-center rounded-full bg-white">
         <div className="text-center">
           <div className="flex items-end justify-center">
-            <span className="text-5xl font-black" style={{ color: t.ring }}>
+            <span className="text-5xl font-black" style={{ color: c.text }}>
               {value}
             </span>
             {unit && (
-              <span className="mb-1 ml-0.5 text-xl font-bold" style={{ color: t.ring }}>
+              <span className="mb-1 ml-0.5 text-xl font-bold" style={{ color: c.text }}>
                 {unit}
               </span>
             )}
@@ -343,7 +360,7 @@ export default function RecommendationLayout({
             </div>
 
             <div className="flex flex-col items-center">
-              {score}
+              <RiskColorContext.Provider value={riskColor}>{score}</RiskColorContext.Provider>
               <span className={`mt-4 rounded-full px-5 py-2 text-center font-semibold ${RISK_BADGE[riskColor]}`}>
                 {riskLevel}
               </span>
