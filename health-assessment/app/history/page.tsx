@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import Sidebar from "@/app/components/Sidebar";
+import Sidebar, { markFromHistory } from "@/app/components/Sidebar";
 import { docColorOf, type DocColor } from "@/lib/riskLevel";
 
 import {
@@ -530,6 +530,7 @@ function HistoryCard({
           {detailHref ? (
             <Link
               href={detailHref}
+              onClick={() => markFromHistory(detailHref)}
               className={`flex h-12 items-center justify-center gap-2 rounded-2xl px-5 font-bold transition ${resultStyle.button}`}
             >
               ดูรายละเอียด

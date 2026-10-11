@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import {
   usePathname,
@@ -60,8 +60,43 @@ function clearUserStorage() {
    SIDEBAR
 ========================================================= */
 
+/* เปิดหน้าผลจาก "ดูรายละเอียด" ในหน้าประวัติ → ไฮไลต์เมนู "ประวัติการประเมิน"
+   จำ path ปลายทางไว้ก่อนเปลี่ยนหน้า แถบเมนูของหน้าใหม่จึงไฮไลต์ถูกตั้งแต่แรก ไม่กระพริบ */
+const FROM_HISTORY_KEY = "sidebarFromHistory";
+
+export function markFromHistory(href: string) {
+  try {
+    sessionStorage.setItem(FROM_HISTORY_KEY, href.split("?")[0]);
+  } catch {
+    /* ignore */
+  }
+}
+
+const noopSubscribe = () => () => {};
+
 export default function Sidebar() {
   const pathname = usePathname();
+  const fromHistory = useSyncExternalStore(
+    noopSubscribe,
+    () => {
+      try {
+        return sessionStorage.getItem(FROM_HISTORY_KEY) === pathname;
+      } catch {
+        return false;
+      }
+    },
+    () => false,
+  );
+
+  // ออกจากหน้าผลนั้นแล้ว ลืมค่าที่จำไว้
+  useEffect(() => {
+    try {
+      const path = sessionStorage.getItem(FROM_HISTORY_KEY);
+      if (path && path !== pathname) sessionStorage.removeItem(FROM_HISTORY_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [pathname]);
   const router = useRouter();
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
@@ -216,10 +251,11 @@ export default function Sidebar() {
 
   // แบบประเมินทุกแบบ และหน้าผลของแต่ละแบบ (/recommendation_xxx, /recommendation-CVD) อยู่ในเมนู "แบบประเมินสุขภาพ"
   const isAssessmentActive =
-    pathname.startsWith("/assessment") ||
+    !fromHistory &&
+    (pathname.startsWith("/assessment") ||
     pathname.startsWith("/sleep-assessment") ||
     pathname.startsWith("/recommendation_") ||
-    pathname.startsWith("/recommendation-CVD");
+    pathname.startsWith("/recommendation-CVD"));
 
   const isResultActive =
     pathname === "/dashboard" ||
@@ -233,7 +269,8 @@ export default function Sidebar() {
 
   const isHistoryActive =
     pathname === "/history" ||
-    pathname.startsWith("/history/");
+    pathname.startsWith("/history/") ||
+    fromHistory;
 
   const isRecommendationActive =
     pathname === "/recommendation-health" ||
