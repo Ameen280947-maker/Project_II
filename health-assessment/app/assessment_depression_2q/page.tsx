@@ -16,6 +16,7 @@ import {
 import Sidebar from "@/app/components/Sidebar";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    TYPES
@@ -390,6 +391,7 @@ export default function Depression2QPage() {
               แบบคัดกรองเบื้องต้นเพื่อประเมินความรู้สึกหรืออาการที่เกิดขึ้นในช่วง 2 สัปดาห์ที่ผ่านมารวมถึงวันนี้
               กรุณาตอบตามความเป็นจริงเพื่อประโยชน์ในการดูแลสุขภาพจิตของท่าน
             </p>
+            <AssessmentSourceNote typeId={13} className="mt-2" />
 
             {!userId && (
               <div className="mt-4 flex items-center gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">

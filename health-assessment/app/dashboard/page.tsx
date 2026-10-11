@@ -7,6 +7,7 @@ import NotificationBell from "@/app/components/NotificationBell";
 
 import Sidebar from "@/app/components/Sidebar";
 import { riskLevelOf, type Level } from "@/lib/riskLevel";
+import { assessmentThaiName as thName, riskLevelThai } from "@/lib/assessmentNames";
 import {
   Activity,
   AlertTriangle,
@@ -42,6 +43,9 @@ type Assessment = {
   recommendation_text?: string | null;
   self_harm_flag?: boolean; // 9Q: ตอบข้อคิดทำร้ายตนเอง > 0
 };
+
+// ระดับผลเป็นภาษาไทย (บางแบบเก็บเป็นภาษาอังกฤษ เช่น Diabetes TDS: moderate)
+const riskTh = (a: Pick<Assessment, "assessment_name" | "risk_level">) => riskLevelThai(a.assessment_name, a.risk_level);
 
 type DashboardData = {
   success: boolean;
@@ -508,7 +512,7 @@ function DashboardContent({
         />
         <KpiCard
           label="ประเมินล่าสุด"
-          value={latest?.assessment_name ?? "-"}
+          value={latest ? thName(latest.assessment_name) : "-"}
           icon={CalendarDays}
           iconWrap="bg-[#E8EEF8] text-[#2B5197]"
           small
@@ -733,7 +737,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
     <div className="bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-5">
       <div role="tablist" aria-label="เลือกแบบประเมิน" className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-[#F3F1EC] self-start">
         {tab(null, "ทั้งหมด")}
-        {types.map((a) => tab(a.assessment_type_id, a.assessment_name))}
+        {types.map((a) => tab(a.assessment_type_id, thName(a.assessment_name)))}
       </div>
       {active ? (
         <TypeTrend key={active.assessment_type_id} list={history(active.assessment_type_id)} />
@@ -787,7 +791,7 @@ function TypeTrend({ list }: { list: Assessment[] }) {
         <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(latest)}</span>
         <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
         <span className={`px-2.5 py-1 rounded-full text-[13px] font-semibold ${LEVEL_STYLE[getLevel(latest)].pill}`}>
-          {latest.risk_level || LEVEL_STYLE[getLevel(latest)].label}
+          {riskTh(latest) || LEVEL_STYLE[getLevel(latest)].label}
         </span>
         <DeltaPill delta={delta} />
       </div>
@@ -843,7 +847,7 @@ function HistoryRadar({ list }: { list: Assessment[] }) {
         <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(latest)}</span>
         <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
         <span className={`px-2.5 py-1 rounded-full text-[13px] font-semibold ${LEVEL_STYLE[getLevel(latest)].pill}`}>
-          {latest.risk_level || LEVEL_STYLE[getLevel(latest)].label}
+          {riskTh(latest) || LEVEL_STYLE[getLevel(latest)].label}
         </span>
         <DeltaPill delta={delta} />
       </div>
@@ -853,7 +857,7 @@ function HistoryRadar({ list }: { list: Assessment[] }) {
           viewBox="-170 -140 340 280"
           className="w-full max-w-[520px] h-auto"
           role="img"
-          aria-label={`กราฟแมงมุมคะแนน ${latest.assessment_name} ${n} ครั้งล่าสุด: ${list
+          aria-label={`กราฟแมงมุมคะแนน ${thName(latest.assessment_name)} ${n} ครั้งล่าสุด: ${list
             .map((a) => `${formatShortDate(a.assessed_at)} ${displayScore(a)}`)
             .join(", ")}`}
         >
@@ -1040,7 +1044,7 @@ function ScoreTrend({ list }: { list: Assessment[] }) {
           viewBox="0 0 100 100"
           preserveAspectRatio="none"
           className="absolute inset-0 w-full h-full overflow-visible"
-          aria-label={`กราฟคะแนน ${list[0].assessment_name}`}
+          aria-label={`กราฟคะแนน ${thName(list[0].assessment_name)}`}
           role="img"
         >
           <path d={linePath} fill="none" stroke={ACCENT} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
@@ -1134,7 +1138,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
         viewBox="-230 -150 460 300"
         className="w-full max-w-[640px] h-auto"
         role="img"
-        aria-label={`กราฟแมงมุมระดับความเสี่ยง: ${current.map((c) => `${c.a.assessment_name} ${LEVEL_STYLE[c.level].label}`).join(", ")}`}
+        aria-label={`กราฟแมงมุมระดับความเสี่ยง: ${current.map((c) => `${thName(c.a.assessment_name)} ${LEVEL_STYLE[c.level].label}`).join(", ")}`}
       >
         {/* พื้นหลังแต่ละช่วง */}
         {ZONES.map((z) => (
@@ -1158,7 +1162,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
         />
         {current.map((c) => (
           <circle key={c.a.assessment_id} cx={c.xy[0]} cy={c.xy[1]} r={4.5} fill={LEVEL_COLOR[c.level]} stroke="#fff" strokeWidth={1.5}>
-            <title>{`${c.a.assessment_name}: ${c.a.risk_level || "-"} (${displayScore(c.a)})`}</title>
+            <title>{`${thName(c.a.assessment_name)}: ${riskTh(c.a) || "-"} (${displayScore(c.a)})`}</title>
           </circle>
         ))}
 
@@ -1171,10 +1175,10 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
           return (
             <text key={c.a.assessment_id} x={x} y={y + dy} textAnchor={anchor} fontSize={11}>
               <tspan x={x} fill="#16181D" fontWeight={600}>
-                {c.a.assessment_name}
+                {thName(c.a.assessment_name)}
               </tspan>
               <tspan x={x} dy={13} fill={LEVEL_COLOR[c.level]} fontSize={10}>
-                {c.a.risk_level || LEVEL_STYLE[c.level].label}
+                {riskTh(c.a) || LEVEL_STYLE[c.level].label}
               </tspan>
             </text>
           );
@@ -1202,7 +1206,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
 
       {unrated.length > 0 && (
         <p className="text-xs text-[#5E6470]">
-          ไม่แสดงในกราฟ (ยังไม่มีเกณฑ์แบ่งระดับ): {unrated.map((a) => a.assessment_name).join(", ")}
+          ไม่แสดงในกราฟ (ยังไม่มีเกณฑ์แบ่งระดับ): {unrated.map((a) => thName(a.assessment_name)).join(", ")}
         </p>
       )}
     </div>
@@ -1244,11 +1248,8 @@ function AssessmentCard({
       </div>
 
       <div>
-        <p className="font-[family-name:var(--font-anuphan)] text-xl font-bold">{a.assessment_name}</p>
-        <p className="text-[13px] text-[#5E6470]">
-          {cfg.thaiName && `${cfg.thaiName} · `}
-          {formatShortDate(a.assessed_at)}
-        </p>
+        <p className="font-[family-name:var(--font-anuphan)] text-xl font-bold">{thName(a.assessment_name)}</p>
+        <p className="text-[13px] text-[#5E6470]">{formatShortDate(a.assessed_at)}</p>
       </div>
 
       <div className="flex w-full items-baseline gap-1.5">
@@ -1259,7 +1260,7 @@ function AssessmentCard({
             {delta > 0 ? "▲" : "▼"} {Math.abs(delta)} จากครั้งก่อน
           </span>
         ) : (
-          <span className={`ml-auto text-sm font-semibold text-right line-clamp-1 ${s.text}`}>{a.risk_level}</span>
+          <span className={`ml-auto text-sm font-semibold text-right line-clamp-1 ${s.text}`}>{riskTh(a)}</span>
         )}
       </div>
 
@@ -1297,7 +1298,7 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
       return {
         key: a.assessment_id,
         level: "high" as Level,
-        source: `จาก ${a.assessment_name}`,
+        source: `จาก ${thName(a.assessment_name)}`,
         title: "ขอความช่วยเหลือทันที",
         text:
           "ผลประเมินพบความคิดทำร้ายตนเอง โปรดโทรสายด่วนสุขภาพจิต 1323 (ฟรี 24 ชั่วโมง) " +
@@ -1307,7 +1308,7 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
     return {
       key: a.assessment_id,
       level: getLevel(a),
-      source: `จาก ${a.assessment_name}`,
+      source: `จาก ${thName(a.assessment_name)}`,
       title: cfg.tip.title,
       // ใช้คำแนะนำจากฐานข้อมูลก่อน ถ้าไม่มีค่อยใช้ข้อความสำรอง
       text: a.recommendation_text?.trim() || cfg.tip.text,
@@ -1318,7 +1319,7 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
     tips.push({
       key: -1,
       level: "ok",
-      source: `จาก ${goodOnes.map((a) => a.assessment_name).join(", ")}`,
+      source: `จาก ${goodOnes.map((a) => thName(a.assessment_name)).join(", ")}`,
       title: "รักษาระดับที่ดีไว้",
       text: "ผลอยู่ในเกณฑ์ปกติ ดูแลตัวเองแบบนี้ต่อไป และประเมินซ้ำตามรอบ",
     });

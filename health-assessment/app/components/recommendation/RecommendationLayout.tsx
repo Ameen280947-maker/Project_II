@@ -6,6 +6,7 @@ import Sidebar from "@/app/components/Sidebar";
 import AnswerReview from "@/app/components/AnswerReview";
 import ResultActions from "@/app/components/ResultActions";
 import FollowUpActions from "@/app/components/recommendation/FollowUpActions";
+import { ResultSources } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    โครงหน้าคำแนะนำ ใช้รูปแบบเดียวกันทุกแบบประเมิน (อิงหน้าโรคหัวใจ)
@@ -367,6 +368,8 @@ export default function RecommendationLayout({
                 {recommendation && (
                   <div className="mt-4 whitespace-pre-line leading-8 text-[#666872]">{recommendation}</div>
                 )}
+                {/* แหล่งอ้างอิงที่เจ้าหน้าที่กรอก (ไม่ได้กรอก = ไม่แสดง) */}
+                <ResultSources assessmentId={assessmentId} className="mt-4" />
               </div>
             </div>
           </section>

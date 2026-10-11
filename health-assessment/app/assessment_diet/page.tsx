@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 type Choice = {
   choice_id: number;
@@ -407,6 +408,8 @@ export default function DietAssessmentPage() {
               <HealthConsentNotice />
               <AssessmentBackLink href="/assessment-menu-behavior" />
             </header>
+            {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
+            <AssessmentSourceNote typeId={10} className="mt-3" />
 
             {/* PROGRESS */}
 

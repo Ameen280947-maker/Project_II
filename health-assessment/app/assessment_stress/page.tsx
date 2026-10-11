@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    TYPES
@@ -388,6 +389,8 @@ export default function StressAssessmentPage() {
                       <HealthConsentNotice />
                       <AssessmentBackLink href="/assessment-menu-mental-health" />
                     </header>
+                    {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
+                    <AssessmentSourceNote typeId={12} className="mt-3" />
 
                     {/* INFO */}
 

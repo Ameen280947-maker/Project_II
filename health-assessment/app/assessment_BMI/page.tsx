@@ -6,6 +6,7 @@ import { ArrowRight, Weight } from "lucide-react";
 import Sidebar from "@/app/components/Sidebar";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    แบบประเมินภาวะน้ำหนักเกิน (BMI)
@@ -186,6 +187,8 @@ export default function WeightAssessmentPage() {
             <HealthConsentNotice />
             <AssessmentBackLink href="/assessment-menu" />
           </header>
+          {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
+          <AssessmentSourceNote typeId={1} className="mt-3" />
 
           {/* จัดฟอร์มให้อยู่กลางพื้นที่ที่เหลือ (ขยับขึ้นเล็กน้อยให้ดูสมดุล) */}
           <div className="flex flex-1 items-center py-10 lg:pb-24">

@@ -12,6 +12,7 @@ import {
 import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
 import AssessmentMenuCard, { type CardTone } from "@/app/components/AssessmentMenuCard";
+import CategoryAssessmentCards from "@/app/components/CategoryAssessmentCards";
 
 const assessmentCards: { title: string; icon: typeof Heart; tone: CardTone; href: string }[] = [
   {
@@ -86,6 +87,8 @@ export default function AssessmentMenuPage() {
             {assessmentCards.map((card) => (
               <AssessmentMenuCard key={card.href} title={card.title} href={card.href} icon={card.icon} tone={card.tone} />
             ))}
+            {/* แบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดนี้ */}
+            <CategoryAssessmentCards routePath="/assessment-menu" />
           </div>
 
           {/* =================================================

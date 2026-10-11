@@ -9,6 +9,7 @@ import AnswerReview from "@/app/components/AnswerReview";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote, ResultSources } from "@/app/components/AssessmentSources";
 
 /* =========================================================
    หน้ากลางสำหรับแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
@@ -21,6 +22,8 @@ type Assessment = {
   name: string;
   description: string | null;
   questions: { id: number; text: string; choices: { id: number; text: string }[] }[];
+  // หน้าเมนูของหมวดที่แบบประเมินนี้อยู่
+  menuHref?: string;
 };
 
 type Result = {
@@ -155,9 +158,10 @@ function Form({ typeId }: { typeId: number }) {
         </div>
         {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
         <HealthConsentNotice />
-        <AssessmentBackLink href="/assessment-type" />
+        <AssessmentBackLink href={data.menuHref ?? "/assessment-type"} />
       </div>
       {data.description && <p className="mt-3 leading-7 text-[#8b8f98]">{data.description}</p>}
+      <AssessmentSourceNote typeId={typeId} className="mt-2" />
 
       <div className="mt-6 h-2 overflow-hidden rounded-full bg-[#f1e9ea]" aria-hidden>
         <div className="h-full rounded-full bg-[#ef4962] transition-all" style={{ width: `${(answered / data.questions.length) * 100}%` }} />
@@ -211,7 +215,7 @@ function Form({ typeId }: { typeId: number }) {
 
       <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
         <Link
-          href="/assessment-type"
+          href={data.menuHref ?? "/assessment-type"}
           className="flex h-14 items-center justify-center gap-2 rounded-2xl border border-[#e8dddd] bg-white px-6 font-semibold text-[#777780] transition hover:bg-[#faf7f7]"
         >
           <ArrowLeft size={18} /> กลับไปเลือกแบบประเมิน
@@ -282,7 +286,7 @@ function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: nu
           </p>
         )}
         {r.reassessDays && <p className="mt-3 text-sm text-[#858991]">แนะนำให้ประเมินซ้ำในอีก {r.reassessDays} วัน</p>}
-        {r.source && <p className="mt-3 text-xs text-[#9a9ba2]">อ้างอิง: {r.source}</p>}
+        <ResultSources assessmentId={assessmentId} className="mt-3" />
       </div>
 
       <AnswerReview assessmentId={assessmentId} className="mt-5" />

@@ -4,6 +4,7 @@ import Link from "next/link";
 import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
 import AssessmentMenuCard, { type CardTone } from "@/app/components/AssessmentMenuCard";
+import CategoryAssessmentCards from "@/app/components/CategoryAssessmentCards";
 
 import {
   ArrowLeft,
@@ -152,6 +153,8 @@ export default function BehaviorAssessmentPage() {
                 tone={assessment.tone}
               />
             ))}
+            {/* แบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดนี้ */}
+            <CategoryAssessmentCards routePath="/assessment-menu-behavior" />
           </div>
 
           {/* =================================================

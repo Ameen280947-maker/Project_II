@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
+import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
 type SleepOption = {
     id: number;
@@ -329,6 +330,9 @@ export default function SleepAssessmentPage() {
                     <AssessmentBackLink href="/assessment-menu-behavior" />
 
                 </div>
+
+                {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
+                <AssessmentSourceNote typeId={9} className="mb-6" />
 
 
                 {/* =================================================
