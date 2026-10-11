@@ -705,44 +705,165 @@ function KpiCard({
    - เส้นทึบ = ผลล่าสุด, เส้นประ = ผลครั้งก่อน
 ========================================================= */
 
-// แถบเลือก "ทั้งหมด" (กราฟแมงมุม) หรือดูทีละแบบประเมิน (กราฟเส้นตามเวลา)
+/* ===== กลุ่มของตัวเลือก (ตรงกับ 3 หมวดในหน้า "เข้าสู่แบบประเมิน") =====
+   แบบประเมินหลักจัดกลุ่มตามชื่อ เรียงตามลำดับในรายการ
+   แบบที่เจ้าหน้าที่สร้างเอง: ตามหมวดจาก /api/assessments/categories (หมวด 1-3 = 3 กลุ่มนี้, หมวดอื่นใช้ชื่อหมวด) */
+const TREND_GROUPS: { key: string; label: string; categoryId: number; names: string[] }[] = [
+  { key: "physical", label: "สุขภาพกาย", categoryId: 1, names: ["bmi", "blood pressure", "diabetes tds", "diabetes risk", "thai cvd"] },
+  { key: "behavior", label: "พฤติกรรม", categoryId: 2, names: ["sleep", "physical activity", "diet", "alcohol", "smoking", "oral health"] },
+  { key: "mental", label: "สุขภาพจิต", categoryId: 3, names: ["stress", "phq-2", "9q"] },
+];
+
+// checklist เลือกแบบประเมินที่จะแสดง (ค่าเริ่มต้น = เลือกทุกแบบ)
+// - เลือก 1 แบบ → กราฟรายละเอียดของแบบนั้น
+// - เลือกหลายแบบ → กราฟแมงมุมเฉพาะแบบที่เลือก
 function TrendCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
-  const [selected, setSelected] = useState<number | null>(null);
+  // เก็บแบบที่ "ไม่เลือก" ไว้ แบบประเมินใหม่ที่เพิ่งทำจึงถูกเลือกให้อัตโนมัติ
+  const [unchecked, setUnchecked] = useState<number[]>([]);
+  // หมวดของแบบประเมินที่เจ้าหน้าที่สร้างเอง: assessment id → { categoryId, name }
+  const [customCats, setCustomCats] = useState<Map<number, { id: number; name: string }>>(new Map());
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/assessments/categories", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (cancelled || !d?.success) return;
+        const map = new Map<number, { id: number; name: string }>();
+        for (const c of d.categories as { id: number; name: string; assessments: { id: number }[] }[]) {
+          for (const a of c.assessments) map.set(a.id, { id: c.id, name: c.name });
+        }
+        setCustomCats(map);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const history = (typeId: number) =>
     assessments
       .filter((a) => a.assessment_type_id === typeId && Number.isFinite(scoreOf(a)))
       .sort((a, b) => new Date(a.assessed_at).getTime() - new Date(b.assessed_at).getTime())
       .slice(-8);
-  const types = items.filter((a) => history(a.assessment_type_id).length > 0);
-  const active = types.find((a) => a.assessment_type_id === selected);
+  // ทุกแบบประเมินที่มีผล (กราฟแมงมุมใช้ระดับผล ไม่จำเป็นต้องมีคะแนนตัวเลข)
+  const types = items;
+  const chosen = types.filter((a) => !unchecked.includes(a.assessment_type_id));
 
-  const tab = (key: number | null, label: string) => {
-    const isActive = key === (active?.assessment_type_id ?? null);
-    return (
-      <button
-        key={key ?? "all"}
-        role="tab"
-        aria-selected={isActive}
-        onClick={() => setSelected(key)}
-        className={`px-3.5 min-h-9 rounded-[9px] text-sm ${
-          isActive ? "bg-white font-semibold shadow-sm" : "text-[#4A4F59] hover:text-[#16181D]"
-        }`}
-      >
-        {label}
-      </button>
-    );
-  };
+  // จัดกลุ่มตามหมวด (เรียงตามลำดับใน TREND_GROUPS) ที่เหลือเป็นหมวดของเจ้าหน้าที่หรือ "อื่น ๆ"
+  const groups: { key: string; label: string; items: Assessment[] }[] = TREND_GROUPS.map((g) => ({ key: g.key, label: g.label, items: [] as Assessment[] }));
+  for (const a of types) {
+    const name = String(a.assessment_name ?? "").toLowerCase().trim();
+    const builtIn = TREND_GROUPS.findIndex((g) => g.names.includes(name));
+    const cat = customCats.get(a.assessment_type_id);
+    const byCat = cat ? TREND_GROUPS.findIndex((g) => g.categoryId === cat.id) : -1;
+    const idx = builtIn >= 0 ? builtIn : byCat;
+    if (idx >= 0) {
+      groups[idx].items.push(a);
+      continue;
+    }
+    const key = cat ? `cat-${cat.id}` : "other";
+    const label = cat?.name ?? "อื่น ๆ";
+    const g = groups.find((x) => x.key === key) ?? (groups.push({ key, label, items: [] }), groups[groups.length - 1]);
+    g.items.push(a);
+  }
+  // แบบประเมินหลักเรียงตามลำดับที่กำหนด แบบที่เจ้าหน้าที่สร้างต่อท้าย
+  for (const [i, g] of TREND_GROUPS.entries()) {
+    const rank = (a: Assessment) => {
+      const n = g.names.indexOf(a.assessment_name.toLowerCase().trim());
+      return n < 0 ? g.names.length : n;
+    };
+    groups[i].items.sort((x, y) => rank(x) - rank(y));
+  }
+  const visibleGroups = groups.filter((g) => g.items.length > 0);
+
+  const toggleGroup = (ids: number[], allOn: boolean) =>
+    setUnchecked((list) => (allOn ? [...new Set([...list, ...ids])] : list.filter((x) => !ids.includes(x))));
+
+  const toggle = (id: number) =>
+    setUnchecked((list) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]));
 
   return (
     <div className="bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-5">
-      <div role="tablist" aria-label="เลือกแบบประเมิน" className="flex flex-wrap gap-1.5 p-1 rounded-xl bg-[#F3F1EC] self-start">
-        {tab(null, "ทั้งหมด")}
-        {types.map((a) => tab(a.assessment_type_id, thName(a.assessment_name)))}
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-bold text-[#16181D]">
+            แบบประเมินที่แสดง{" "}
+            <span className="font-normal text-[#5E6470]">
+              {chosen.length}/{types.length}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => setUnchecked(chosen.length > 0 ? types.map((a) => a.assessment_type_id) : [])}
+            className="text-sm font-semibold text-[#16181D] underline underline-offset-4 hover:opacity-70"
+          >
+            {chosen.length > 0 ? "ล้างทั้งหมด" : "เลือกทั้งหมด"}
+          </button>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {visibleGroups.map((g) => {
+            const ids = g.items.map((a) => a.assessment_type_id);
+            const onCount = ids.filter((id) => !unchecked.includes(id)).length;
+            const allOn = onCount === ids.length;
+            return (
+              <div key={g.key} className="flex flex-col gap-2 sm:flex-row sm:items-start">
+                {/* กดชื่อกลุ่ม = เลือก/ยกเลิกทั้งกลุ่ม */}
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(ids, allOn)}
+                  aria-label={`${allOn ? "ยกเลิก" : "เลือก"}ทั้งกลุ่ม${g.label}`}
+                  className="shrink-0 self-start rounded-md text-left text-[13px] text-[#4A4F59] hover:text-[#16181D] sm:w-28 sm:pt-2"
+                >
+                  <span className="font-semibold">{g.label}</span>{" "}
+                  <span className="text-[#8A8F99]">
+                    {onCount}/{ids.length}
+                  </span>
+                </button>
+                <div role="group" aria-label={`แบบประเมินกลุ่ม${g.label}`} className="flex flex-wrap gap-2">
+                  {g.items.map((a) => {
+                    const on = !unchecked.includes(a.assessment_type_id);
+                    return (
+                      <button
+                        key={a.assessment_type_id}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={on}
+                        onClick={() => toggle(a.assessment_type_id)}
+                        className={`min-h-9 rounded-full border px-4 text-sm font-semibold transition ${
+                          on
+                            ? "border-[#16181D] bg-[#16181D] text-white"
+                            : "border-[#E2DED5] bg-white text-[#4A4F59] hover:border-[#B9B3A6] hover:text-[#16181D]"
+                        }`}
+                      >
+                        {thName(a.assessment_name)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <p className="text-xs text-[#5E6470]">กดชื่อกลุ่มเพื่อเลือก/ยกเลิกทั้งกลุ่ม เช่น ดูเฉพาะสุขภาพจิต</p>
       </div>
-      {active ? (
-        <TypeTrend key={active.assessment_type_id} list={history(active.assessment_type_id)} />
+
+      {chosen.length === 0 ? (
+        <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-sm text-[#4A4F59]">
+          <Info size={18} />
+          เลือกอย่างน้อย 1 แบบประเมินเพื่อแสดงกราฟ
+        </div>
+      ) : chosen.length === 1 ? (
+        history(chosen[0].assessment_type_id).length > 0 ? (
+          <TypeTrend key={chosen[0].assessment_type_id} list={history(chosen[0].assessment_type_id)} />
+        ) : (
+          <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-sm text-[#4A4F59]">
+            <Info size={18} />
+            แบบประเมินนี้ไม่มีคะแนนที่แสดงเป็นกราฟได้ เลือกหลายแบบเพื่อดูในกราฟรวมแทน
+          </div>
+        )
       ) : (
-        <RadarCard items={items} assessments={assessments} />
+        <RadarCard items={chosen} assessments={assessments} />
       )}
     </div>
   );
@@ -1114,7 +1235,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
     return (
       <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-sm text-[#4A4F59]">
         <Info size={18} />
-        ต้องมีผลประเมินอย่างน้อย 3 ด้านจึงจะแสดงกราฟรวมได้ เลือกดูทีละแบบประเมินจากแถบด้านบนแทน
+        กราฟรวมต้องมีอย่างน้อย 3 ด้านที่มีเกณฑ์แบ่งระดับ เลือกเพิ่มให้ครบ 3 ด้าน หรือเลือกแบบเดียวเพื่อดูรายละเอียด
       </div>
     );
   }

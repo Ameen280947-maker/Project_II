@@ -112,38 +112,6 @@ export default function MentalHealthMenuPage() {
                     </div>
 
                     {/* =================================================
-              INFORMATION BANNER
-          ================================================= */}
-
-                    <div className="mt-7 rounded-[24px] border border-[#e8edf5] bg-[#f5f8fc] px-6 py-5">
-
-                        <div className="flex items-start gap-4">
-
-                            <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-[#e7f0fb] text-[#6595ce]">
-                                <Brain
-                                    size={23}
-                                    strokeWidth={1.8}
-                                />
-                            </div>
-
-                            <div>
-                                <h3 className="font-bold text-[#4f535b]">
-                                    เกี่ยวกับการประเมินสุขภาพจิต
-                                </h3>
-
-                                <p className="mt-1 text-sm leading-6 text-[#858991]">
-                                    แบบประเมินนี้ใช้สำหรับคัดกรองความเสี่ยงเบื้องต้น
-                                    ไม่ใช่การวินิจฉัยทางการแพทย์
-                                    หากพบว่ามีความเสี่ยงหรือมีอาการที่ส่งผลกระทบต่อการใช้ชีวิต
-                                    ควรปรึกษาผู้เชี่ยวชาญด้านสุขภาพจิต
-                                </p>
-                            </div>
-
-                        </div>
-
-                    </div>
-
-                    {/* =================================================
               BACK BUTTON
           ================================================= */}
 
