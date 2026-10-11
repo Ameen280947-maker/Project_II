@@ -1,6 +1,6 @@
 "use client";
 
-import { ClipboardList, ListOrdered, Phone } from "lucide-react";
+import { ClipboardList, Phone } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import RecommendationLayout, {
@@ -202,39 +202,6 @@ function SmokingRecommendationContent() {
           <RiskBox range="5–8 คะแนน" title="ความเสี่ยงสูง" active={score >= 5} color="orange" />
         </div>
       </RecommendationSection>
-
-      {/* =================================================
-          คะแนนรายข้อ
-      ================================================== */}
-
-      {answers.length > 0 && (
-        <RecommendationSection
-          icon={<ListOrdered size={27} className={t.eyebrow} />}
-          title="คะแนนรายข้อ"
-        >
-          <div className="space-y-3 rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
-            {answers.map((answer, index) => (
-              <div
-                key={answer.question_id}
-                className="flex items-start gap-4 rounded-2xl bg-[#faf9f7] p-4"
-              >
-                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${t.iconSoft}`}>
-                  {index + 1}
-                </span>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-6 text-[#5e6268]">{answer.question_text}</p>
-                  <p className="mt-1 font-semibold text-[#2f3037]">{answer.choice_text ?? "-"}</p>
-                </div>
-
-                <span className={`shrink-0 text-sm font-bold ${t.eyebrow}`}>
-                  {Number(answer.score ?? 0)} คะแนน
-                </span>
-              </div>
-            ))}
-          </div>
-        </RecommendationSection>
-      )}
 
       {/* =================================================
           สายด่วนเลิกบุหรี่
