@@ -270,6 +270,7 @@ function RecommendationDiabetesContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="diabetes tds"
       title={
         <>
           ความเสี่ยงการเกิดโรคเบาหวานใน{" "}

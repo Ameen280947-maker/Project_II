@@ -108,6 +108,7 @@ function RecommendationContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="thai cvd"
       title={
         <>
           ความเสี่ยงต่อการเกิดโรคหัวใจและหลอดเลือดใน{" "}

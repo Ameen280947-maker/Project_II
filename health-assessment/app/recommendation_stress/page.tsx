@@ -161,6 +161,7 @@ function StressRecommendationContent() {
     return (
         <RecommendationLayout
             tone={TONE}
+            assessmentKey="stress"
             title={
                 <>
                     แบบประเมิน<span className={t.accent}>ความเครียด</span> (ST-5)

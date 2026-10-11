@@ -216,6 +216,7 @@ function AlcoholRecommendationContent() {
   return (
     <RecommendationLayout
       tone={TONE}
+      assessmentKey="alcohol"
       title={
         <>
           ผลการประเมิน<span className={t.accent}>การดื่มแอลกอฮอล์</span>

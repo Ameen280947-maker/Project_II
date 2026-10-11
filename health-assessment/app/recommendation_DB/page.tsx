@@ -1,13 +1,8 @@
 "use client";
 
-import Link from "next/link";
-
 import {
-  ArrowRight,
   Gauge,
   HeartPulse,
-  Stethoscope,
-  X,
 } from "lucide-react";
 
 import {
@@ -17,7 +12,6 @@ import {
 } from "react";
 
 import {
-  useRouter,
   useSearchParams,
 } from "next/navigation";
 
@@ -72,13 +66,6 @@ const DOT: Record<RiskColor, string> = {
 };
 
 // ระดับที่ควรแนะนำให้ประเมินโรคหัวใจและหลอดเลือดเพิ่ม
-const HIGH_RISK_LEVELS = [
-  "ความดันโลหิตเริ่มสูง",
-  "อาจเป็นโรคความดันโลหิตสูง",
-  "น่าจะเป็นโรคความดันโลหิตสูง",
-  "ความดันโลหิตสูงอันตราย",
-];
-
 export default function BloodPressureRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -88,7 +75,6 @@ export default function BloodPressureRecommendationPage() {
 }
 
 function RecommendationContent() {
-  const router = useRouter();
   const searchParams =
     useSearchParams();
 
@@ -107,9 +93,6 @@ function RecommendationContent() {
 
   const [error, setError] =
     useState("");
-
-  const [showPopup, setShowPopup] =
-    useState(false);
 
   /* =========================================================
      โหลดผลจาก Database
@@ -195,9 +178,6 @@ function RecommendationContent() {
     return <RecommendationError tone={TONE} message={error} editHref="/assessment_DB" />;
   }
 
-  const shouldSuggestMoreAssessment =
-    HIGH_RISK_LEVELS.includes(result.riskLevel);
-
   const riskColor: RiskColor =
     BP_LEVELS.find((b) => b.level === result.riskLevel)?.color ?? "gray";
 
@@ -207,6 +187,7 @@ function RecommendationContent() {
     <>
       <RecommendationLayout
         tone={TONE}
+        assessmentKey="blood pressure"
         title={
           <>
             ผลการประเมิน<span className={t.accent}>ความดันโลหิต</span>ของคุณ
@@ -237,13 +218,6 @@ function RecommendationContent() {
         recommendation={result.recommendation}
         assessmentId={assessmentId}
         editHref="/assessment_DB"
-        onMenuClick={() => {
-          if (shouldSuggestMoreAssessment) {
-            setShowPopup(true);
-          } else {
-            router.push("/assessment-menu");
-          }
-        }}
       >
         {/* =====================================================
             ค่าความดันที่วัดได้ + เกณฑ์แต่ละระดับ
@@ -294,74 +268,6 @@ function RecommendationContent() {
         </RecommendationSection>
       </RecommendationLayout>
 
-      {/* =====================================================
-          Popup แนะนำ CVD
-      ====================================================== */}
-
-      {showPopup &&
-        shouldSuggestMoreAssessment && (
-          <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-5 backdrop-blur-sm">
-
-            <div className="relative w-full max-w-[480px] rounded-[30px] bg-white p-8 text-center shadow-[0_25px_80px_rgba(0,0,0,0.18)]">
-
-              <button
-                type="button"
-                onClick={() =>
-                  setShowPopup(
-                    false,
-                  )
-                }
-                className="absolute right-5 top-5 grid h-10 w-10 place-items-center rounded-full bg-[#f7f4f4] text-[#777780]"
-              >
-                <X size={20} />
-              </button>
-
-              <div className={`mx-auto grid h-20 w-20 place-items-center rounded-full ${t.iconSoft}`}>
-                <Stethoscope
-                  size={38}
-                />
-              </div>
-
-              <h2 className="mt-6 text-2xl font-bold">
-                แนะนำให้ประเมินเพิ่มเติม
-              </h2>
-
-              <p className="mt-3 leading-7 text-[#74757d]">
-                ผลการประเมินพบว่า
-                ความดันโลหิตของคุณสูงกว่าปกติ
-                แนะนำให้ประเมินความเสี่ยงโรคอื่นเพิ่มเติม โดยเฉพาะโรคหัวใจและหลอดเลือด
-              </p>
-
-              <div className="mt-7 flex flex-col gap-3">
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      "/assessment_CVD",
-                    )
-                  }
-                  className="flex h-14 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#4f6fc0] to-[#22397a] font-bold text-white"
-                >
-                  ประเมินโรคหัวใจและหลอดเลือด
-                  <ArrowRight
-                    size={20}
-                  />
-                </button>
-
-                <Link
-                  href="/assessment-type"
-                  className="flex h-14 items-center justify-center rounded-2xl border border-[#c8d3ec] font-semibold text-[#777780]"
-                >
-                  ไว้ภายหลัง
-                </Link>
-
-              </div>
-
-            </div>
-
-          </div>
-        )}
     </>
   );
 }
