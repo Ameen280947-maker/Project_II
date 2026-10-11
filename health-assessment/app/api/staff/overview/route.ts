@@ -79,7 +79,7 @@ export async function GET(request: NextRequest) {
         `WITH x AS (
            SELECT u.user_id, u.created_at, COALESCE(u.is_active, TRUE) AS is_active,
                   ${LOCAL_CREATED} AS local_created,
-                  GREATEST(MAX(a.assessed_at), u.created_at) AS last_seen
+                  GREATEST(MAX(a.assessed_at), u.created_at, u.last_login_at) AS last_seen
              FROM users u LEFT JOIN assessment a ON a.user_id = u.user_id
             WHERE u.role_id = $1
             GROUP BY u.user_id)
