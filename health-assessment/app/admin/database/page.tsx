@@ -92,7 +92,7 @@ export default function AdminDatabasePage() {
             <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
               <ShieldCheck size={18} className="text-[#1e3a8a]" /> ตรวจความถูกต้องของข้อมูล
             </h2>
-            <p className="mb-4 text-sm text-[#64748b]">ค้นหาข้อมูลกำพร้าที่อ้างถึงข้อมูลที่ถูกลบไปแล้ว</p>
+            <p className="mb-4 text-sm text-[#64748b]">ค้นหาข้อมูลที่ค้างอยู่ทั้งที่ข้อมูลหลักถูกลบไปแล้ว</p>
             <ul className="divide-y divide-[#eef1f7]">
               {data.integrity.map((c) => (
                 <li key={c.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
