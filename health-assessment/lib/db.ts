@@ -23,7 +23,8 @@ const pool =
   global.postgresPool ??
   new Pool({
     connectionString,
-    max: 10,
+    // Supabase session pooler รับได้รวม 15 ช่องทั้งทีม → แอปละไม่เกิน 5 ให้ 2–3 คนรันพร้อมกันได้
+    max: 5,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
   });

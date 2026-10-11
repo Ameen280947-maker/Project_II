@@ -1,7 +1,7 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { ClipboardList, ListOrdered } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import RecommendationLayout, {
   RECOMMENDATION_TONES,
@@ -73,7 +73,6 @@ function AlcoholRecommendationContent() {
   const assessmentId = searchParams.get("assessmentId");
 
   const [assessment, setAssessment] = useState<Assessment | null>(null);
-  const [answers, setAnswers] = useState<Answer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -119,7 +118,6 @@ function AlcoholRecommendationContent() {
         }
 
         setAssessment(data.assessment);
-        setAnswers(data.answers ?? []);
       } catch (loadError) {
         console.error("LOAD ALCOHOL RESULT ERROR:", loadError);
 
@@ -274,38 +272,6 @@ function AlcoholRecommendationContent() {
         </div>
       </RecommendationSection>
 
-      {/* =================================================
-          คะแนนรายข้อ
-      ================================================== */}
-
-      {answers.length > 0 && (
-        <RecommendationSection
-          icon={<ListOrdered size={27} className={t.eyebrow} />}
-          title="คะแนนรายข้อ"
-        >
-          <div className="space-y-3 rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
-            {answers.map((answer, index) => (
-              <div
-                key={answer.answer_id ?? index}
-                className="flex items-start gap-4 rounded-2xl bg-[#faf9f7] p-4"
-              >
-                <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm font-bold ${t.iconSoft}`}>
-                  {index + 1}
-                </span>
-
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm leading-6 text-[#5e6268]">{answer.question_text}</p>
-                  <p className="mt-1 font-semibold text-[#2f3037]">{answer.choice_text}</p>
-                </div>
-
-                <span className={`shrink-0 text-sm font-bold ${t.eyebrow}`}>
-                  {Number(answer.answer_score)} คะแนน
-                </span>
-              </div>
-            ))}
-          </div>
-        </RecommendationSection>
-      )}
     </RecommendationLayout>
   );
 }
