@@ -30,21 +30,15 @@ type Backup = {
 };
 
 export default function AdminBackupPage() {
-  const [tables, setTables] = useState<string[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [history, setHistory] = useState<Backup[]>([]);
-  const [note, setNote] = useState("");
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
   const load = useCallback(async () => {
-    const res = await adminFetch<{ tables: string[]; history: Backup[] }>("/api/admin/backup");
-    if (res.success) {
-      setTables(res.tables);
-      setHistory(res.history);
-      setSelected((prev) => (prev.size ? prev : new Set(res.tables)));
-    } else setNotice({ kind: "error", text: res.message ?? "โหลดไม่สำเร็จ" });
+    const res = await adminFetch<{ history: Backup[] }>("/api/admin/backup");
+    if (res.success) setHistory(res.history);
+    else setNotice({ kind: "error", text: res.message ?? "โหลดไม่สำเร็จ" });
     setLoading(false);
   }, []);
 
@@ -52,24 +46,13 @@ export default function AdminBackupPage() {
     load();
   }, [load]);
 
-  const toggle = (t: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(t)) next.delete(t);
-      else next.add(t);
-      return next;
-    });
-
-  const allSelected = selected.size === tables.length && tables.length > 0;
-
   const runBackup = async () => {
     setRunning(true);
     setNotice(null);
     try {
       const response = await fetch("/api/admin/backup", {
         method: "POST",
-        headers: adminHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ tables: allSelected ? [] : [...selected], note }),
+        headers: adminHeaders(),
       });
 
       if (!response.ok) {
@@ -87,7 +70,6 @@ export default function AdminBackupPage() {
       URL.revokeObjectURL(url);
 
       setNotice({ kind: "success", text: `สำรองข้อมูลเรียบร้อย ดาวน์โหลดไฟล์ ${fileName} แล้ว` });
-      setNote("");
     } catch (error) {
       setNotice({ kind: "error", text: error instanceof Error ? error.message : "สำรองข้อมูลไม่สำเร็จ" });
     } finally {
@@ -111,50 +93,19 @@ export default function AdminBackupPage() {
         <div className="grid gap-6 lg:grid-cols-5">
           {/* สร้าง backup */}
           <Card className="lg:col-span-2">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold">เลือกตารางที่ต้องการสำรอง</h2>
-              <button
-                onClick={() => setSelected(allSelected ? new Set() : new Set(tables))}
-                className="text-sm font-semibold text-[#1e3a8a] hover:underline"
-              >
-                {allSelected ? "ไม่เลือกทั้งหมด" : "เลือกทั้งหมด"}
-              </button>
-            </div>
+            <h2 className="text-lg font-bold">สำรองข้อมูลทั้งหมด</h2>
+            <p className="mt-1 text-sm text-[#64748b]">
+              ดาวน์โหลดข้อมูลทุกตารางเป็นไฟล์ JSON (ไม่รวมรหัสผ่านของผู้ใช้)
+            </p>
 
-            <div className="max-h-72 space-y-1 overflow-y-auto rounded-2xl border border-[#eef1f7] p-2">
-              {tables.map((t) => (
-                <label key={t} className="flex cursor-pointer items-center gap-3 rounded-xl px-3 py-2 hover:bg-[#f5f7fb]">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(t)}
-                    onChange={() => toggle(t)}
-                    className="h-4 w-4 accent-[#1e3a8a]"
-                  />
-                  <span className="font-mono text-sm">{t}</span>
-                </label>
-              ))}
-            </div>
-
-            <input
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              placeholder="หมายเหตุ (ไม่บังคับ) เช่น ก่อนอัปเดตระบบ"
-              className="mt-4 w-full rounded-2xl border border-[#e3e8f2] px-4 py-3 text-sm outline-none focus:border-[#1e3a8a]"
-            />
-
-            <PrimaryButton
-              className="mt-4 w-full py-4"
-              loading={running}
-              disabled={selected.size === 0}
-              onClick={runBackup}
-            >
+            <PrimaryButton className="mt-5 w-full py-4" loading={running} onClick={runBackup}>
               {!running && <Download size={18} />}
-              {running ? "กำลังสำรองข้อมูล..." : `สำรองข้อมูล (${selected.size} ตาราง)`}
+              {running ? "กำลังสำรองข้อมูล..." : "สำรองข้อมูล"}
             </PrimaryButton>
 
             <div className="mt-4 flex gap-2 rounded-2xl bg-[#fef5e2] p-3 text-xs text-[#92400e]">
               <ShieldAlert size={16} className="shrink-0" />
-              ไฟล์สำรองมีข้อมูลส่วนตัวและรหัสผ่านที่เข้ารหัสของผู้ใช้ ควรเก็บในที่ปลอดภัย
+              ไฟล์สำรองมีข้อมูลส่วนตัวและข้อมูลสุขภาพของผู้ใช้ ควรเก็บในที่ปลอดภัย
             </div>
           </Card>
 

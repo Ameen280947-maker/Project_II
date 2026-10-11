@@ -15,32 +15,35 @@ export const dynamic = "force-dynamic";
    สำรองข้อมูล (JSON)
 
    GET  /api/admin/backup
-        → รายชื่อตาราง + ประวัติการสำรอง 50 ครั้งล่าสุด
+        → ประวัติการสำรอง 50 ครั้งล่าสุด
 
-   POST /api/admin/backup   { tables?: string[], note?: string }
-        → ส่งไฟล์ JSON กลับไปให้ดาวน์โหลด และบันทึกลง backup_history
-          (ไม่ส่ง tables = สำรองทุกตาราง)
+   POST /api/admin/backup
+        → สำรองทุกตาราง ส่งไฟล์ JSON กลับไปให้ดาวน์โหลด และบันทึกลง backup_history
+          ไม่รวมข้อมูลลับ (รหัสผ่านที่เข้ารหัส, token รีเซ็ตรหัสผ่าน)
 ========================================================= */
+
+// ตารางที่ไม่สำรอง และคอลัมน์ที่ตัดออกจากไฟล์
+const SKIP_TABLES = new Set(["password_reset_tokens"]);
+const SECRET_COLUMNS: Record<string, string[]> = {
+  users: ["password_hash"],
+};
 
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
 
-    const [tables, historyRes] = await Promise.all([
-      listPublicTables(),
-      pool.query(
-        `
-        SELECT b.*, u.username AS created_by_name
-        FROM backup_history b
-        LEFT JOIN users u ON u.user_id = b.created_by
-        ORDER BY b.created_at DESC
-        LIMIT 50
-        `,
-      ),
-    ]);
+    const historyRes = await pool.query(
+      `
+      SELECT b.*, u.username AS created_by_name
+      FROM backup_history b
+      LEFT JOIN users u ON u.user_id = b.created_by
+      ORDER BY b.created_at DESC
+      LIMIT 50
+      `,
+    );
 
-    return NextResponse.json({ success: true, tables, history: historyRes.rows });
+    return NextResponse.json({ success: true, history: historyRes.rows });
   } catch (error) {
     console.error("ADMIN BACKUP GET ERROR:", error);
     return serverError("โหลดประวัติการสำรองข้อมูลไม่สำเร็จ", error);
@@ -55,23 +58,7 @@ export async function POST(request: NextRequest) {
   if (!auth) return serverError("ตรวจสิทธิ์ไม่สำเร็จ", "auth failed");
   if (!auth.ok) return auth.response;
 
-  const body = (await request.json().catch(() => ({}))) as {
-    tables?: string[];
-    note?: string;
-  };
-
-  const allTables = await listPublicTables();
-  const selected =
-    Array.isArray(body.tables) && body.tables.length > 0
-      ? body.tables.filter((t) => allTables.includes(t))
-      : allTables;
-
-  if (selected.length === 0) {
-    return NextResponse.json(
-      { success: false, message: "กรุณาเลือกตารางที่ต้องการสำรอง" },
-      { status: 400 },
-    );
-  }
+  const selected = (await listPublicTables()).filter((t) => !SKIP_TABLES.has(t));
 
   // ชื่อไฟล์ใช้เวลาไทย ให้ตรงกับเวลาที่แสดงในประวัติ
   const stamp = new Date(Date.now() + 7 * 60 * 60 * 1000)
@@ -79,7 +66,7 @@ export async function POST(request: NextRequest) {
     .replace(/[:.]/g, "-")
     .slice(0, 19);
   const fileName = `health-backup-${stamp}.json`;
-  const note = String(body.note ?? "").trim().slice(0, 500) || null;
+  const note = null;
 
   // ใช้ REPEATABLE READ ให้ทุกตารางเป็นภาพเดียวกัน ณ เวลาเดียว
   const client = await pool.connect();
@@ -92,7 +79,14 @@ export async function POST(request: NextRequest) {
 
     for (const table of selected) {
       const r = await client.query(`SELECT * FROM ${quoteIdent(table)}`);
-      data[table] = r.rows;
+      const secrets = SECRET_COLUMNS[table] ?? [];
+      data[table] = secrets.length
+        ? r.rows.map((row) => {
+            const copy = { ...row };
+            for (const col of secrets) delete copy[col];
+            return copy;
+          })
+        : r.rows;
       rowCounts[table] = r.rows.length;
       totalRows += r.rows.length;
     }

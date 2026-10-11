@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Bug, CheckCircle2, EyeOff, Plus, RotateCcw, Search, Trash2, X } from "lucide-react";
+import { Bug, CheckCircle2, EyeOff, RotateCcw, Search, Trash2, X } from "lucide-react";
 import {
   Card,
   GhostButton,
@@ -54,10 +54,6 @@ export default function AdminErrorsPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [resolving, setResolving] = useState<Log | null>(null);
   const [note, setNote] = useState("");
-  const [showNew, setShowNew] = useState(false);
-  const [form, setForm] = useState({ source: "", message: "", level: "error" });
-  const [formError, setFormError] = useState("");
-  const [triedSubmit, setTriedSubmit] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,30 +84,6 @@ export default function AdminErrorsPage() {
     load();
   };
 
-  const openNew = () => {
-    setForm({ source: "", message: "", level: "error" });
-    setFormError("");
-    setTriedSubmit(false);
-    setShowNew(true);
-  };
-
-  const createLog = async () => {
-    // ตรวจในหน้าก่อน ข้อความผิดพลาดแสดงในหน้าต่างเอง (ไม่ใช่หลังฉากมืด)
-    setTriedSubmit(true);
-    if (!form.source.trim() || !form.message.trim()) {
-      setFormError("กรุณากรอกตำแหน่งที่พบและรายละเอียดปัญหา");
-      return;
-    }
-    const res = await adminFetch("/api/admin/errors", { method: "POST", json: form });
-    if (!res.success) {
-      setFormError(res.message ?? "บันทึกไม่สำเร็จ");
-      return;
-    }
-    setNotice({ kind: "success", text: res.message ?? "บันทึกแล้ว" });
-    setShowNew(false);
-    load();
-  };
-
   const clearClosed = async () => {
     if (!window.confirm("ลบรายการที่ 'แก้ไขแล้ว' และ 'ข้ามไป' ทั้งหมด?")) return;
     const res = await adminFetch("/api/admin/errors", { method: "DELETE" });
@@ -126,14 +98,9 @@ export default function AdminErrorsPage() {
         title="แก้ไขข้อผิดพลาด"
         subtitle="ติดตามข้อผิดพลาดที่ระบบบันทึกไว้ และบันทึกวิธีแก้ไข"
         action={
-          <div className="flex gap-2">
-            <GhostButton onClick={clearClosed}>
-              <Trash2 size={16} /> ล้างที่ปิดแล้ว
-            </GhostButton>
-            <PrimaryButton onClick={openNew}>
-              <Plus size={16} /> บันทึกปัญหา
-            </PrimaryButton>
-          </div>
+          <GhostButton onClick={clearClosed}>
+            <Trash2 size={16} /> ล้างที่ปิดแล้ว
+          </GhostButton>
         }
       />
 
@@ -242,57 +209,6 @@ export default function AdminErrorsPage() {
         </Modal>
       )}
 
-      {/* ---------- MODAL: บันทึกปัญหาใหม่ ---------- */}
-      {showNew && (
-        <Modal title="บันทึกปัญหาที่พบ" onClose={() => setShowNew(false)}>
-          <div className="space-y-3">
-            {formError && (
-              <p role="alert" className="rounded-2xl bg-[#fdecec] px-4 py-3 text-sm font-semibold text-[#b91c1c]">
-                {formError}
-              </p>
-            )}
-            <label className="block text-sm font-semibold text-[#334155]">
-              ตำแหน่งที่พบ <span className="text-[#b91c1c]">*</span>
-              <input
-                autoFocus
-                value={form.source}
-                onChange={(e) => setForm({ ...form, source: e.target.value })}
-                placeholder="ตำแหน่งที่พบ เช่น หน้า Dashboard"
-                aria-invalid={triedSubmit && !form.source.trim()}
-                className={`mt-1.5 w-full rounded-2xl border px-4 py-3 text-sm font-normal outline-none focus:border-[#1e3a8a] ${
-                  triedSubmit && !form.source.trim() ? "border-[#ef4444]" : "border-[#e3e8f2]"
-                }`}
-              />
-            </label>
-            <label className="block text-sm font-semibold text-[#334155]">
-              รายละเอียดปัญหา <span className="text-[#b91c1c]">*</span>
-              <textarea
-                value={form.message}
-                onChange={(e) => setForm({ ...form, message: e.target.value })}
-                rows={4}
-                placeholder="รายละเอียดปัญหา"
-                aria-invalid={triedSubmit && !form.message.trim()}
-                className={`mt-1.5 w-full rounded-2xl border p-3 text-sm font-normal outline-none focus:border-[#1e3a8a] ${
-                  triedSubmit && !form.message.trim() ? "border-[#ef4444]" : "border-[#e3e8f2]"
-                }`}
-              />
-            </label>
-            <select
-              value={form.level}
-              onChange={(e) => setForm({ ...form, level: e.target.value })}
-              className="w-full rounded-2xl border border-[#e3e8f2] px-4 py-3 text-sm outline-none focus:border-[#1e3a8a]"
-            >
-              <option value="error">Error — ใช้งานไม่ได้</option>
-              <option value="warning">Warning — ใช้งานได้แต่ผิดปกติ</option>
-              <option value="info">Info — ข้อสังเกต</option>
-            </select>
-          </div>
-          <div className="mt-4 flex justify-end gap-2">
-            <GhostButton onClick={() => setShowNew(false)}>ยกเลิก</GhostButton>
-            <PrimaryButton onClick={createLog}>บันทึก</PrimaryButton>
-          </div>
-        </Modal>
-      )}
     </>
   );
 }

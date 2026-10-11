@@ -7,7 +7,6 @@ import {
   ClipboardCheck,
   HardDriveDownload,
   RefreshCw,
-  Server,
   UsersRound,
 } from "lucide-react";
 import {
@@ -37,24 +36,12 @@ type SystemData = {
     openErrors: number;
     lastBackup: string | null;
   };
-  server: Record<string, string>;
 };
 
 const ROLE_LABEL: Record<string, string> = {
   user: "ผู้ทำแบบประเมิน",
   staff: "Staff",
   system_admin: "System Admin",
-};
-
-const SERVER_LABEL: Record<string, string> = {
-  dbName: "ฐานข้อมูล",
-  dbVersion: "เวอร์ชัน PostgreSQL",
-  dbSize: "ขนาดฐานข้อมูล",
-  dbUptime: "ฐานข้อมูลทำงานมาแล้ว",
-  nodeVersion: "Node.js",
-  serverUptime: "เซิร์ฟเวอร์ทำงานมาแล้ว",
-  platform: "แพลตฟอร์ม",
-  rss: "หน่วยความจำที่ใช้",
 };
 
 export default function AdminSystemPage() {
@@ -86,7 +73,7 @@ export default function AdminSystemPage() {
       <PageHeader
         icon={<Activity size={28} />}
         title="ตรวจสอบระบบ"
-        subtitle="สถานะการทำงานของเซิร์ฟเวอร์ ฐานข้อมูล และภาพรวมการใช้งาน"
+        subtitle="สถานะการทำงานของระบบ และภาพรวมการใช้งาน"
         action={
           <PrimaryButton onClick={load} loading={loading}>
             {!loading && <RefreshCw size={16} />} ตรวจสอบอีกครั้ง
@@ -172,21 +159,6 @@ export default function AdminSystemPage() {
                     );
                   })}
                 </div>
-              </Card>
-
-              {/* ข้อมูลเซิร์ฟเวอร์ */}
-              <Card>
-                <h2 className="mb-4 flex items-center gap-2 text-lg font-bold">
-                  <Server size={18} className="text-[#1e3a8a]" /> ข้อมูลเซิร์ฟเวอร์
-                </h2>
-                <dl className="space-y-2 text-sm">
-                  {Object.entries(data.server).map(([k, v]) => (
-                    <div key={k} className="flex justify-between gap-3">
-                      <dt className="shrink-0 text-[#64748b]">{SERVER_LABEL[k] ?? k}</dt>
-                      <dd className="min-w-0 truncate text-right font-medium" title={String(v)}>{v}</dd>
-                    </div>
-                  ))}
-                </dl>
               </Card>
             </div>
           </div>
