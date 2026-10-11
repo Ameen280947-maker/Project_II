@@ -14,11 +14,8 @@ export async function POST(request: NextRequest) {
     const username = String(body.username || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
-    // ความยินยอม 3 ข้อ ตรงกับหน้าการตั้งค่า
-    // ข้อมูลสุขภาพจำเป็นต้องยินยอม ส่วนเจ้าหน้าที่/การศึกษาไม่บังคับ (ค่าเริ่มต้นไม่ยินยอม)
+    // ความยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ (จำเป็น) ตรงกับหน้าการตั้งค่า
     const consentHealth = body.consentHealth === true;
-    const consentStaff = body.consentStaff === true;
-    const consentResearch = body.consentResearch === true;
 
     // ตรวจสอบข้อมูล
     if (!username || !email || !password) {
@@ -139,21 +136,15 @@ export async function POST(request: NextRequest) {
         `
         INSERT INTO user_settings (
           user_id,
-          consent_health, consent_health_at,
-          consent_staff, consent_staff_at,
-          consent_research, consent_research_at
+          consent_health, consent_health_at
         )
-        VALUES ($1, $2, NOW(), $3, NOW(), $4, NOW())
+        VALUES ($1, $2, NOW())
         ON CONFLICT (user_id) DO UPDATE
           SET consent_health = EXCLUDED.consent_health,
               consent_health_at = EXCLUDED.consent_health_at,
-              consent_staff = EXCLUDED.consent_staff,
-              consent_staff_at = EXCLUDED.consent_staff_at,
-              consent_research = EXCLUDED.consent_research,
-              consent_research_at = EXCLUDED.consent_research_at,
               updated_at = NOW()
         `,
-        [result.rows[0].user_id, consentHealth, consentStaff, consentResearch]
+        [result.rows[0].user_id, consentHealth]
       );
 
       await client.query("COMMIT");

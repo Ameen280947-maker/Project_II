@@ -10,6 +10,7 @@ import {
 import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfAssessmentClosed } from "../_lib/assessmentStatus";
 import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
+import { markAssessmentSaved } from "../_lib/assessmentVersion";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -570,6 +571,9 @@ export async function POST(request: NextRequest) {
     }
 
     await client.query("COMMIT");
+
+    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
+    await markAssessmentSaved(client, { userId, typeId: ASSESSMENT_TYPE_ID, assessmentId: newAssessmentId });
 
     return NextResponse.json({
       success: true,
