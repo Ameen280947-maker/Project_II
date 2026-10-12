@@ -24,6 +24,7 @@ type AdminCheck =
   | { ok: true; admin: AdminUser }
   | { ok: false; response: NextResponse };
 
+// ตรวจ session ของแอดมินและ role ในฐานข้อมูล ผ่านแล้วคืนข้อมูลแอดมิน ไม่ผ่านคืน response 401/403
 export async function requireAdmin(request: NextRequest): Promise<AdminCheck> {
   const session = getSession(request, "admin");
   const userId = session?.userId ?? 0;

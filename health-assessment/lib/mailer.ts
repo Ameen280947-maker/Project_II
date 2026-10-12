@@ -11,12 +11,14 @@ import nodemailer from "nodemailer";
 
 export const OTP_VALID_MINUTES = 10;
 
+// เช็คว่าตั้งค่า GMAIL_USER และ GMAIL_APP_PASSWORD ไว้ครบหรือยัง
 export function isMailerConfigured() {
   return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 }
 
 let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 
+// สร้างตัวส่งอีเมล Gmail ครั้งแรกแล้วเก็บไว้ใช้ซ้ำ
 function getTransporter() {
   if (!transporter) {
     transporter = nodemailer.createTransport({

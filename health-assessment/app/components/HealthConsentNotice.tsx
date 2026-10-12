@@ -10,6 +10,7 @@ import { ShieldOff } from "lucide-react";
    ให้เลือกไปเปิดความยินยอม หรือกลับไปหน้าแบบประเมิน
 ========================================================= */
 
+// ตรวจว่าผู้ใช้ถอนความยินยอมข้อมูลสุขภาพหรือไม่ ถ้าถอนแล้วจะแสดงหน้าต่างแจ้งเตือนทับหน้า
 export default function HealthConsentNotice() {
   const [withdrawn, setWithdrawn] = useState(false);
 

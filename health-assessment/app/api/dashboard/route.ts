@@ -11,6 +11,7 @@ const TYPE_9Q = 14;
    GET DASHBOARD
 ========================================================= */
 
+// GET: สรุปข้อมูลแดชบอร์ดจากผลการประเมินของผู้ใช้ที่ล็อกอินอยู่
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);

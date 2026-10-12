@@ -58,6 +58,7 @@ async function authorize(request: NextRequest, claimedUserId?: unknown) {
    GET
    ========================================================= */
 
+// GET: ส่ง assessmentId = คืนผล 2Q/9Q พร้อมคำแนะนำ, ไม่ส่ง = คืนคำถามตาม stage
 export async function GET(request: NextRequest) {
   const rawStage = request.nextUrl.searchParams.get("stage");
   const assessmentIdParam = request.nextUrl.searchParams.get("assessmentId");
@@ -290,6 +291,7 @@ export async function GET(request: NextRequest) {
    POST
    ========================================================= */
 
+// POST: บันทึกคำตอบ 2Q หรือ 9Q (ตาม stage) พร้อมคิดคะแนนและระดับความเสี่ยง
 export async function POST(request: NextRequest) {
   const body = await readJsonObject(request);
   if (!body) return fail("รูปแบบข้อมูลไม่ถูกต้อง");

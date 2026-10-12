@@ -46,6 +46,7 @@ function getRiskColor(score: number): RiskColor {
     return "red";
 }
 
+// หน้าผลและคำแนะนำการนอนหลับ: อ่าน recordId จาก URL แล้วโหลดผลมาแสดง
 export default function RecommendationSleepPage() {
     const router = useRouter();
 
@@ -86,6 +87,7 @@ export default function RecommendationSleepPage() {
             return;
         }
 
+        // โหลดผลประเมินการนอนตาม recordId จาก API
         async function loadResult() {
             try {
                 setLoading(true);

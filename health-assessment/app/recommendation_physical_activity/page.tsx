@@ -68,6 +68,7 @@ const BADGE: Record<RiskColor, string> = {
    MAIN CONTENT
 ========================================================= */
 
+// เนื้อหาหน้าผลกิจกรรมทางกาย: โหลดผลตาม assessmentId แล้วแสดงระดับและคำแนะนำ
 function PhysicalActivityResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -86,6 +87,7 @@ function PhysicalActivityResultContent() {
   ========================================================= */
 
   useEffect(() => {
+    // ตรวจ assessmentId แล้วโหลดผลประเมินกิจกรรมทางกายของผู้ใช้จาก API
     const loadResult = async () => {
       try {
         setLoading(true);
@@ -282,6 +284,7 @@ function PhysicalActivityResultContent() {
    SUSPENSE
 ========================================================= */
 
+// หน้าผลและคำแนะนำกิจกรรมทางกาย: ครอบเนื้อหาด้วย Suspense
 export default function PhysicalActivityRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>

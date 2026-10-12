@@ -99,6 +99,7 @@ const fromKeywords = (v: string): Level => {
   return "unknown";
 };
 
+// แปลงระดับผลประเมินเป็น ok / mid / high ตามตารางของแต่ละแบบประเมิน (ไม่พบจึงเดาจากคำในข้อความ)
 export const riskLevelOf = (
   assessmentName?: string | null,
   riskLevel?: string | null
@@ -160,6 +161,7 @@ const LEVEL_TO_DOC: Record<Level, DocColor> = {
   unknown: "unknown",
 };
 
+// หาสีตามเอกสารกรมควบคุมโรค (เขียว/เหลือง/ส้ม/แดง) ของระดับผล ไม่อยู่ในตารางใช้สีจาก riskLevelOf
 export const docColorOf = (
   assessmentName?: string | null,
   riskLevel?: string | null

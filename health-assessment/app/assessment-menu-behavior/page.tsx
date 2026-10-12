@@ -98,6 +98,7 @@ const behaviorAssessments: BehaviorAssessment[] = [
    PAGE
 ========================================================= */
 
+// หน้าเมนูแบบประเมินความเสี่ยงด้านพฤติกรรม แสดงการ์ดลิงก์ไปแต่ละแบบประเมิน
 export default function BehaviorAssessmentPage() {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">

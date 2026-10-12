@@ -11,6 +11,7 @@ import type { Pool, PoolClient } from "pg";
 
 type Db = Pool | PoolClient;
 
+// สร้าง response JSON แจ้งข้อผิดพลาด (ค่าเริ่มต้น status 400)
 export function badRequest(message: string, status = 400) {
   return NextResponse.json({ success: false, message }, { status });
 }
@@ -62,6 +63,7 @@ export function toId(value: unknown): number | null {
 
 /* ---------- ผู้ใช้ ---------- */
 
+// ตรวจว่ามีผู้ใช้ id นี้อยู่ในฐานข้อมูลหรือไม่
 export async function userExists(db: Db, userId: number) {
   const result = await db.query("SELECT 1 FROM users WHERE user_id = $1 LIMIT 1", [userId]);
   return (result.rowCount ?? 0) > 0;

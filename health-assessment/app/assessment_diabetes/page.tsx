@@ -88,6 +88,7 @@ type AssessmentResponse = {
    PAGE
 ========================================================= */
 
+// หน้าแบบประเมินความเสี่ยงเบาหวานใน 12 ปี: ใช้ข้อมูลสุขภาพจากโปรไฟล์ร่วมกับคำตอบเพิ่มเติม
 export default function AssessmentDiabetesPage() {
   const router = useRouter();
 
@@ -159,6 +160,7 @@ export default function AssessmentDiabetesPage() {
   ========================================================= */
 
   useEffect(() => {
+    // โหลดข้อมูลสุขภาพของผู้ใช้จากโปรไฟล์ (ไม่มี userId ให้ไปหน้า login)
     const loadProfile = async () => {
       try {
         setLoadingProfile(true);
@@ -361,6 +363,7 @@ export default function AssessmentDiabetesPage() {
      START / CANCEL EDITING
   ========================================================= */
 
+  // เปิดโหมดแก้ไข โดยคัดลอกข้อมูลโปรไฟล์ปัจจุบันลงแบบร่าง
   const startEditingProfile = () => {
     if (!profile) {
       return;
@@ -380,6 +383,7 @@ export default function AssessmentDiabetesPage() {
     setIsEditingProfile(true);
   };
 
+  // ยกเลิกโหมดแก้ไขข้อมูลสุขภาพ
   const cancelEditingProfile = () => {
     setIsEditingProfile(false);
     setError("");
@@ -391,6 +395,7 @@ export default function AssessmentDiabetesPage() {
      PUT /api/profile (ช่วงค่าเดียวกับหน้า CVD และหน้าข้อมูลสุขภาพ)
   ========================================================= */
 
+  // ตรวจช่วงค่าข้อมูลสุขภาพในแบบร่าง แล้วบันทึกลงโปรไฟล์ผ่าน PUT /api/profile
   const saveProfile = async () => {
     try {
       setSavingProfile(true);
@@ -560,6 +565,7 @@ export default function AssessmentDiabetesPage() {
      SUBMIT
   ========================================================= */
 
+  // ตรวจเงื่อนไขก่อนประเมิน แล้ว POST ไปคำนวณความเสี่ยงเบาหวาน และพาไปหน้าคำแนะนำ
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
@@ -1249,6 +1255,7 @@ export default function AssessmentDiabetesPage() {
    INFO ROW
 ========================================================= */
 
+// แถวแสดงข้อมูลสุขภาพแบบอ่านอย่างเดียว (ไอคอน ป้ายชื่อ ค่า)
 function InfoRow({
   icon,
   label,
@@ -1332,6 +1339,7 @@ function EditRow({
    YES / NO BUTTON
 ========================================================= */
 
+// ปุ่มตัวเลือกใช่/ไม่ใช่ เปลี่ยนสีเมื่อถูกเลือก
 function YesNoButton({
   active,
   children,

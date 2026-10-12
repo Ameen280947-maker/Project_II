@@ -38,6 +38,7 @@ const DOT: Record<Entry["kind"], string> = {
 
 const SECTIONS: Change["section"][] = ["ข้อมูลทั่วไป", "คำถามและคะแนน", "เกณฑ์ผลและคำแนะนำ"];
 
+// แท็บประวัติ: โหลดรายการเผยแพร่/เปิด-ปิดใช้งานของแบบประเมินแล้วแสดงเป็นไทม์ไลน์
 export default function HistoryTab({ typeId, refreshKey }: { typeId: number; refreshKey: string }) {
   const reqKey = `${typeId}|${refreshKey}`;
   const [result, setResult] = useState<{ key: string; entries?: Entry[]; error?: string } | null>(null);
@@ -75,6 +76,7 @@ export default function HistoryTab({ typeId, refreshKey }: { typeId: number; ref
   );
 }
 
+// การ์ดหนึ่งรายการในประวัติ: หัวข้อ วันเวลา ผู้ทำ และจุดที่เปลี่ยนแยกตามส่วน
 function EntryCard({ entry }: { entry: Entry }) {
   const changes = entry.changes ?? [];
   return (
@@ -109,6 +111,7 @@ function EntryCard({ entry }: { entry: Entry }) {
   );
 }
 
+// แถวแสดงการเปลี่ยนแปลงหนึ่งจุด (ประเภท ค่าเดิม → ค่าใหม่)
 function ChangeRow({ change }: { change: Change }) {
   const label = { add: "เพิ่ม", remove: "ลบ", change: "แก้ไข" }[change.kind];
   return (
@@ -139,6 +142,7 @@ function SnapshotViewer({ versionId }: { versionId: number }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
 
+  // เปิด/ปิดส่วนเนื้อหา และโหลด snapshot เมื่อเปิดครั้งแรก
   const toggle = () => {
     const next = !open;
     setOpen(next);

@@ -35,8 +35,10 @@ const HIDDEN_ACTIONS = ["view_user_detail", "view_follow_up_case"];
 
 type ResultRow = { user_id: number; type_id: number; name: string; risk_level: string; t: number; in_range: boolean };
 
+// คิด % (ทศนิยม 1 ตำแหน่ง) คืน null ถ้ากลุ่มเล็กกว่า MIN_GROUP
 const pctOf = (n: number, d: number) => (d >= MIN_GROUP ? Math.round((n / d) * 1000) / 10 : null);
 
+// GET: คืนข้อมูลหน้าภาพรวมระบบของ staff ตามช่วงวันที่ from–to
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -353,6 +355,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// รวมผลบวกของตัวเลขทั้งหมด
 function sum(values: Iterable<number>) {
   let s = 0;
   for (const v of values) s += v;
@@ -397,6 +400,7 @@ type LogRow = {
   rec_level: string | null;
 };
 
+// แปลง access log เป็นข้อความภาษาไทยสำหรับแสดงในฟีดกิจกรรม
 function describeLog(r: LogRow) {
   const who = r.staff ?? "เจ้าหน้าที่";
   const detail = r.detail ?? "";

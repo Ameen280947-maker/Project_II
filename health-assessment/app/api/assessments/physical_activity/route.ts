@@ -35,6 +35,7 @@ const SEDENTARY_LEVEL: Record<number, string> = {
   3: "เสี่ยงสูง",
 };
 
+// แปลงคะแนนพฤติกรรมเนือยนิ่งเป็นระดับ พร้อมดึงข้อความคำแนะนำ
 async function getSedentaryResult(
   client: { query: Pool["query"] },
   score: number | null,
@@ -74,6 +75,7 @@ async function getSedentaryResult(
    GET
 ========================================================= */
 
+// GET: ไม่ส่ง assessmentId = คืนคำถาม, ส่ง assessmentId = คืนผลประเมินกิจกรรมทางกาย
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -382,6 +384,7 @@ export async function GET(request: NextRequest) {
    POST
 ========================================================= */
 
+// POST: ตรวจคำตอบ หาระดับความเสี่ยง แล้วบันทึกผลประเมินกิจกรรมทางกาย
 export async function POST(
   request: NextRequest
 ) {

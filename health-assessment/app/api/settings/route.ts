@@ -55,6 +55,7 @@ const ALLOWED_VALUES: Partial<Record<SettingKey, string[]>> = {
   year_format: ["be", "ce"],
 };
 
+// GET: คืนการตั้งค่าของผู้ใช้ (ค่าที่ยังไม่ได้ตั้งใช้ค่าเริ่มต้น)
 export async function GET(request: NextRequest) {
   try {
     // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
@@ -75,6 +76,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// PUT: บันทึกการตั้งค่าเฉพาะฟิลด์ที่แก้ไขได้ และตรวจว่าเป็นค่าที่อนุญาต
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();

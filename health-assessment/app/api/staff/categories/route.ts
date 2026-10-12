@@ -12,8 +12,10 @@ import { CATEGORY_NAME_MAX, CATEGORY_SUBTITLE_MAX, isCategoryTheme } from "@/lib
    - การสร้างหมวดใหม่ทำพร้อมการสร้างแบบประเมิน (POST /api/staff/assessments)
 ========================================================= */
 
+// สร้าง response JSON แจ้งข้อผิดพลาด (ค่าเริ่มต้น status 400)
 const fail = (message: string, status = 400) => NextResponse.json({ success: false, message }, { status });
 
+// โหลดหมวดหมู่ที่แก้ไขได้ (ไม่พบ = 404, หมวดหลักของระบบ = error)
 async function loadEditable(categoryId: number) {
   const { rows } = await pool.query("SELECT category_id, name, is_builtin FROM assessment_categories WHERE category_id = $1", [categoryId]);
   const c = rows[0];
@@ -22,6 +24,7 @@ async function loadEditable(categoryId: number) {
   return { category: c as { category_id: number; name: string } };
 }
 
+// PATCH: แก้ชื่อ คำอธิบายสั้น และสีของหมวดหมู่
 export async function PATCH(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -62,6 +65,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+// DELETE: ลบหมวดหมู่ แล้วย้ายแบบประเมินในหมวดไปหมวด moveTo (null = ไม่มีหมวด)
 export async function DELETE(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;

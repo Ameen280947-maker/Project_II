@@ -41,6 +41,7 @@ const assessmentCards: { title: string; icon: typeof Heart; tone: CardTone; href
   },
 ];
 
+// หน้าเมนูแบบประเมินโรคไม่ติดต่อเรื้อรัง (CVD, เบาหวาน, ความดัน, น้ำหนัก)
 export default function AssessmentMenuPage() {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">

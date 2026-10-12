@@ -29,12 +29,14 @@ type Backup = {
   created_at: string;
 };
 
+// หน้าสำรองข้อมูลของแอดมิน: กดสร้างไฟล์สำรอง (ดาวน์โหลด JSON) และดูประวัติการสำรอง
 export default function AdminBackupPage() {
   const [history, setHistory] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
+  // โหลดประวัติการสำรองข้อมูลจาก API
   const load = useCallback(async () => {
     const res = await adminFetch<{ history: Backup[] }>("/api/admin/backup");
     if (res.success) setHistory(res.history);
@@ -46,6 +48,7 @@ export default function AdminBackupPage() {
     load();
   }, [load]);
 
+  // สั่งสำรองข้อมูล แล้วดาวน์โหลดไฟล์ที่ได้ลงเครื่องทันที จากนั้นโหลดประวัติใหม่
   const runBackup = async () => {
     setRunning(true);
     setNotice(null);

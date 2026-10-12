@@ -13,21 +13,26 @@ import { inputCls } from "./ui";
    - คิดจากสตริงวันที่ของวันนี้ (todayInBangkok) ไม่ใช้ toISOString กับเวลาปัจจุบัน
 ========================================================= */
 
+// คืนวันที่ของวันนี้ตามเวลาไทยในรูปแบบ YYYY-MM-DD
 export const todayInBangkok = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
 
+// เลื่อนวันที่ (YYYY-MM-DD) ไปข้างหน้า/ถอยหลังตามจำนวนวัน
 export const shiftDate = (ymd: string, days: number) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 };
 
+// แปลงวันที่ YYYY-MM-DD เป็นข้อความวันที่ภาษาไทยแบบย่อ
 export const formatThaiDate = (ymd: string) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
 };
 
+// ข้อความช่วงวันที่ภาษาไทย (ถ้าวันเดียวกันแสดงวันเดียว)
 export const rangeText = (from: string, to: string) =>
   from === to ? formatThaiDate(from) : `${formatThaiDate(from)} – ${formatThaiDate(to)}`;
 
+// เติม 0 ข้างหน้าให้เป็นเลข 2 หลัก
 const pad = (n: number) => String(n).padStart(2, "0");
 // วันสุดท้ายของเดือน m (1-12) ของปี y
 const lastDayOf = (y: number, m: number) => `${y}-${pad(m)}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
@@ -88,10 +93,12 @@ export function useDateRange() {
           : "";
 
   const range: DateRange = { from, to, invalid: error !== "", error };
+  // ตั้งวันเริ่มและวันสิ้นสุดพร้อมกัน
   const setRange = (f: string, t: string) => {
     setFrom(f);
     setTo(t);
   };
+  // รีเซ็ตกลับเป็นช่วงเริ่มต้น (เดือนที่แล้ว)
   const reset = () => setRange(initFrom, initTo);
   return { range, today, setFrom, setTo, setRange, reset };
 }

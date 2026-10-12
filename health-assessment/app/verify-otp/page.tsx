@@ -36,6 +36,7 @@ type VerifyOtpResponse = {
    CONTENT
 ========================================================= */
 
+// เนื้อหาหน้ายืนยัน OTP: รับอีเมลจาก URL ให้กรอกรหัส OTP
 function VerifyOtpContent() {
   const router =
     useRouter();
@@ -78,6 +79,7 @@ function VerifyOtpContent() {
      VERIFY OTP
   ========================================================= */
 
+  // ส่ง OTP ไปตรวจสอบ ถ้าถูกต้องได้ resetToken แล้วพาไปหน้าตั้งรหัสผ่านใหม่
   const handleSubmit =
     async (
       event: FormEvent<HTMLFormElement>,
@@ -476,6 +478,7 @@ function VerifyOtpContent() {
    useSearchParams ต้องอยู่ภายใต้ Suspense
 ========================================================= */
 
+// หน้ายืนยัน OTP ห่อด้วย Suspense (เพราะใช้ useSearchParams)
 export default function VerifyOtpPage() {
   return (
     <Suspense

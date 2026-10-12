@@ -90,6 +90,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ดึงผลประเมินของผู้ใช้ พร้อมคำแนะนำและข้อมูลระดับความเสี่ยง
 async function result(assessmentId: number, userId: number) {
   const { rows } = await pool.query(
     `SELECT a.assessment_id, a.assessment_type_id, a.total_score, a.risk_level, a.assessed_at,
@@ -124,6 +125,7 @@ async function result(assessmentId: number, userId: number) {
   });
 }
 
+// POST: บันทึกคำตอบแบบประเมินที่ staff สร้าง โดยคิดคะแนนจากฐานข้อมูล
 export async function POST(request: NextRequest) {
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");

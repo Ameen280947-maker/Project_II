@@ -28,6 +28,7 @@ const SECRET_COLUMNS: Record<string, string[]> = {
   users: ["password_hash"],
 };
 
+// GET: คืนประวัติการสำรองข้อมูล 50 รายการล่าสุด (เฉพาะแอดมิน)
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// POST: สำรองข้อมูลทุกตาราง (ตัดคอลัมน์ลับ) เป็นไฟล์ JSON ให้ดาวน์โหลด และบันทึกประวัติ
 export async function POST(request: NextRequest) {
   const auth = await requireAdmin(request).catch((error) => {
     console.error(error);

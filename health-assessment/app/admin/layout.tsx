@@ -14,6 +14,7 @@ import AdminSidebar from "./components/AdminSidebar";
    - API ทุกตัวของ admin ตรวจสิทธิ์ซ้ำอีกชั้น (lib/adminAuth.ts)
 ========================================================= */
 
+// เลย์เอาต์ของหน้า /admin/*: ตรวจสิทธิ์แอดมินจาก server ก่อนแสดงเมนูและเนื้อหา
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);

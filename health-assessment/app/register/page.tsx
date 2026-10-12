@@ -22,6 +22,7 @@ const CONSENTS = [
   { name: "consentHealth", required: true, ...CONSENT_TEXT.health },
 ];
 
+// หน้าสมัครสมาชิก: กรอกชื่อผู้ใช้ อีเมล รหัสผ่าน และยินยอมให้เก็บข้อมูลสุขภาพ
 export default function RegisterPage() {
   const router = useRouter();
 
@@ -30,6 +31,7 @@ export default function RegisterPage() {
     useState(false);
   const [error, setError] = useState("");
 
+  // ตรวจข้อมูลในฟอร์มแล้วส่งไปสมัครสมาชิก สำเร็จพาไปหน้า login
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
@@ -286,6 +288,7 @@ type InputFieldProps = {
   icon: ReactNode;
 };
 
+// ช่องกรอกข้อความพร้อมไอคอนด้านหน้า
 function InputField({
   name,
   type,
@@ -315,6 +318,7 @@ type PasswordFieldProps = {
   onToggle: () => void;
 };
 
+// ช่องกรอกรหัสผ่าน พร้อมปุ่มแสดง/ซ่อนรหัสผ่าน
 function PasswordField({
   name,
   placeholder,

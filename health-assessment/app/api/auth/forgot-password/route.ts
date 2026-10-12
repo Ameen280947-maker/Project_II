@@ -24,6 +24,7 @@ type ForgotPasswordBody = {
    HELPER
 ========================================================= */
 
+// สุ่มรหัส OTP ตัวเลข 6 หลัก
 function generateOtp() {
   return crypto.randomInt(100000, 1000000).toString();
 }
@@ -32,6 +33,7 @@ function generateOtp() {
    POST /api/auth/forgot-password
 ========================================================= */
 
+// POST: สร้าง OTP รีเซ็ตรหัสผ่าน บันทึกลงฐานข้อมูล แล้วส่งไปที่อีเมลผู้ใช้
 export async function POST(request: NextRequest) {
   /*
     ต้องตั้งค่า Gmail ก่อนเสมอ (OTP ส่งทางอีเมลเท่านั้น ไม่แสดงใน Terminal)

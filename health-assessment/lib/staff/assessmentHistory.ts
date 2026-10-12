@@ -15,8 +15,11 @@ export type Change = {
   after?: string;
 };
 
+// แปลงค่าเป็นข้อความตัดช่องว่าง (null/undefined = "")
 const clean = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
+// ข้อความสำหรับแสดงผล ถ้าว่างใช้คำแทน เช่น "(ว่าง)"
 const shown = (v: unknown, empty = "(ว่าง)") => clean(v) || empty;
+// ข้อความช่วงคะแนนของระดับผล เช่น "0–4" (ไม่มีช่วง = "คำนวณในระบบ")
 const range = (l: SnapLevel) => (l.min === null && l.max === null ? "คำนวณในระบบ" : `${l.min ?? "–"}–${l.max ?? "–"}`);
 
 // จับคู่รายการเก่า/ใหม่: id ก่อน แล้วค่อยใช้ key สำรอง
@@ -34,15 +37,18 @@ function pair<T extends { id?: number }>(prev: T[], next: T[], key: (x: T) => st
   return pairs;
 }
 
+// ถ้าค่าเดิมกับค่าใหม่ต่างกัน เพิ่มรายการ "change" ลงในผลลัพธ์
 function field(out: Change[], section: Change["section"], title: string, before: unknown, after: unknown) {
   if (clean(before) !== clean(after)) out.push({ section, kind: "change", title, before: shown(before), after: shown(after) });
 }
 
+// ข้อความสรุปคำถามพร้อมตัวเลือกและคะแนน ใช้แสดงตอนเพิ่ม/ลบคำถาม
 function questionText(q: SnapQuestion) {
   const choices = q.choices.map((c) => `${c.text} (${c.score})`).join(" / ");
   return choices ? `${q.text} — ${choices}` : q.text;
 }
 
+// เทียบ snapshot สองเวอร์ชัน คืนรายการสิ่งที่เพิ่ม/ลบ/แก้ไข แยกตามส่วนของแบบประเมิน
 export function diffSnapshots(prev: Snapshot, next: Snapshot): Change[] {
   const out: Change[] = [];
 

@@ -36,6 +36,7 @@ const DELETE_ACCOUNT_SQL = [
   `DELETE FROM users WHERE user_id = $1`,
 ];
 
+// POST: ยืนยันรหัสผ่านแล้วล้างประวัติการประเมิน (clear) หรือลบบัญชี (delete)
 export async function POST(request: NextRequest) {
   let body: { userId?: string | number; password?: string; action?: string };
   try {

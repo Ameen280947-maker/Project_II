@@ -29,6 +29,7 @@ type QuestionRow = {
    HELPERS
 ========================================================= */
 
+// คืนค่าตัวเลขตัวแรกที่หาได้จาก key ที่กำหนดใน profile (ไม่พบ = null)
 function getNumber(
   profile: Record<string, unknown>,
   keys: string[],
@@ -52,6 +53,7 @@ function getNumber(
   return null;
 }
 
+// คืนค่าข้อความตัวแรกที่ไม่ว่างจาก key ที่กำหนดใน profile (ไม่พบ = null)
 function getString(
   profile: Record<string, unknown>,
   keys: string[],
@@ -75,6 +77,7 @@ function getString(
    AGE FROM BIRTH YEAR
 ========================================================= */
 
+// คำนวณอายุจากปีเกิด (รองรับ พ.ศ.) คืน null ถ้าอายุไม่อยู่ในช่วง 0-120
 function calculateAgeFromBirthYear(
   birthYear: number,
 ): number | null {
@@ -106,6 +109,7 @@ function calculateAgeFromBirthYear(
    EXTRACT PROFILE
 ========================================================= */
 
+// ดึงอายุ เพศ ส่วนสูง น้ำหนัก รอบเอว และความดันจาก profile (รองรับชื่อ key หลายแบบ)
 function extractHealthProfile(
   profile: Record<string, unknown>,
 ) {
@@ -244,6 +248,7 @@ function extractHealthProfile(
    CALCULATE DIABETES RISK
 ========================================================= */
 
+// คำนวณ BMI และ % ความเสี่ยงเบาหวาน แล้วจัดระดับ (low/moderate/high/very_high)
 function calculateDiabetesRisk(
   age: number,
   gender: "male" | "female",
@@ -445,6 +450,7 @@ const RECOMMENDATION_LEVEL: Record<string, string> = {
    GET
 ========================================================= */
 
+// GET: คืนผลประเมินเบาหวานของผู้ใช้ตาม assessmentId (ข้อมูลสุขภาพ คำตอบ คำแนะนำ)
 export async function GET(
   request: Request,
 ) {
@@ -798,6 +804,7 @@ export async function GET(
    POST
 ========================================================= */
 
+// POST: คำนวณความเสี่ยงเบาหวานจากโปรไฟล์และคำตอบ แล้วบันทึกผลประเมิน
 export async function POST(
   request: Request,
 ) {
@@ -1165,6 +1172,7 @@ export async function POST(
        INSERT ANSWER
     ===================================================== */
 
+    // บันทึกคำตอบหนึ่งข้อ (หาคำถามจากลำดับข้อ) ลง assessment_answers
     async function insertAnswer(
       displayOrder: number,
       value: string,

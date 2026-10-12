@@ -142,6 +142,7 @@ type ProfileSnapshot = {
    PAGE
 ========================================================= */
 
+// หน้าโปรไฟล์สุขภาพ: ดู/กรอก/แก้ไขข้อมูลร่างกายและประวัติสุขภาพของผู้ใช้
 export default function ProfilePage() {
   const router =
     useRouter();
@@ -258,6 +259,7 @@ export default function ProfilePage() {
      CHECK COMPLETE
   ========================================================= */
 
+  // เช็กว่ากรอกข้อมูลสุขภาพครบทุกช่องแล้วหรือยัง
   const isComplete =
     useMemo(() => {
       return (
@@ -286,6 +288,7 @@ export default function ProfilePage() {
      CHECK VALID
   ========================================================= */
 
+  // เช็กว่าข้อมูลครบและค่าอายุ/น้ำหนัก/ส่วนสูง/รอบเอวอยู่ในช่วงที่กำหนด
   const isValid =
     useMemo(() => {
       if (!isComplete) {
@@ -355,6 +358,7 @@ export default function ProfilePage() {
   ========================================================= */
 
   useEffect(() => {
+    // โหลดข้อมูลสุขภาพจาก API มาใส่ฟอร์ม (ผู้ใช้ใหม่เปิดให้กรอกทันที) ไม่พบ userId พาไป login
     const loadProfile =
       async () => {
         try {
@@ -690,6 +694,7 @@ export default function ProfilePage() {
      START EDITING
   ========================================================= */
 
+  // เข้าโหมดแก้ไข โดยเก็บค่าเดิมไว้เผื่อกดยกเลิก
   const startEditing =
     () => {
       setError("");
@@ -720,6 +725,7 @@ export default function ProfilePage() {
      CANCEL EDITING
   ========================================================= */
 
+  // ยกเลิกการแก้ไข คืนค่าทุกช่องเป็นค่าเดิมแล้วออกจากโหมดแก้ไข
   const cancelEditing =
     () => {
       if (
@@ -771,6 +777,7 @@ export default function ProfilePage() {
      SAVE PROFILE
   ========================================================= */
 
+  // ตรวจข้อมูลแล้วบันทึกโปรไฟล์ ผู้ใช้เดิมอยู่หน้าเดิม ผู้ใช้ใหม่ไปหน้าเลือกแบบประเมิน
   const handleSubmit =
     async (
       event: FormEvent<HTMLFormElement>,
@@ -1109,6 +1116,7 @@ export default function ProfilePage() {
      และในหน้าต่างแก้ไข (ผู้ใช้เก่า)
   ========================================================= */
 
+  // สร้างช่องกรอกข้อมูลร่างกายและประวัติสุขภาพ (ล็อกไม่ให้แก้ได้ตาม disabled)
   const renderFields = (disabled: boolean) => (
     <div className="space-y-7">
       {/* ข้อมูลร่างกาย */}
@@ -1571,6 +1579,7 @@ export default function ProfilePage() {
    STAT TILE (ข้อมูลร่างกาย)
 ========================================================= */
 
+// กล่องแสดงค่าข้อมูลร่างกายหนึ่งรายการ พร้อมไอคอนและหน่วย
 function StatTile({
   icon,
   label,
@@ -1600,6 +1609,7 @@ function StatTile({
    HISTORY ROW (ประวัติสุขภาพ)
 ========================================================= */
 
+// แถวแสดงประวัติสุขภาพแบบ ใช่/ไม่ใช่ (ไม่มีข้อมูลแสดง "-")
 function HistoryRow({
   icon,
   label,
@@ -1634,6 +1644,7 @@ function HistoryRow({
    EDIT TILE (กรอกตัวเลข ในหน้าต่างแก้ไข / ฟอร์มครั้งแรก)
 ========================================================= */
 
+// ช่องกรอกตัวเลข พร้อมแจ้งเตือนเมื่อค่าอยู่นอกช่วง min–max
 function EditTile({
   icon,
   label,
@@ -1693,6 +1704,7 @@ function EditTile({
    GENDER TILE
 ========================================================= */
 
+// ปุ่มเลือกเพศ ชาย/หญิง
 function GenderTile({
   value,
   disabled,
@@ -1738,6 +1750,7 @@ function GenderTile({
    CHOICE ROW (ใช่ / ไม่ใช่ ในหน้าต่างแก้ไข / ฟอร์มครั้งแรก)
 ========================================================= */
 
+// แถวคำถามให้เลือก ใช่/ไม่ใช่
 function ChoiceRow({
   icon,
   label,

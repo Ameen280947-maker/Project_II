@@ -8,6 +8,7 @@ import type { SnapLevel, SnapQuestion } from "./shared";
    ใช้ซ้ำในหน้าดูเวอร์ชันเก่า (readOnly)
 ========================================================= */
 
+// แท็บตัวอย่าง: แสดงคำถามแบบที่ผู้ใช้เห็น ลองเลือกคำตอบเพื่อดูคะแนนรวมและผล
 export default function PreviewTab({
   label,
   description,

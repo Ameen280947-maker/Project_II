@@ -11,6 +11,7 @@ import type { Overview } from "./types";
    สีผล: ปกติ = risk-ok, ควรระวัง = risk-mid, เสี่ยงสูง = risk-high (ตามโทน staff)
 ========================================================= */
 
+// จัดรูปแบบตัวเลขแบบไทย
 const fmt = (n: number) => n.toLocaleString("th-TH");
 
 // ลายทแยงสำหรับแท่งที่ยังไม่ครบช่วง (เดือนปัจจุบัน)
@@ -18,6 +19,7 @@ const HATCH = "repeating-linear-gradient(135deg, var(--color-staff-600) 0 2px, v
 
 /* ---------- กราฟจำนวนการประเมินต่อช่วงเวลา (ช่วงนี้ vs ช่วงก่อน) ---------- */
 
+// กราฟแท่งจำนวนการประเมินช่วงนี้ พร้อมเส้นประของช่วงก่อนไว้เทียบ
 export function UsageChart({ chart }: { chart: Overview["chart"] }) {
   const max = Math.max(1, ...chart.map((c) => Math.max(c.value, c.prev ?? 0)));
   const n = chart.length;
@@ -65,6 +67,7 @@ export function UsageChart({ chart }: { chart: Overview["chart"] }) {
   );
 }
 
+// คำอธิบายกราฟการใช้งาน (ช่วงนี้/ช่วงก่อน)
 export function UsageLegend() {
   return (
     <div className="flex gap-4 text-sm text-staff-muted">
@@ -79,9 +82,11 @@ export function UsageLegend() {
 
 /* ---------- ผลการประเมินโดยรวม (แท่งซ้อนแนวนอน) ---------- */
 
+// แท่งซ้อนสัดส่วนผล ปกติ/ควรระวัง/เสี่ยงสูง (ซ่อนถ้าข้อมูลน้อยกว่าเกณฑ์)
 export function OutcomeBreakdown({ outcome, minGroup }: { outcome: Overview["outcome"]; minGroup: number }) {
   const c = outcome.counts;
   const total = c ? c.ok + c.mid + c.high : 0;
+  // คิดเป็นร้อยละของทั้งหมด (ปัดเศษ)
   const pct = (v: number) => (total ? Math.round((v / total) * 100) : 0);
   const rows = [
     { key: "ok", label: "ปกติ", color: "bg-risk-ok", v: c?.ok ?? 0 },
@@ -127,6 +132,7 @@ export function OutcomeBreakdown({ outcome, minGroup }: { outcome: Overview["out
 
 /* ---------- การ์ด "ส่วนต่าง ๆ ของระบบ" ---------- */
 
+// การ์ดสรุปแต่ละส่วนของระบบพร้อมลิงก์ไปหน้าจัดการ
 export function SystemCard({
   icon,
   title,
@@ -163,6 +169,7 @@ export function SystemCard({
   );
 }
 
+// กล่องตัวเลขสถิติขนาดเล็ก
 export function MiniStat({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) {
   return (
     <div className="min-w-0 rounded-2xl bg-staff-soft px-3 py-2.5">
@@ -175,6 +182,7 @@ export function MiniStat({ label, value, note }: { label: string; value: ReactNo
 
 /* ---------- แท่งแนวนอน (แบบประเมินยอดนิยม) ---------- */
 
+// แท่งแนวนอนตามสัดส่วนค่า (ใช้แสดงแบบประเมินยอดนิยม)
 export function HBars({ items }: { items: { key: string | number; label: string; value: number }[] }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
@@ -198,6 +206,7 @@ export function HBars({ items }: { items: { key: string | number; label: string;
 
 /* ---------- แท่งรายเดือนขนาดเล็ก (เดือนปัจจุบันเป็นลายทแยง = ยังไม่ครบเดือน) ---------- */
 
+// กราฟแท่งรายเดือนขนาดเล็ก เดือนปัจจุบันเป็นลายทแยง
 export function MonthlyBars({ months }: { months: Overview["reports"]["monthly"] }) {
   const max = Math.max(1, ...months.map((m) => m.value));
   return (
@@ -230,6 +239,7 @@ export function MonthlyBars({ months }: { months: Overview["reports"]["monthly"]
 
 /* ---------- รายการงานค้าง ---------- */
 
+// ลิงก์รายการงานค้างพร้อมจำนวนและรายละเอียด
 export function TaskItem({
   title,
   count,

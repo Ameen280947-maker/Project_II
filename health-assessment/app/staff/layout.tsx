@@ -13,6 +13,7 @@ import { clearStaffSession } from "@/lib/staff/client";
 
 const STAFF_ROLE_ID = "3";
 
+// Layout ฝั่ง staff: ตรวจ session staff ก่อนแสดงหน้า ไม่ผ่านจะส่งกลับไปหน้า login
 export default function StaffLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [allowed, setAllowed] = useState(false);

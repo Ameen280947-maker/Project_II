@@ -6,6 +6,7 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// GET: คืนประวัติการประเมินทั้งหมดของผู้ใช้ เรียงจากล่าสุด พร้อมคำแนะนำ
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);

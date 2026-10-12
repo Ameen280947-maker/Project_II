@@ -47,6 +47,7 @@ function severities(levels: ELevel[], generic: boolean): Record<string, Severity
   return Object.fromEntries(order.map((l, i) => [l.key, severityForRank(i, order.length)]));
 }
 
+// แท็บเกณฑ์ผล: เลือกระดับ แก้ช่วงคะแนน/คำแนะนำ เพิ่ม/ลบระดับ และเตือนช่วงไม่ต่อกัน
 export default function LevelsTab({
   label,
   generic,
@@ -66,6 +67,7 @@ export default function LevelsTab({
   const sev = severities(levels, generic);
   const level = levels.find((l) => l.key === selKey) ?? levels[0];
 
+  // แก้ไขข้อมูลระดับผลตาม key
   const set = (key: string, patch: Partial<ELevel>) => onChange(levels.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
   const range = possibleRange(questions);
@@ -87,6 +89,7 @@ export default function LevelsTab({
     );
   };
 
+  // เพิ่มระดับใหม่ต่อจากช่วงคะแนนสูงสุด แล้วเลือกระดับนั้น
   const addLevel = () => {
     const last = sorted[sorted.length - 1];
     const start = last?.max !== null && last?.max !== undefined ? last.max + 1 : range.min;
@@ -95,6 +98,7 @@ export default function LevelsTab({
     setSelKey(l.key);
   };
 
+  // ลบระดับผล (ถามยืนยัน) แล้วเลือกระดับแรกแทน
   const removeLevel = (key: string) => {
     if (!confirm("ลบระดับผลนี้? (มีผลเมื่อเผยแพร่)")) return;
     const next = levels.filter((l) => l.key !== key);
@@ -193,8 +197,10 @@ export default function LevelsTab({
    ฟอร์มของระดับที่เลือก + ตัวอย่างหน้าผลที่ผู้ใช้เห็น
 ========================================================= */
 
+// แปลงข้อความเป็นจำนวนเต็ม ถ้าว่างคืน null
 const numOrNull = (v: string) => (v.trim() === "" ? null : Math.trunc(Number(v)));
 
+// ฟอร์มแก้ไขระดับที่เลือก: ชื่อ ช่วงคะแนน คำแนะนำ รอบประเมินซ้ำ สายด่วน และประวัติ
 function LevelForm({
   label,
   level,
@@ -217,6 +223,7 @@ function LevelForm({
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [histError, setHistError] = useState("");
 
+  // เปิด/ซ่อนประวัติข้อความคำแนะนำของระดับนี้ (โหลดจาก API)
   const toggleHistory = () => {
     if (history) return setHistory(null);
     if (!level.id) return;
@@ -379,6 +386,7 @@ function LevelForm({
   );
 }
 
+// ตัวอย่างหน้าผลแบบมือถือที่ผู้ใช้จะเห็นสำหรับระดับนี้
 function ResultPreview({ label, level, severity }: { label: string; level: ELevel; severity: Severity }) {
   return (
     <div className="w-full 2xl:w-[300px] 2xl:shrink-0">

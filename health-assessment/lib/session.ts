@@ -48,6 +48,7 @@ type Payload = {
   exp: number;
 };
 
+// อ่าน SESSION_SECRET จาก env (ต้องยาวอย่างน้อย 32 ตัวอักษร ไม่งั้น throw)
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
@@ -56,10 +57,12 @@ function getSecret() {
   return secret;
 }
 
+// สร้างลายเซ็น HMAC-SHA256 ของข้อมูล (base64url)
 function sign(data: string) {
   return crypto.createHmac("sha256", getSecret()).update(data).digest("base64url");
 }
 
+// อ่านค่า cookie ตามชื่อจาก header ของคำขอ (ไม่พบคืน null)
 function readCookie(request: Request, name: string) {
   const header = request.headers.get("cookie") ?? "";
   for (const part of header.split(";")) {
@@ -74,6 +77,7 @@ function readCookie(request: Request, name: string) {
 
 /* ---------- ตั้ง / ลบ cookie ---------- */
 
+// สร้าง token session ที่ลงลายเซ็น (อายุ 7 วัน) แล้วตั้งเป็น cookie ตาม role ของผู้ใช้
 export function setSessionCookie(
   response: NextResponse,
   user: { userId: number; roleId: number | null }
@@ -94,6 +98,7 @@ export function setSessionCookie(
   });
 }
 
+// ลบ cookie session ของ role ที่ระบุ (ตั้งค่าว่างและหมดอายุทันที)
 export function clearSessionCookie(response: NextResponse, role: SessionRole = "user") {
   response.cookies.set(SESSION_COOKIES[role], "", {
     httpOnly: true,
@@ -106,6 +111,7 @@ export function clearSessionCookie(response: NextResponse, role: SessionRole = "
 
 /* ---------- อ่าน session ---------- */
 
+// อ่านและตรวจลายเซ็น/วันหมดอายุของ session cookie ตาม role คืน Session หรือ null
 export function getSession(request: Request, role: SessionRole = "user"): Session | null {
   const token = readCookie(request, SESSION_COOKIES[role]);
   if (!token) return null;
@@ -145,6 +151,7 @@ type RequireUserResult =
   | { ok: true; userId: number; session: Session }
   | { ok: false; response: NextResponse };
 
+// ตรวจว่ามี session ผู้ใช้ และ userId ที่ส่งมา (ถ้ามี) ตรงกับ session ไม่ผ่านคืน response 401/403
 export function requireUser(request: Request, claimedUserId?: unknown): RequireUserResult {
   const session = getSession(request);
 

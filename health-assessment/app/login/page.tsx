@@ -57,6 +57,7 @@ type ProfileCheckResponse = {
    PAGE
 ============================================================ */
 
+// หน้าเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่าน
 export default function LoginPage() {
   const router = useRouter();
 
@@ -81,6 +82,7 @@ export default function LoginPage() {
      LOGIN
   ========================================================= */
 
+  // ส่งชื่อผู้ใช้และรหัสผ่านไปล็อกอิน เก็บข้อมูลผู้ใช้ แล้วพาไปหน้าตาม role (admin/staff/user)
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
@@ -721,6 +723,7 @@ export default function LoginPage() {
    FEATURE
 ============================================================ */
 
+// กล่องแนะนำจุดเด่นของระบบ: ไอคอน หัวข้อ และคำอธิบาย
 function Feature({
   icon,
   title,

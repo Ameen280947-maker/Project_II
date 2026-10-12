@@ -24,6 +24,7 @@ type SubmitResponse = {
   message?: string;
 };
 
+// หน้าแบบประเมินภาวะน้ำหนักเกิน (BMI): กรอกน้ำหนัก/ส่วนสูง แล้วส่งไปคำนวณและบันทึกผล
 export default function WeightAssessmentPage() {
   const router = useRouter();
 
@@ -42,6 +43,7 @@ export default function WeightAssessmentPage() {
     const id = localStorage.getItem("userId");
     if (!id) return;
 
+    // ดึงน้ำหนัก/ส่วนสูงจากโปรไฟล์มาเติมในช่องกรอก (ไม่ทับค่าที่ผู้ใช้พิมพ์แล้ว)
     const loadProfile = async () => {
       try {
         const response = await fetch(`/api/profile?userId=${id}`, {
@@ -79,6 +81,7 @@ export default function WeightAssessmentPage() {
      บันทึกผลประเมิน
   ========================================================= */
 
+  // ตรวจค่าน้ำหนัก/ส่วนสูง แล้ว POST ไปบันทึกผล BMI และพาไปหน้าคำแนะนำ
   const handleStartAssessment = async () => {
     try {
       setSubmitting(true);
@@ -282,6 +285,7 @@ export default function WeightAssessmentPage() {
    Measure input (รูปแบบเดียวกับช่องกรอกความดันโลหิต)
 ========================================================= */
 
+// ช่องกรอกตัวเลขพร้อมป้ายชื่อและหน่วย (ใช้กรอกน้ำหนัก/ส่วนสูง)
 function MeasureInput({
   label,
   unit,

@@ -15,6 +15,7 @@ export const USER_ROLE_ID = 2;
 
 export type StaffUser = { userId: number; username: string };
 
+// ตรวจ session ของ staff + x-staff-id + role ในฐานข้อมูล คืน staff หรือ response error 401/403
 export async function requireStaff(
   request: NextRequest
 ): Promise<{ staff: StaffUser; error?: never } | { staff?: never; error: NextResponse }> {

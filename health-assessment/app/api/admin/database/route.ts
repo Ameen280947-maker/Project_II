@@ -33,7 +33,7 @@ const INTEGRITY_CHECKS: {
 }[] = [
   {
     key: "answers_without_assessment",
-    label: "คำตอบ (assessment_answers) ที่ไม่มีผลการประเมินแม่",
+    label: "คำตอบแบบประเมินที่ผลการประเมินถูกลบไปแล้ว",
     countSql: `SELECT COUNT(*)::int AS n FROM assessment_answers aa
                WHERE NOT EXISTS (SELECT 1 FROM assessment a WHERE a.assessment_id = aa.assessment_id)`,
     fixSql: [
@@ -43,7 +43,7 @@ const INTEGRITY_CHECKS: {
   },
   {
     key: "assessment_without_user",
-    label: "ผลการประเมิน (assessment) ที่ไม่มีผู้ใช้",
+    label: "ผลการประเมินของผู้ใช้ที่ถูกลบไปแล้ว",
     countSql: `SELECT COUNT(*)::int AS n FROM assessment a
                WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.user_id = a.user_id)`,
     fixSql: [
@@ -56,7 +56,7 @@ const INTEGRITY_CHECKS: {
   },
   {
     key: "profile_without_user",
-    label: "ข้อมูลสุขภาพ (health_profile) ที่ไม่มีผู้ใช้",
+    label: "ข้อมูลสุขภาพของผู้ใช้ที่ถูกลบไปแล้ว",
     countSql: `SELECT COUNT(*)::int AS n FROM health_profile h
                WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.user_id = h.user_id)`,
     fixSql: [
@@ -66,7 +66,7 @@ const INTEGRITY_CHECKS: {
   },
   {
     key: "users_without_role",
-    label: "ผู้ใช้ที่ไม่มีบทบาท (role) หรือ role ไม่ถูกต้อง",
+    label: "ผู้ใช้ที่ไม่ได้กำหนดสิทธิ์ (ผู้ใช้ / Staff / Admin)",
     countSql: `SELECT COUNT(*)::int AS n FROM users u
                WHERE u.role_id IS NULL
                   OR NOT EXISTS (SELECT 1 FROM roles r WHERE r.role_id = u.role_id)`,
@@ -83,6 +83,7 @@ const INTEGRITY_CHECKS: {
    GET
 ========================================================= */
 
+// GET: คืนรายการตาราง (จำนวนแถว/ขนาด) ผลตรวจข้อมูลกำพร้า และขนาดฐานข้อมูล
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -153,6 +154,7 @@ export async function GET(request: NextRequest) {
    POST
 ========================================================= */
 
+// POST: แก้ไขข้อมูลกำพร้าตามรายการตรวจที่เลือก (action = fix_integrity)
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);

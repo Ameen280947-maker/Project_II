@@ -9,6 +9,7 @@ import { CalendarClock } from "lucide-react";
    แสดงทับหน้าทำแบบประเมิน ผู้ใช้ทำต่อไม่ได้ ให้เลือกไปหน้าอื่นแทน
 ========================================================= */
 
+// ตรวจว่าแบบประเมินถูกปิดใช้งานหรือไม่ ถ้าปิดจะแสดงหน้าต่างแจ้งเตือนทับหน้าทำแบบประเมิน
 export default function AssessmentClosedNotice({ typeId }: { typeId: number }) {
   const [closed, setClosed] = useState(false);
 

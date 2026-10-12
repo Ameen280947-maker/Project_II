@@ -393,25 +393,30 @@ const RED_FLAGS = [
    HELPERS
 ========================================================= */
 
+// หาค่าตั้งค่าแผนคำแนะนำของแบบประเมินจากชื่อ (ไม่พบใช้ค่าสำรอง)
 const getConfig = (name?: string | null): TypeConfig => {
   const key = String(name || "").toLowerCase().trim();
   return TYPE_CONFIGS.find((c) => c.match.includes(key)) ?? FALLBACK_CONFIG;
 };
 
+// เช็กว่าเป็นแบบประเมินความดันโลหิตหรือไม่
 const isBloodPressure = (a: Assessment) =>
   String(a.assessment_name || "").toLowerCase().trim() === "blood pressure";
 
+// ค่าคะแนนของผลประเมิน: ความดันใช้ตัวบน แบบอื่นใช้คะแนนรวม (ไม่มีข้อมูลคืน NaN)
 const scoreOf = (a?: Assessment | null): number => {
   if (!a) return NaN;
   const raw = isBloodPressure(a) ? a.systolic : a.total_score;
   return raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
 };
 
+// แปลงคะแนนเป็นข้อความ (ทศนิยม 2 ตำแหน่ง ไม่มีค่าแสดง "-")
 const formatScore = (n: number) => {
   if (!Number.isFinite(n)) return "-";
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 };
 
+// ข้อความคะแนนที่แสดง: ความดันแสดงเป็น ตัวบน/ตัวล่าง แบบอื่นแสดงคะแนนรวม
 const displayScore = (a: Assessment) => {
   if (isBloodPressure(a)) {
     return a.systolic != null && a.diastolic != null ? `${a.systolic}/${a.diastolic}` : "-";
@@ -419,6 +424,7 @@ const displayScore = (a: Assessment) => {
   return formatScore(scoreOf(a));
 };
 
+// หาระดับความเสี่ยงจากคะแนนตามเกณฑ์ หรือจาก risk_level ที่บันทึกไว้
 const getLevel = (a: Assessment): Level => {
   // 9Q ที่ตอบข้อคิดทำร้ายตนเอง = เสี่ยงสูงเสมอ ไม่ว่าคะแนนรวมเท่าไร
   if (a.self_harm_flag) return "high";
@@ -428,6 +434,7 @@ const getLevel = (a: Assessment): Level => {
   return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
+// แปลงวันที่เป็นรูปแบบไทย เช่น 12 ต.ค. 2569 (ไม่มีวันที่แสดง "-")
 const formatDate = (date?: string | null) =>
   date ? new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }) : "-";
 
@@ -439,6 +446,7 @@ const weekKey = () => {
   return d.toISOString().slice(0, 10);
 };
 
+// ลิงก์ไปหน้าผลละเอียดของการประเมินนั้น (ไม่มีหน้าเฉพาะใช้หน้าประวัติ)
 const resultHref = (a: Assessment) => {
   const cfg = getConfig(a.assessment_name);
   return cfg.detailHref
@@ -450,6 +458,7 @@ const resultHref = (a: Assessment) => {
    PAGE
 ========================================================= */
 
+// หน้าคำแนะนำสุขภาพ: แผนดูแลตามผลที่เสี่ยง เป้าหมายรายสัปดาห์ และกำหนดประเมินซ้ำ
 export default function RecommendationHealthPage() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
@@ -465,6 +474,7 @@ export default function RecommendationHealthPage() {
 
   /* ---------- load ---------- */
   useEffect(() => {
+    // โหลดข้อมูล Dashboard + การแจ้งเตือน และเป้าหมายรายสัปดาห์ที่เก็บในเครื่อง
     const load = async () => {
       try {
         setLoading(true);
@@ -511,6 +521,7 @@ export default function RecommendationHealthPage() {
   const latest = data?.latestByType ?? [];
   const history = data?.assessments ?? [];
 
+  // รายการแบบประเมินที่ผลเสี่ยง (สูง/ระวัง) เรียงตามความรุนแรงและวันที่ล่าสุด
   const plans = useMemo(
     () =>
       latest
@@ -530,6 +541,7 @@ export default function RecommendationHealthPage() {
 
   const goods = useMemo(() => latest.filter((a) => getLevel(a) === "ok"), [latest]);
 
+  // หาผลครั้งก่อนหน้าของแบบประเมินเดียวกัน
   const previousOf = (a: Assessment) =>
     history
       .filter(
@@ -539,8 +551,10 @@ export default function RecommendationHealthPage() {
       )
       .sort((x, y) => new Date(y.assessed_at).getTime() - new Date(x.assessed_at).getTime())[0];
 
+  // หาการแจ้งเตือนประเมินซ้ำของแบบประเมินนั้น
   const notifOf = (a: Assessment) => notifs.find((n) => n.assessmentTypeId === a.assessment_type_id);
 
+  // รวมเป้าหมายรายสัปดาห์จากแผนที่เสี่ยง + หลักป้องกัน NCDs ตัดตัวซ้ำ เหลือไม่เกิน 7 ข้อ
   const weeklyGoals = useMemo(() => {
     const fromPlans = plans.flatMap((a) =>
       getConfig(a.assessment_name).weeklyGoals.map((g) => ({ label: g, from: `จากแผน: ${getConfig(a.assessment_name).thaiName || a.assessment_name}` }))
@@ -553,6 +567,7 @@ export default function RecommendationHealthPage() {
   const doneCount = weeklyGoals.filter((g) => doneGoals[g.label]).length;
   const progress = weeklyGoals.length ? Math.round((doneCount / weeklyGoals.length) * 100) : 0;
 
+  // ติ๊ก/ยกเลิกเป้าหมาย แล้วบันทึกลง localStorage ของผู้ใช้ในสัปดาห์นี้
   const toggleGoal = (label: string) => {
     const next = { ...doneGoals, [label]: !doneGoals[label] };
     setDoneGoals(next);
@@ -565,6 +580,7 @@ export default function RecommendationHealthPage() {
     }
   };
 
+  // เช็กว่าแบบประเมินอยู่ในหมวดที่เลือกกรองไว้หรือไม่
   const inFilter = (a: Assessment) => filter === "all" || getConfig(a.assessment_name).category === filter;
   const shownPlans = plans.filter(inFilter);
 
@@ -802,6 +818,7 @@ export default function RecommendationHealthPage() {
    COMPONENTS
 ========================================================= */
 
+// การ์ดตัวเลขสรุป พร้อมไอคอน ชื่อ และหน่วย
 function SummaryCard({
   icon: Icon,
   iconWrap,
@@ -830,6 +847,7 @@ function SummaryCard({
   );
 }
 
+// กล่องข้อความเมื่อไม่มีข้อมูล พร้อมปุ่มลิงก์ (ถ้ามี)
 function EmptyBox({ text, action }: { text: string; action?: { href: string; label: string } }) {
   return (
     <div className="bg-white border-2 border-dashed border-gray-200 rounded-3xl p-10 text-center">
@@ -846,6 +864,7 @@ function EmptyBox({ text, action }: { text: string; action?: { href: string; lab
   );
 }
 
+// การ์ดแผนดูแลของแบบประเมินหนึ่ง กดขยายดูขั้นตอน คะแนนเทียบครั้งก่อน และกำหนดประเมินซ้ำ
 function PlanCard({
   rank,
   assessment: a,
@@ -989,6 +1008,7 @@ function PlanCard({
   );
 }
 
+// กล่องข้อความสั้นมีเส้นสีด้านซ้าย (น้ำเงิน/แดง/เทา)
 function InfoBox({ tone, title, text }: { tone: "blue" | "red" | "gray"; title: string; text: string }) {
   const styles = {
     blue: "border-blue-400 text-blue-700",

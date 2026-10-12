@@ -10,8 +10,10 @@ import { logSystemError } from "@/lib/errorLogger";
      คำแนะนำใช้ฉบับที่ใช้อยู่ตอนทำแบบประเมิน (recommendation_at) เหมือนข้อความคำแนะนำ
 ========================================================= */
 
+// ตัดช่องว่างหัวท้าย คืน null ถ้าไม่ใช่ข้อความหรือเป็นค่าว่าง
 const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
+// GET: คืนแหล่งอ้างอิงของแบบประเมิน (typeId) หรือของผลประเมิน+คำแนะนำ (assessmentId)
 export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
   const typeId = Number(p.get("typeId"));

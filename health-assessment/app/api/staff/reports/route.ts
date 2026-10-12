@@ -52,11 +52,14 @@ type Row = {
   age: number | null;
 };
 
+// คิด % (ทศนิยม 1 ตำแหน่ง) คืน null ถ้ากลุ่มเล็กกว่า MIN_GROUP
 const pct = (n: number, d: number) => (d >= MIN_GROUP ? Math.round((n / d) * 1000) / 10 : null);
 // % เปลี่ยนแปลงของจำนวน เทียบช่วงก่อน (ช่วงก่อนเป็น 0 → เทียบไม่ได้)
 const growth = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null);
+// ผลต่างของสองค่า (หน่วย % point) คืน null ถ้าค่าใดเป็น null
 const diffPts = (a: number | null, b: number | null) => (a !== null && b !== null ? Math.round((a - b) * 10) / 10 : null);
 
+// เลื่อนวันที่ YYYY-MM-DD ไป n วัน
 const addDays = (ymd: string, days: number) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
@@ -68,6 +71,7 @@ const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).toISOStr
 // วันแรกของเดือนที่เลื่อนไป n เดือน
 const monthStart = (y: number, m: number, n: number) => new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10);
 
+// หาวันเริ่มของช่วงก่อนหน้า (ปี/ไตรมาส/เดือนเต็ม หรือช่วงยาวเท่ากันก่อนหน้าทันที)
 function previousPeriodStart(from: string, to: string, days: number) {
   const [y, m, d] = from.split("-").map(Number);
   if (d === 1) {
@@ -87,6 +91,7 @@ const bkkMidnight = (ymd: string) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return Date.UTC(y, m - 1, d) - BKK_OFFSET_MS;
 };
+// วันที่ของวันนี้ตามเวลาไทย (YYYY-MM-DD)
 const todayInBangkok = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
 
 // วันแรกของช่วงย่อยที่วันนั้นอยู่ (สัปดาห์เริ่มวันจันทร์ ตรงกับ date_trunc('week'))
@@ -99,6 +104,7 @@ function bucketStart(day: string, bucket: Bucket) {
   }
   return day;
 }
+// วันแรกของช่วงย่อยถัดไป (วัน/สัปดาห์/เดือน)
 function nextBucket(start: string, bucket: Bucket) {
   if (bucket === "month") {
     const [y, m] = start.split("-").map(Number);
@@ -106,6 +112,7 @@ function nextBucket(start: string, bucket: Bucket) {
   }
   return addDays(start, bucket === "week" ? 7 : 1);
 }
+// key ของช่วงย่อย (รายเดือนใช้ YYYY-MM นอกนั้นใช้ YYYY-MM-DD)
 const bucketKey = (start: string, bucket: Bucket) => (bucket === "month" ? start.slice(0, 7) : start);
 
 // ผลล่าสุดของแต่ละคน/แต่ละแบบ ภายในชุดข้อมูลที่ให้มา
@@ -119,6 +126,7 @@ function latestPerUserType(rows: Row[]) {
   return Array.from(m.values());
 }
 
+// ผลนี้อยู่ระดับความรุนแรงสูง (severity >= 2) หรือไม่
 const high = (r: Row) => severityOf(r.name, r.risk_level) >= 2;
 
 // % ผู้ใช้ที่ผลล่าสุด (แบบใดแบบหนึ่ง) อยู่ระดับสูง
@@ -163,6 +171,7 @@ function onTimeRate(series: Map<string, Row[]>, typeId: number | null, startMs: 
   return users.size >= MIN_GROUP ? pct(ok, due) : null;
 }
 
+// GET: คืนรายงานภาพรวมแบบไม่ระบุตัวตน กรองตามช่วงวันที่ แบบประเมิน เพศ และอายุ
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;

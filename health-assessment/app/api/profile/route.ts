@@ -39,6 +39,7 @@ type ProfileBody = {
    GET /api/profile?userId=1
 ========================================================= */
 
+// GET: คืนโปรไฟล์สุขภาพล่าสุดของผู้ใช้ (?history=1 = คืนประวัติทุกเวอร์ชัน)
 export async function GET(
   request: NextRequest,
 ) {

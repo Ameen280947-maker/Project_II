@@ -109,6 +109,7 @@ const needsFollowUp = (key: string, riskLevel: string, next: NextAssessment) => 
   return level === "high" || (!!next.fromMid && level === "mid");
 };
 
+// ปุ่มท้ายหน้าผล + ถ้าผลเข้าเกณฑ์ จะเปิด popup แนะนำแบบประเมินที่ควรทำต่อก่อนกลับเมนู
 export default function FollowUpActions({
   assessmentKey,
   riskLevel,

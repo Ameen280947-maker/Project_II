@@ -55,6 +55,7 @@ type ResultResponse = {
    PAGE WRAPPER
 ========================================================= */
 
+// หน้าผลและคำแนะนำการดื่มแอลกอฮอล์: ครอบเนื้อหาด้วย Suspense
 export default function AlcoholRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -67,6 +68,7 @@ export default function AlcoholRecommendationPage() {
    CONTENT
 ========================================================= */
 
+// เนื้อหาหน้าผลแอลกอฮอล์: โหลดผลตาม assessmentId แล้วแสดงระดับความเสี่ยงและคำแนะนำ
 function AlcoholRecommendationContent() {
   const searchParams = useSearchParams();
 
@@ -81,6 +83,7 @@ function AlcoholRecommendationContent() {
   ====================================================== */
 
   useEffect(() => {
+    // ตรวจ assessmentId แล้วโหลดผลประเมินแอลกอฮอล์จาก API
     const loadResult = async () => {
       try {
         setLoading(true);
@@ -295,6 +298,7 @@ const RISK_BOX_STYLES = {
   },
 };
 
+// กล่องแสดงช่วงคะแนนและระดับความเสี่ยง ไฮไลต์เมื่อตรงกับผลของผู้ใช้
 function RiskBox({
   range,
   title,

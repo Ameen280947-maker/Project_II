@@ -45,6 +45,7 @@ export async function getGenericLevels(typeId: number, db: Queryable = pool): Pr
   }));
 }
 
+// หาระดับผลที่ช่วงคะแนนครอบคะแนนนี้ (ไม่พบ = null)
 export const levelForScore = (levels: GenericLevel[], score: number) =>
   levels.find((l) => score >= l.min && score <= l.max) ?? null;
 

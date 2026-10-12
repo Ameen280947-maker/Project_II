@@ -26,12 +26,14 @@ type Integrity = { key: string; label: string; count: number | null; error: stri
 
 type DbData = { databaseSize: string; tables: TableInfo[]; integrity: Integrity[] };
 
+// หน้าดูแลฐานข้อมูลของแอดมิน: ดูขนาดตาราง ตรวจความถูกต้องของข้อมูล และสั่งซ่อมแซม
 export default function AdminDatabasePage() {
   const [data, setData] = useState<DbData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
+  // โหลดข้อมูลขนาดฐานข้อมูล ตาราง และผลตรวจความถูกต้องจาก API
   const load = useCallback(async () => {
     setLoading(true);
     const res = await adminFetch<DbData>("/api/admin/database");
@@ -44,6 +46,7 @@ export default function AdminDatabasePage() {
     load();
   }, [load]);
 
+  // สั่งงานบำรุงฐานข้อมูลผ่าน API (ถามยืนยันก่อนถ้ากำหนด) แล้วโหลดข้อมูลใหม่
   const run = async (key: string, json: Record<string, string>, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return;
     setBusy(key);
@@ -92,7 +95,7 @@ export default function AdminDatabasePage() {
             <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
               <ShieldCheck size={18} className="text-[#1e3a8a]" /> ตรวจความถูกต้องของข้อมูล
             </h2>
-            <p className="mb-4 text-sm text-[#64748b]">ค้นหาข้อมูลกำพร้าที่อ้างถึงข้อมูลที่ถูกลบไปแล้ว</p>
+            <p className="mb-4 text-sm text-[#64748b]">ค้นหาข้อมูลที่ค้างอยู่ทั้งที่ข้อมูลหลักถูกลบไปแล้ว</p>
             <ul className="divide-y divide-[#eef1f7]">
               {data.integrity.map((c) => (
                 <li key={c.key} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">

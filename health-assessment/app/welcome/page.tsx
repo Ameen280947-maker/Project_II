@@ -38,6 +38,7 @@ const healthItems = [
   },
 ];
 
+// หน้าต้อนรับ แนะนำระบบพร้อมปุ่มไปหน้าเข้าสู่ระบบและสมัครสมาชิก
 export default function WelcomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#fbf7f7] text-[#2f3037]">

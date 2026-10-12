@@ -55,6 +55,7 @@ const BUCKET_TEXT: Record<Bucket, { title: string; unit: string; partial: string
   day: { title: "แนวโน้มรายวัน", unit: "วัน", partial: "วันนี้ซึ่งยังไม่สิ้นสุดวัน" },
 };
 
+// จัดรูปแบบตัวเลขแบบไทย
 const num = (n: number) => n.toLocaleString("th-TH");
 
 // ▲ +12.5% / ▼ 3% / 0% · suffix เช่น "%" หรือ " จุด"
@@ -65,6 +66,7 @@ const delta = (v: number | null, suffix = "%") =>
    PAGE
 ========================================================= */
 
+// หน้ารายงานและสถิติ: เลือกช่วงเวลา/ตัวกรอง โหลดรายงาน แสดงกราฟ ตาราง และส่งออก CSV/PDF
 export default function ReportsPage() {
   const dr = useDateRange();
   const { range } = dr;
@@ -101,6 +103,7 @@ export default function ReportsPage() {
   const periodText = data ? rangeText(data.range.from, data.range.to) : rangeText(range.from, range.to);
   const prevText = data ? rangeText(data.range.prevFrom, data.range.prevTo) : "";
 
+  // ส่งออกรายงานตามตัวกรองปัจจุบันเป็นไฟล์ CSV
   const exportCsv = () => {
     if (!data) return;
     const { kpi, usage, range: r } = data;
@@ -393,6 +396,7 @@ export default function ReportsPage() {
   );
 }
 
+// ช่อง select ตัวกรองพร้อมป้ายกำกับ
 function Filter({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: ReactNode }) {
   return (
     <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-staff-muted">

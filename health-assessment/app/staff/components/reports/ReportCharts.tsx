@@ -12,6 +12,7 @@ export const C_BAR = "#2b2a28";
 export const HATCH = `repeating-linear-gradient(135deg, ${C_BAR} 0 2px, #ffffff 2px 6px)`;
 const HATCH_SOFT = "repeating-linear-gradient(135deg, #77746d 0 2px, #ffffff 2px 6px)";
 
+// จัดรูปแบบตัวเลขพร้อมหน่วย (ค่า null แสดง –)
 export const fmt = (v: number | null | undefined, suffix = "%") =>
   v === null || v === undefined ? "–" : `${v.toLocaleString("th-TH")}${suffix}`;
 
@@ -21,6 +22,7 @@ export type FunnelStep = { label: string; n: number; pct: number | null };
 
 /* ---------- แนวโน้ม: กราฟแท่งตามช่วงย่อย ---------- */
 
+// กราฟแท่งแนวโน้มตามช่วงย่อย (จำนวนครั้งหรือ % เสี่ยงสูง) ไฮไลต์แท่งที่ชี้
 export function TrendBars({ data, metric }: { data: TrendPoint[]; metric: "total" | "highPct" }) {
   const [hover, setHover] = useState<number | null>(null);
   const vals = data.map((d) => (metric === "total" ? d.total : d.highPct));
@@ -76,8 +78,10 @@ export function TrendBars({ data, metric }: { data: TrendPoint[]; metric: "total
 
 /* ---------- ความเสี่ยงสูงตามช่วงอายุ: แท่งคู่ กาย (ทึบ) / จิต (เส้นทแยง) ---------- */
 
+// กราฟแท่งคู่ % ความเสี่ยงสูง แยกกาย/จิต ตามช่วงอายุ
 export function AgeBars({ data }: { data: AgePoint[] }) {
   const max = Math.max(10, ...data.flatMap((d) => [d.physical.pct ?? 0, d.mental.pct ?? 0]));
+  // วาดแท่งเดียวพร้อมตัวเลขและ tooltip
   const bar = (v: { pct: number | null; n: number }, fill: string, kind: string, group: string) => (
     <div
       className="flex h-full w-full max-w-[44px] flex-col items-center justify-end gap-1"
@@ -115,6 +119,7 @@ export function AgeBars({ data }: { data: AgePoint[] }) {
   );
 }
 
+// คำอธิบายลวดลายแท่งกราฟ
 export function BarLegend({ fill, label }: { fill: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
@@ -126,6 +131,7 @@ export function BarLegend({ fill, label }: { fill: string; label: string }) {
 
 /* ---------- อันดับปัญหาสุขภาพ ---------- */
 
+// รายการอันดับปัญหาสุขภาพพร้อมแถบร้อยละ
 export function RankedBars({ items }: { items: { label: string; pct: number }[] }) {
   return (
     <ol className="flex flex-col gap-3.5">
@@ -149,6 +155,7 @@ export function RankedBars({ items }: { items: { label: string; pct: number }[] 
 
 /* ---------- เส้นทางผู้ใช้ (funnel) ---------- */
 
+// แสดงเส้นทางผู้ใช้ (funnel) เป็นแถบยาวตามสัดส่วนเทียบขั้นแรก
 export function Funnel({ steps }: { steps: FunnelStep[] }) {
   const base = Math.max(1, steps[0]?.n ?? 0);
   return (

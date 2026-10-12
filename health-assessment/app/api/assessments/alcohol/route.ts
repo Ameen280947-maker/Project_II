@@ -117,6 +117,7 @@ const QUESTIONS: AlcoholQuestion[] = [
    GET /api/assessments/alcohol?assessmentId=123
 ========================================================= */
 
+// GET: ไม่ส่ง assessmentId = คืนชุดคำถาม, ส่ง assessmentId = คืนผลประเมินของผู้ใช้
 export async function GET(request: NextRequest) {
   try {
     const assessmentIdParam = request.nextUrl.searchParams.get("assessmentId");
@@ -325,6 +326,7 @@ export async function GET(request: NextRequest) {
    POST /api/assessments/alcohol
 ========================================================= */
 
+// POST: ตรวจคำตอบ คิดคะแนนฝั่ง server แล้วบันทึกผลประเมินการดื่มแอลกอฮอล์
 export async function POST(request: NextRequest) {
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");

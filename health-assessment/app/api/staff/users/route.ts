@@ -58,7 +58,9 @@ const BASE = `
      WHERE u.role_id = $1
   )`;
 
+// ตรวจว่าเป็นค่าแท็บสถานะที่รองรับหรือไม่
 const isStatus = (v: string | null): v is StatusKey => !!v && Object.hasOwn(STATUS_WHERE, v);
+// ตรวจว่าเป็นค่าการเรียงลำดับที่รองรับหรือไม่
 const isSort = (v: string | null): v is SortKey => !!v && Object.hasOwn(SORTS, v);
 
 type Row = {
@@ -74,9 +76,11 @@ type Row = {
   last_seen: Date;
 };
 
+// หาสถานะบัญชี: ถูกระงับ / ไม่ได้ใช้งานเกิน 30 วัน / ใช้งานอยู่
 const statusOf = (r: Row) =>
   !r.is_active ? "suspended" : new Date(r.last_seen).getTime() < Date.now() - 30 * 86_400_000 ? "inactive" : "active";
 
+// แปลงแถวจากฐานข้อมูลเป็นข้อมูลผู้ใช้ที่ส่งให้หน้าเว็บ
 const toUser = (r: Row) => ({
   userId: r.user_id,
   username: r.username,
@@ -87,6 +91,7 @@ const toUser = (r: Row) => ({
   status: statusOf(r),
 });
 
+// GET: คืนรายชื่อผู้ใช้ตามแท็บ/คำค้น/การเรียง พร้อม KPI หรือรายละเอียดรายคน (?userId)
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -163,6 +168,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ข้อมูลบัญชีรายคน จำนวนครั้งแยกตามแบบประเมิน และประวัติการจัดการบัญชี
 async function userDetail(userId: number, staffId: number) {
   const { rows } = await pool.query<Row>(`${BASE} SELECT * FROM x WHERE x.user_id = $3`, [
     USER_ROLE_ID,
@@ -213,6 +219,7 @@ async function userDetail(userId: number, staffId: number) {
   });
 }
 
+// PATCH: ระงับ (ต้องระบุเหตุผล) หรือเปิดใช้งานบัญชีผู้ใช้ทั่วไป
 export async function PATCH(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;

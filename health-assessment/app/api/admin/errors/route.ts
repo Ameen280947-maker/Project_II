@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 
 const STATUSES = ["open", "resolved", "ignored"] as const;
 
+// GET: คืนรายการข้อผิดพลาดของระบบ กรองตามสถานะและคำค้น
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// PATCH: เปลี่ยนสถานะและบันทึกโน้ตของรายการข้อผิดพลาด
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -108,6 +110,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
+// DELETE: ลบรายการข้อผิดพลาดที่แก้แล้วหรือข้ามไปทั้งหมด
 export async function DELETE(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);

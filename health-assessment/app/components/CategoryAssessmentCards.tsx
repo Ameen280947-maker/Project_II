@@ -11,6 +11,7 @@ import { cardToneFor, type AssessmentCategory, type CategoryAssessment } from "@
    - หาหมวดจาก route_path ของหน้านั้น (เช่น /assessment-menu)
 ========================================================= */
 
+// โหลดแบบประเมินที่เจ้าหน้าที่เพิ่มในหมวดของ routePath นี้ แล้วแสดงเป็นการ์ด
 export default function CategoryAssessmentCards({ routePath }: { routePath: string }) {
   const [items, setItems] = useState<CategoryAssessment[]>([]);
 

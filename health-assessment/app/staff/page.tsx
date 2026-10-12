@@ -31,8 +31,10 @@ const AS_OF = "ณ วันนี้";
 const IN_RANGE = "30 วันล่าสุด";
 const CONSENT_NOTE = "นับเฉพาะผู้ใช้ที่ยินยอมให้ประมวลผลข้อมูลสุขภาพ";
 
+// จัดรูปแบบตัวเลขแบบไทย ถ้าไม่มีค่าแสดง –
 const fmt = (n: number | null | undefined) => (n === null || n === undefined ? "–" : n.toLocaleString("th-TH"));
 
+// แสดง % เปลี่ยนแปลงของจำนวนการประเมินเทียบกับ 30 วันก่อนหน้า
 function Delta({ cur, prev }: { cur: number; prev: number }) {
   if (prev === 0) return <>{cur > 0 ? "ช่วงก่อนไม่มีการประเมิน" : "ไม่มีการประเมินทั้งสองช่วง"}</>;
   const pct = Math.round(((cur - prev) / prev) * 100);
@@ -44,6 +46,7 @@ function Delta({ cur, prev }: { cur: number; prev: number }) {
   );
 }
 
+// หน้าภาพรวมระบบ: โหลดข้อมูล 30 วันล่าสุด แสดง KPI กราฟ งานค้าง และกิจกรรมล่าสุด
 export default function StaffOverviewPage() {
   // ช่วงตายตัว 30 วันล่าสุดรวมวันนี้ (วันที่ตามเวลาไทย ไม่ใช้ toISOString กับเวลาปัจจุบัน)
   const today = todayInBangkok();

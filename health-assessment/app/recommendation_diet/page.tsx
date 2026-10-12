@@ -64,6 +64,7 @@ const OVERALL_COLOR: Record<string, RiskColor> = {
    PAGE
 ===================================================== */
 
+// หน้าผลและคำแนะนำพฤติกรรมการกิน: ครอบเนื้อหาด้วย Suspense
 export default function DietRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -72,6 +73,7 @@ export default function DietRecommendationPage() {
   );
 }
 
+// เนื้อหาหน้าผลอาหาร: โหลดผลตาม assessmentId แล้วแสดงผลแยกตามหมวดอาหาร
 function DietRecommendationContent() {
   const searchParams = useSearchParams();
 
@@ -96,6 +98,7 @@ function DietRecommendationContent() {
       return;
     }
 
+    // โหลดผลประเมินพฤติกรรมการกินตาม assessmentId จาก API
     const loadResult = async () => {
       try {
         setLoading(true);
@@ -226,6 +229,7 @@ function DietRecommendationContent() {
    DOMAIN CARD
 ===================================================== */
 
+// การ์ดแสดงผลของหมวดอาหารหนึ่งหมวด พร้อมไอคอนและระดับ
 function DomainCard({
   title,
   icon,
@@ -279,6 +283,7 @@ function DomainCard({
    LABEL
 ===================================================== */
 
+// สร้างข้อความป้ายระดับ (หมวดผักใช้คำว่า "ปริมาณ" นอกนั้นใช้ "ระดับ")
 function getDomainLabel(
   title: string,
   level: string,

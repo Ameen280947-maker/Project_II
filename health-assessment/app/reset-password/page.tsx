@@ -42,6 +42,7 @@ type ResetPasswordResponse = {
    CONTENT
 ========================================================= */
 
+// เนื้อหาหน้าตั้งรหัสผ่านใหม่: รับอีเมลและ token จาก URL
 function ResetPasswordContent() {
   const router =
     useRouter();
@@ -110,6 +111,7 @@ function ResetPasswordContent() {
      SUBMIT
   ========================================================= */
 
+  // ตรวจรหัสผ่านใหม่ (อย่างน้อย 8 ตัว และตรงกันทั้งสองช่อง) แล้วส่งไปเปลี่ยนรหัสผ่าน
   const handleSubmit =
     async (
       event: FormEvent<HTMLFormElement>,
@@ -664,6 +666,7 @@ function ResetPasswordContent() {
    PASSWORD FIELD
 ========================================================= */
 
+// ช่องกรอกรหัสผ่านพร้อมป้ายชื่อ และปุ่มแสดง/ซ่อนรหัสผ่าน
 function PasswordField({
   label,
   value,
@@ -768,6 +771,7 @@ function PasswordField({
    PAGE
 ========================================================= */
 
+// หน้าตั้งรหัสผ่านใหม่ ห่อด้วย Suspense (เพราะใช้ useSearchParams)
 export default function ResetPasswordPage() {
   return (
     <Suspense

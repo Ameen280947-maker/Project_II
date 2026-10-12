@@ -57,6 +57,7 @@ const SEV_STYLE = [
   { box: "bg-[#ffe6ea] border-[#f2b9c2]", text: "text-[#8a1420]" },
 ];
 
+// หน้าแบบประเมินที่เจ้าหน้าที่สร้างเอง: วาง Sidebar และครอบเนื้อหาด้วย Suspense
 export default function CustomAssessmentPage() {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
@@ -74,6 +75,7 @@ export default function CustomAssessmentPage() {
   );
 }
 
+// อ่าน id จาก URL แล้วเลือกแสดงผลการประเมิน (?result=) หรือฟอร์มทำแบบประเมิน
 function Content() {
   const params = useParams<{ id: string }>();
   const resultId = Number(useSearchParams().get("result")) || null;
@@ -96,6 +98,7 @@ function Content() {
    ทำแบบประเมิน
 ========================================================= */
 
+// ฟอร์มทำแบบประเมิน: โหลดคำถามตาม typeId ให้ผู้ใช้เลือกคำตอบแล้วส่งบันทึก
 function Form({ typeId }: { typeId: number }) {
   const router = useRouter();
   const [data, setData] = useState<Assessment | null>(null);
@@ -117,6 +120,7 @@ function Form({ typeId }: { typeId: number }) {
 
   const answered = data ? data.questions.filter((q) => answers[q.id]).length : 0;
 
+  // ตรวจว่าตอบครบทุกข้อ แล้ว POST คำตอบไปบันทึก และพาไปหน้าแสดงผล
   const submit = async () => {
     if (!data) return;
     const userId = localStorage.getItem("userId");
@@ -237,6 +241,7 @@ function Form({ typeId }: { typeId: number }) {
    ผลการประเมิน
 ========================================================= */
 
+// โหลดผลการประเมินตาม assessmentId แล้วแสดงระดับความเสี่ยง คะแนน และคำแนะนำ
 function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: number }) {
   const router = useRouter();
   const [r, setR] = useState<Result | null>(null);
@@ -311,6 +316,7 @@ function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: nu
   );
 }
 
+// ไอคอนหมุนแสดงสถานะกำลังโหลด
 function Spinner() {
   return (
     <div className="grid min-h-[50vh] place-items-center">
@@ -319,6 +325,7 @@ function Spinner() {
   );
 }
 
+// แสดงข้อความแจ้ง (เช่น ไม่พบแบบประเมิน) พร้อมลิงก์กลับไปเลือกแบบประเมิน
 function Message({ text }: { text: string }) {
   return (
     <div className="grid min-h-[50vh] place-items-center text-center">

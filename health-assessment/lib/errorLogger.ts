@@ -17,6 +17,7 @@ import { ensureAdminTables } from "@/lib/adminSchema";
 
 export type ErrorLevel = "error" | "warning" | "info";
 
+// บันทึกข้อผิดพลาดลงตาราง system_error_logs (ไม่ throw ต่อแม้บันทึกไม่สำเร็จ)
 export async function logSystemError(
   source: string,
   error: unknown,
