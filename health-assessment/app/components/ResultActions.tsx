@@ -22,6 +22,7 @@ const TONES: Record<CardTone, { edit: string; menu: string }> = {
   pink: { edit: "border-[#efc1d3] text-[#8c1a45]", menu: "bg-[#fce9f0] text-[#b4235a]" },
 };
 
+// ปุ่มท้ายหน้าผล: กลับไปแก้แบบประเมิน และเลือกแบบประเมินอื่น (สีตามโทน)
 export default function ResultActions({
   editHref,
   menuHref = "/assessment-menu",

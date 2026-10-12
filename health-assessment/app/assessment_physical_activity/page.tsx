@@ -27,6 +27,7 @@ type Question = {
   choices: Choice[];
 };
 
+// หน้าแบบประเมินกิจกรรมทางกาย: แสดงคำถามทั้งหมด แล้วส่งคำตอบไปประเมินผล
 export default function PhysicalActivityAssessmentPage() {
   const router = useRouter();
 
@@ -44,6 +45,7 @@ export default function PhysicalActivityAssessmentPage() {
   ========================================================= */
 
   useEffect(() => {
+    // โหลดคำถามแบบประเมินกิจกรรมทางกายจาก API
     const loadQuestions = async () => {
       try {
         setLoading(true);
@@ -86,6 +88,7 @@ export default function PhysicalActivityAssessmentPage() {
      SELECT ANSWER
   ========================================================= */
 
+  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
   const handleSelect = (
     questionId: number,
     choiceId: number
@@ -100,6 +103,7 @@ export default function PhysicalActivityAssessmentPage() {
      SUBMIT
   ========================================================= */
 
+  // ตรวจ userId และการตอบครบทุกข้อ แล้ว POST ผลและพาไปหน้าคำแนะนำ
   const handleSubmit = async () => {
     try {
       setError("");

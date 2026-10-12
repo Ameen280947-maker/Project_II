@@ -7,6 +7,7 @@ import { AlertTriangle } from "lucide-react";
    ชิ้นส่วน UI ที่ใช้ร่วมกันทุกหน้าของ Staff (โทน staff-* ใน globals.css)
 ========================================================= */
 
+// หัวเพจ: eyebrow ชื่อเรื่อง (ส่วนเน้นสี) คำอธิบาย และปุ่มด้านขวา
 export function PageHeader({
   eyebrow,
   title,
@@ -35,6 +36,7 @@ export function PageHeader({
   );
 }
 
+// การ์ดพื้นขาวขอบมนสำหรับห่อเนื้อหา
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div className={`min-w-0 rounded-[22px] border border-staff-line bg-white p-6 shadow-[0_1px_2px_rgba(20,20,19,0.04)] ${className}`}>
@@ -43,6 +45,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   );
 }
 
+// การ์ดตัวเลขสถิติพร้อมป้ายและหมายเหตุ ถ้าส่ง onClick จะกดดูรายละเอียดได้
 export function StatCard({
   label,
   value,
@@ -97,6 +100,7 @@ const SEV_PILL = [
   "bg-[#fbd9dc] text-[#8e1b25]",
 ];
 
+// ป้ายแสดงระดับความเสี่ยง สีตาม severity
 export function RiskPill({ severity, children }: { severity: number; children: ReactNode }) {
   return (
     <span className={`inline-flex max-w-full items-center truncate rounded-full px-2.5 py-0.5 text-xs font-semibold ${SEV_PILL[severity] ?? SEV_PILL[0]}`}>
@@ -105,6 +109,7 @@ export function RiskPill({ severity, children }: { severity: number; children: R
   );
 }
 
+// วงกลมแสดงตัวอักษรแรกของชื่อผู้ใช้
 export function Avatar({ name, tone = "brand", size = 36 }: { name: string; tone?: "brand" | "danger"; size?: number }) {
   return (
     <span
@@ -118,6 +123,7 @@ export function Avatar({ name, tone = "brand", size = 36 }: { name: string; tone
   );
 }
 
+// แถบปุ่มตัวกรองแบบชิป (tab) แสดงจำนวนของแต่ละตัวเลือกได้
 export function Chips<T extends string>({
   items,
   value,
@@ -157,6 +163,7 @@ export function Chips<T extends string>({
   );
 }
 
+// ปุ่มเลือกแบบแบ่งส่วน (segmented control) เลือกได้ทีละตัวเลือก
 export function Segmented<T extends string>({
   items,
   value,
@@ -188,6 +195,7 @@ export function Segmented<T extends string>({
   );
 }
 
+// กล่องแสดงข้อความผิดพลาด (ไม่แสดงถ้าไม่มีข้อความ)
 export function ErrorBox({ message }: { message: string }) {
   if (!message) return null;
   return (
@@ -198,10 +206,12 @@ export function ErrorBox({ message }: { message: string }) {
   );
 }
 
+// ข้อความกึ่งกลางกรณีไม่มีข้อมูล
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="py-8 text-center text-sm text-staff-muted">{children}</p>;
 }
 
+// คำอธิบายสัญลักษณ์กราฟ (สี่เหลี่ยมสี + ชื่อ)
 export function Legend({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
@@ -220,6 +230,7 @@ export const btnPrimary =
 export const btnGhost =
   "inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-staff-line bg-white px-4 text-sm font-semibold text-staff-ink transition hover:border-staff-300 hover:bg-staff-soft disabled:opacity-50";
 
+// แปลง ISO date เป็นวันที่ภาษาไทย (เลือกแสดงเวลาได้) ถ้าไม่มีค่าแสดง -
 export const thDate = (iso?: string | null, withTime = false) =>
   iso
     ? new Date(iso).toLocaleDateString("th-TH", {
@@ -230,6 +241,7 @@ export const thDate = (iso?: string | null, withTime = false) =>
       })
     : "-";
 
+// สวิตช์เปิด/ปิด (role=switch)
 export function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
   return (
     <button

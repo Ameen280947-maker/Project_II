@@ -83,6 +83,7 @@ const INTEGRITY_CHECKS: {
    GET
 ========================================================= */
 
+// GET: คืนรายการตาราง (จำนวนแถว/ขนาด) ผลตรวจข้อมูลกำพร้า และขนาดฐานข้อมูล
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -153,6 +154,7 @@ export async function GET(request: NextRequest) {
    POST
 ========================================================= */
 
+// POST: แก้ไขข้อมูลกำพร้าตามรายการตรวจที่เลือก (action = fix_integrity)
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);

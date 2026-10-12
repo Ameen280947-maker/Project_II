@@ -62,6 +62,7 @@ const FALLBACK_CATEGORIES: AssessmentCategory[] = [
   { id: 3, name: "ความเสี่ยงด้านสุขภาพจิต", subtitle: null, theme: "blue", routePath: "/assessment-menu-mental-health", builtIn: true, href: "/assessment-menu-mental-health", assessments: [] },
 ];
 
+// หน้าเลือกประเภทแบบประเมิน: โหลดหมวดหมู่และแบบประเมินเพิ่มเติมจาก API มาแสดงเป็นการ์ด
 export default function AssessmentTypePage() {
   // หมวดหมู่จากฐานข้อมูล + แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
   // (หมวดที่ staff สร้างแต่ยังไม่มีแบบประเมินที่เปิดใช้งาน API จะไม่ส่งมา)
@@ -192,6 +193,7 @@ type AssessmentTypeCardProps = {
   illustration: Illustration;
 };
 
+// การ์ดหมวดหมู่แบบประเมิน แสดงภาพ หัวข้อ รายละเอียด และปุ่มเข้าตามธีมสี
 function AssessmentTypeCard({
   title,
   subtitle,
@@ -400,6 +402,7 @@ function AssessmentTypeCard({
    ASSESSMENT ILLUSTRATION
 ========================================================= */
 
+// ภาพประกอบของแต่ละหมวดแบบประเมิน เลือกไอคอนตามชนิด (kind)
 function AssessmentIllustration({
   kind,
   iconClass,
@@ -507,6 +510,7 @@ function AssessmentIllustration({
    ICON CIRCLE
 ========================================================= */
 
+// กรอบวงกลมสำหรับวางไอคอนในภาพประกอบ
 function IconCircle({
   children,
 }: {

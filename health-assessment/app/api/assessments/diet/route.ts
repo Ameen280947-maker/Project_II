@@ -150,6 +150,7 @@ const DEFAULT_QUESTIONS: Question[] = [
    DOMAIN RISK LEVEL MAPPINGS (MATCHING DB recommendation TABLE)
 ===================================================== */
 
+// แปลงคะแนนการกินผักเป็น key คำแนะนำและระดับ
 function getVegetableRisk(score: number): { key: string; level: string } {
   if (score >= 4) return { key: "ผัก-ปริมาณสูงมาก", level: "สูงมาก" };
   if (score === 3) return { key: "ผัก-ปริมาณสูง", level: "สูง" };
@@ -157,6 +158,7 @@ function getVegetableRisk(score: number): { key: string; level: string } {
   return { key: "ผัก-ปริมาณน้อย", level: "น้อย" };
 }
 
+// แปลงคะแนนการกินหวานเป็น key คำแนะนำและระดับ
 function getSugarRisk(score: number): { key: string; level: string } {
   if (score >= 11) return { key: "น้ำตาล-ปริมาณน้อย", level: "ต่ำ" };
   if (score >= 8) return { key: "น้ำตาล-ระดับปานกลาง", level: "ปานกลาง" };
@@ -164,6 +166,7 @@ function getSugarRisk(score: number): { key: string; level: string } {
   return { key: "น้ำตาล-ระดับสูงมาก", level: "สูงมาก" };
 }
 
+// แปลงคะแนนการกินไขมันเป็น key คำแนะนำและระดับ
 function getFatRisk(score: number): { key: string; level: string } {
   if (score >= 4) return { key: "ไขมัน-ปริมาณน้อย", level: "ต่ำ" };
   if (score === 3) return { key: "ไขมัน-ระดับปานกลาง", level: "ปานกลาง" };
@@ -171,6 +174,7 @@ function getFatRisk(score: number): { key: string; level: string } {
   return { key: "ไขมัน-ระดับสูงมาก", level: "สูงมาก" };
 }
 
+// แปลงคะแนนการกินเค็ม (โซเดียม) เป็น key คำแนะนำและระดับ
 function getSodiumRisk(score: number): { key: string; level: string } {
   if (score >= 15) return { key: "โซเดียม-ปริมาณน้อย", level: "ต่ำ" };
   if (score >= 9) return { key: "โซเดียม-ระดับปานกลาง", level: "ปานกลาง" };

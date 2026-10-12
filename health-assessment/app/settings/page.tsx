@@ -91,6 +91,7 @@ const FONT_SIZE_PX: Record<Settings["font_size"], string> = {
    HELPERS
 ========================================================= */
 
+// แปลงวันที่เป็นรูปแบบไทย เลือกแสดงปี พ.ศ. หรือ ค.ศ. ตามการตั้งค่า
 const formatDate = (d?: string | null, yearFormat: Settings["year_format"] = "be") => {
   if (!d) return "-";
   return new Date(d).toLocaleDateString(yearFormat === "be" ? "th-TH" : "th-TH-u-ca-gregory", {
@@ -162,7 +163,9 @@ const CSV_SECTIONS: { title: string; key: keyof ExportData; columns: [string, st
   },
 ];
 
+// แปลงข้อมูลที่ส่งออกเป็นข้อความ CSV ไฟล์เดียว แบ่งเป็น 3 ส่วนคั่นด้วยบรรทัดว่าง
 const toCsv = (data: ExportData) => {
+  // ครอบค่าด้วยเครื่องหมายคำพูดและ escape " ให้ถูกรูปแบบ CSV
   const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   return CSV_SECTIONS.map(({ title, key, columns }) =>
     [
@@ -177,6 +180,7 @@ const toCsv = (data: ExportData) => {
    PAGE
 ========================================================= */
 
+// หน้าตั้งค่า: บัญชี การแสดงผล ผู้ติดต่อฉุกเฉิน ส่งออกข้อมูล และลบข้อมูล/บัญชี
 export default function SettingsPage() {
   const router = useRouter();
 
@@ -202,6 +206,7 @@ export default function SettingsPage() {
   const [savingEmail, setSavingEmail] = useState(false);
 
   // ประกาศก่อน useEffect ที่เรียกใช้
+  // ปรับขนาดตัวอักษรทั้งหน้า และจำค่าไว้ใน localStorage
   const applyFontSize = (size: Settings["font_size"]) => {
     // Tailwind ใช้หน่วย rem จึงขยายได้ทั้งหน้า
     document.documentElement.style.fontSize = FONT_SIZE_PX[size];
@@ -210,6 +215,7 @@ export default function SettingsPage() {
 
   /* ---------- load ---------- */
   useEffect(() => {
+    // โหลดการตั้งค่าและข้อมูลบัญชีของผู้ใช้ แล้วปรับขนาดตัวอักษรตามที่ตั้งไว้
     const load = async () => {
       try {
         const uid = localStorage.getItem("userId");
@@ -251,6 +257,7 @@ export default function SettingsPage() {
   }, [toast]);
 
   /* ---------- actions ---------- */
+  // บันทึกการตั้งค่าที่เปลี่ยน (อัปเดตหน้าจอก่อน ถ้าบันทึกไม่สำเร็จคืนค่าเดิม)
   const save = async (patch: Partial<Settings>, okText = "บันทึกแล้ว") => {
     if (!userId || !settings) return;
     const previous = settings;
@@ -272,6 +279,7 @@ export default function SettingsPage() {
     }
   };
 
+  // เปลี่ยนชื่อผู้ใช้ผ่าน API แล้วอัปเดตชื่อในหน้าจอและ localStorage
   const saveUsername = async () => {
     if (!userId || !profile) return;
     const username = usernameDraft.trim();
@@ -316,11 +324,13 @@ export default function SettingsPage() {
     }
   };
 
+  // ยกเลิกการแก้ไขอีเมลและล้างช่องรหัสผ่าน
   const cancelEditEmail = () => {
     setEditingEmail(false);
     setEmailPassword("");
   };
 
+  // เปลี่ยนอีเมล (ต้องยืนยันรหัสผ่าน) แล้วอัปเดตในหน้าจอและ localStorage
   const saveEmail = async () => {
     if (!userId || !profile) return;
     const email = emailDraft.trim().toLowerCase();
@@ -359,6 +369,7 @@ export default function SettingsPage() {
     }
   };
 
+  // ออกจากระบบ: ลบ session ฝั่ง server และข้อมูลผู้ใช้ในเครื่อง แล้วกลับหน้า login
   const logout = async () => {
     // ลบ session cookie ฝั่ง server ก่อน (ถ้าเรียกไม่สำเร็จก็ยังออกจากระบบในเครื่องต่อ)
     try {
@@ -372,6 +383,7 @@ export default function SettingsPage() {
     router.replace("/login");
   };
 
+  // ดาวน์โหลดข้อมูลสุขภาพของผู้ใช้ทั้งหมดเป็นไฟล์ CSV
   const downloadData = async () => {
     if (!userId) return;
     try {
@@ -390,6 +402,7 @@ export default function SettingsPage() {
     }
   };
 
+  // ยืนยันรหัสผ่านเพื่อล้างประวัติหรือลบบัญชี (คืนข้อความ error หรือ null ถ้าสำเร็จ)
   const confirmDanger = async (password: string): Promise<string | null> => {
     if (!userId || !dialog) return "ไม่พบข้อมูลผู้ใช้";
     try {
@@ -828,6 +841,7 @@ export default function SettingsPage() {
    COMPONENTS
 ========================================================= */
 
+// การ์ดของแต่ละหมวดการตั้งค่า มีหัวข้อ คำอธิบาย และป้ายกำกับ
 function Card({
   id,
   title,
@@ -853,6 +867,7 @@ function Card({
   );
 }
 
+// แถวตั้งค่าหนึ่งรายการ: ชื่อ/คำอธิบายด้านซ้าย ตัวควบคุมด้านขวา
 function Row({ title, desc, last, children }: { title: string; desc?: string; last?: boolean; children: ReactNode }) {
   return (
     <div className={`flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 py-4 ${last ? "" : "border-b border-gray-100"}`}>
@@ -865,6 +880,7 @@ function Row({ title, desc, last, children }: { title: string; desc?: string; la
   );
 }
 
+// ช่องกรอกข้อมูลพร้อมป้ายชื่อ
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5 text-sm font-semibold text-gray-700">
@@ -874,6 +890,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+// สวิตช์เปิด/ปิด
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -890,6 +907,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
+// ปุ่มเลือกตัวเลือกเดียวแบบแถบแบ่งช่อง
 function Segmented({
   label,
   value,
@@ -920,6 +938,7 @@ function Segmented({
   );
 }
 
+// กล่องยืนยันการกระทำอันตราย ต้องกรอกรหัสผ่านก่อนกดยืนยัน
 function ConfirmDialog({
   title,
   text,
@@ -937,6 +956,7 @@ function ConfirmDialog({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
+  // ส่งรหัสผ่านไปยืนยัน ถ้าไม่สำเร็จแสดงข้อความ error
   const submit = async () => {
     if (!password || busy) return;
     setBusy(true);

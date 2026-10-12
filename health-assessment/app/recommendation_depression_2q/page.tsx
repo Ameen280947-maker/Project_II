@@ -31,6 +31,7 @@ type Result = {
    COMPONENT CONTENT
 ========================================================= */
 
+// เนื้อหาหน้าผล 2Q: โหลดผลตาม assessmentId แล้วแสดงผลคัดกรองและคำแนะนำ
 function Depression2QRecommendationContent() {
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
@@ -46,6 +47,7 @@ function Depression2QRecommendationContent() {
       return;
     }
 
+    // โหลดผลประเมิน 2Q ของผู้ใช้ตาม assessmentId จาก API
     async function loadResult() {
       try {
         setLoading(true);
@@ -158,6 +160,7 @@ function Depression2QRecommendationContent() {
   );
 }
 
+// หน้าผลและคำแนะนำ 2Q: ครอบเนื้อหาด้วย Suspense
 export default function Depression2QRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>

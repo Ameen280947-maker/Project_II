@@ -129,6 +129,7 @@ type UpdateProfileResponse = {
    PAGE
 ========================================================= */
 
+// หน้าแบบประเมินความเสี่ยงโรคหัวใจและหลอดเลือด (Thai CVD Risk) จากข้อมูลสุขภาพในโปรไฟล์
 export default function AssessmentPage() {
   const router =
     useRouter();
@@ -321,6 +322,7 @@ export default function AssessmentPage() {
   ========================================================= */
 
   useEffect(() => {
+    // โหลดผู้ใช้ โปรไฟล์ และคำถาม CVD จาก API แล้วเติมค่าเริ่มต้นลงฟอร์ม
     const loadAssessment =
       async () => {
         try {
@@ -626,6 +628,7 @@ export default function AssessmentPage() {
      START EDITING
   ========================================================= */
 
+  // เปิดโหมดแก้ไขข้อมูลสุขภาพ และล้างข้อความแจ้งเตือนเดิม
   const startEditingProfile =
     () => {
       setError("");
@@ -641,6 +644,7 @@ export default function AssessmentPage() {
      CANCEL EDITING
   ========================================================= */
 
+  // ยกเลิกการแก้ไข: คืนค่าข้อมูลสุขภาพเดิมทั้งหมด แล้วปิดโหมดแก้ไข
   const cancelEditingProfile =
     () => {
       if (
@@ -696,6 +700,7 @@ export default function AssessmentPage() {
      PUT /api/profile
   ========================================================= */
 
+  // ตรวจค่าข้อมูลสุขภาพที่แก้ไข แล้วบันทึกลงโปรไฟล์ผ่าน PUT /api/profile
   const saveProfile =
     async () => {
       try {
@@ -903,6 +908,7 @@ export default function AssessmentPage() {
      GET CHOICE ID BY SCORE
   ========================================================= */
 
+  // หา choiceId ของคำถามจากคะแนนที่ตรงกัน (ไม่พบคืน null)
   const getChoiceIdByScore = (
     question:
       | Question
@@ -925,6 +931,7 @@ export default function AssessmentPage() {
      START ASSESSMENT
   ========================================================= */
 
+  // ตรวจข้อมูลครบถ้วน แล้ว POST คำตอบไปคำนวณความเสี่ยง CVD และพาไปหน้าคำแนะนำ
   const startAssessment =
     async () => {
       try {
@@ -1888,6 +1895,7 @@ type RangeFieldProps = {
   readOnly?: boolean;
 };
 
+// ช่องแสดงค่าตัวเลขแบบแถบเลื่อน (range) พร้อมป้ายชื่อและหน่วย รองรับโหมดอ่านอย่างเดียว
 function RangeField({
   label,
   value,
@@ -2032,6 +2040,7 @@ type ToggleCardProps = {
   readOnly?: boolean;
 };
 
+// การ์ดตัวเลือกใช่/ไม่ใช่ พร้อมไอคอน หัวข้อ คำอธิบาย และสวิตช์เปิดปิด
 function ToggleCard({
   icon,
   title,
@@ -2099,6 +2108,7 @@ function ToggleCard({
    TOGGLE
 ========================================================= */
 
+// ปุ่มสวิตช์เปิด/ปิด (toggle)
 function Toggle({
   checked,
   onChange,

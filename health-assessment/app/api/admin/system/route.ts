@@ -35,6 +35,7 @@ const REQUIRED_TABLES = [
 // เริ่มต้นวันนี้ตามเวลาไทย แปลงเป็น UTC (คอลัมน์เวลาเก็บเป็น timestamp UTC)
 const THAI_TODAY_START = `((date_trunc('day', NOW() AT TIME ZONE 'Asia/Bangkok') AT TIME ZONE 'Asia/Bangkok') AT TIME ZONE 'UTC')`;
 
+// GET: ตรวจสถานะระบบ (DB, ตารางที่จำเป็น, สถิติ, ข้อผิดพลาดค้าง, การสำรองล่าสุด)
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);

@@ -24,6 +24,7 @@ import { isMissing, toEditable, toSnapshot, type CategoryOption, type Detail, ty
 
 type Tab = "questions" | "levels" | "preview" | "history";
 
+// หน้าจัดการแบบประเมิน: ห่อด้วย Suspense เพราะใช้ useSearchParams
 export default function StaffAssessmentsPage() {
   return (
     <Suspense>
@@ -32,6 +33,7 @@ export default function StaffAssessmentsPage() {
   );
 }
 
+// รายการแบบประเมิน เปิด/ปิดใช้งาน สร้างใหม่ จัดการหมวดหมู่ และเปิดตัวแก้ไข
 function Assessments() {
   const params = useSearchParams();
   const [types, setTypes] = useState<TypeRow[]>([]);
@@ -43,6 +45,7 @@ function Assessments() {
   // มีการแก้ไขที่ยังไม่บันทึกในตัวแก้ไขหรือไม่ (ใช้เตือนก่อนเปลี่ยนแบบประเมิน)
   const dirtyRef = useRef(false);
 
+  // โหลดรายการแบบประเมินและหมวดหมู่ แล้วเลือกแบบเริ่มต้น (9Q หรือตัวแรก)
   const loadTypes = useCallback(() => {
     staffFetch<{ types: TypeRow[]; categories: CategoryOption[] }>("/api/staff/assessments")
       .then((d) => {
@@ -58,6 +61,7 @@ function Assessments() {
   }, [loadTypes]);
 
   useEffect(() => {
+    // เตือนก่อนปิด/รีโหลดหน้าเมื่อยังมีการแก้ไขที่ไม่ได้บันทึก
     const warn = (e: BeforeUnloadEvent) => {
       if (dirtyRef.current) e.preventDefault();
     };
@@ -65,6 +69,7 @@ function Assessments() {
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
 
+  // เลือกแบบประเมิน (ถามยืนยันถ้ายังไม่บันทึก) และอัปเดต ?type ใน URL
   const select = (id: number) => {
     if (id === selected) return;
     if (dirtyRef.current && !confirm("มีการแก้ไขที่ยังไม่บันทึกเป็นฉบับร่าง ต้องการออกจากหน้านี้หรือไม่?")) return;
@@ -73,6 +78,7 @@ function Assessments() {
     window.history.replaceState(null, "", `?type=${id}`);
   };
 
+  // สลับเปิด/ปิดใช้งานแบบประเมินทันที (อัปเดตจอก่อน ถ้าพลาดโหลดใหม่)
   const toggle = async (t: TypeRow) => {
     setTypes((all) => all.map((x) => (x.id === t.id ? { ...x, isActive: !x.isActive } : x)));
     try {
@@ -180,6 +186,7 @@ function Assessments() {
    EDITOR
 ========================================================= */
 
+// ตัวแก้ไขแบบประเมิน: แก้คำถาม/เกณฑ์ บันทึกร่าง ทิ้งร่าง เผยแพร่ ย้ายหมวด และลบ
 function Editor({
   typeId,
   isActive: listActive,
@@ -206,6 +213,7 @@ function Editor({
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState<"" | "save" | "discard" | "publish" | "category">("");
 
+  // ตั้งสถานะมีการแก้ไขค้าง ทั้งใน state และ ref ของหน้าแม่
   const setDirty = useCallback(
     (v: boolean) => {
       dirtyRef.current = v;
@@ -214,6 +222,7 @@ function Editor({
     [dirtyRef]
   );
 
+  // โหลดรายละเอียดแบบประเมิน (รวมฉบับร่าง) แล้วแปลงเป็น state สำหรับแก้ไข
   const load = useCallback(() => {
     return staffFetch<{ assessment: Detail }>(`/api/staff/assessments?type=${typeId}`)
       .then((d) => {
@@ -228,11 +237,13 @@ function Editor({
     load();
   }, [load]);
 
+  // แสดงข้อความแจ้งผลชั่วคราว 3 วินาที
   const flash = (m: string) => {
     setMsg(m);
     setTimeout(() => setMsg(""), 3000);
   };
 
+  // รวมการแก้ไขบางส่วนเข้า state และทำเครื่องหมายว่ามีการแก้ไข
   const change = (patch: Partial<EState>) => {
     setEdit((e) => (e ? { ...e, ...patch } : e));
     setDirty(true);
@@ -240,12 +251,14 @@ function Editor({
 
   if (!detail || !edit) return error ? <ErrorBox message={error} /> : <Card><Empty>กำลังโหลด…</Empty></Card>;
 
+  // แปลง state ที่แก้ไขเป็น snapshot สำหรับส่งไป API
   const snapshot = () => toSnapshot(edit, { name: detail.name, generic: detail.generic });
   const hasDraft = Boolean(detail.draft);
   const missing = edit.levels.filter(isMissing).length;
   const active = listActive ?? detail.isActive;
   const categoryId = listCategoryId !== undefined ? listCategoryId : detail.categoryId;
 
+  // รันงาน async พร้อมตั้งสถานะ busy และจับข้อผิดพลาด
   const run = async (kind: typeof busy, fn: () => Promise<void>) => {
     setBusy(kind);
     setError("");
@@ -258,6 +271,7 @@ function Editor({
     }
   };
 
+  // บันทึกการแก้ไขเป็นฉบับร่าง (ยังไม่มีผลกับผู้ใช้)
   const saveDraft = () =>
     run("save", async () => {
       await staffFetch("/api/staff/assessments", { method: "PUT", body: JSON.stringify({ typeId, snapshot: snapshot() }) });
@@ -266,6 +280,7 @@ function Editor({
       flash("บันทึกฉบับร่างแล้ว ยังไม่มีผลกับผู้ใช้จนกว่าจะเผยแพร่");
     });
 
+  // ทิ้งฉบับร่าง/ยกเลิกการแก้ไข แล้วโหลดเนื้อหาเดิมกลับมา
   const discardDraft = () => {
     if (!confirm(hasDraft ? "ทิ้งฉบับร่างนี้? การแก้ไขที่ยังไม่เผยแพร่ทั้งหมดจะหายไป" : "ยกเลิกการแก้ไขที่ยังไม่บันทึก?")) return;
     run("discard", async () => {
@@ -276,6 +291,7 @@ function Editor({
     });
   };
 
+  // เผยแพร่การแก้ไขเป็นเวอร์ชันใหม่ (เตือนถ้ามีระดับที่ยังไม่มีคำแนะนำ)
   const publish = () => {
     const warn = missing ? `\n\nมี ${missing} ระดับที่ยังไม่มีข้อความคำแนะนำ ผู้ใช้ที่ได้ผลระดับนั้นจะไม่เห็นคำแนะนำ` : "";
     if (!confirm(`เผยแพร่การแก้ไข? มีผลกับการประเมินครั้งใหม่ทันที ผลเดิมของผู้ใช้ยังผูกกับเนื้อหาเดิม${warn}`)) return;

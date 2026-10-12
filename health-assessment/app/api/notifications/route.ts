@@ -7,6 +7,7 @@ import { logSystemError } from "@/lib/errorLogger";
 /* =========================================================
    GET /api/notifications?userId=xxx
 ========================================================= */
+// GET: ซิงค์และคืนการแจ้งเตือนของผู้ใช้ แยกครบกำหนด/ใกล้ถึง พร้อมจำนวนที่ยังไม่อ่าน
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
    PATCH /api/notifications
    Mark notification(s) as read
 ========================================================= */
+// PATCH: ทำเครื่องหมายว่าอ่านแล้ว (รายการเดียว หรือทั้งหมดเมื่อส่ง markAll)
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();

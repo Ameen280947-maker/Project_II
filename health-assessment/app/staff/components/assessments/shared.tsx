@@ -57,8 +57,10 @@ export type ELevel = SnapLevel & { key: string };
 export type EState = { description: string; source: string; questions: EQuestion[]; levels: ELevel[] };
 
 let keySeq = 0;
+// สร้าง key ไม่ซ้ำสำหรับรายการในตัวแก้ไข (ใช้เป็น React key)
 export const newKey = () => `k${++keySeq}`;
 
+// แปลง snapshot จาก API เป็น state ที่แก้ไขได้ (คัดลอกและเติม key)
 export const toEditable = (s: Snapshot): EState => ({
   description: s.description ?? "",
   source: s.source ?? "",
@@ -66,6 +68,7 @@ export const toEditable = (s: Snapshot): EState => ({
   levels: s.levels.map((l) => ({ ...l, key: newKey() })),
 });
 
+// แปลง state ที่แก้ไขกลับเป็น snapshot (ตัด key, คำถามแบบตัวเลขไม่มีตัวเลือก)
 export const toSnapshot = (e: EState, base: { name: string; generic: boolean }): Snapshot => ({
   name: base.name,
   generic: base.generic,
@@ -90,6 +93,7 @@ export const toSnapshot = (e: EState, base: { name: string; generic: boolean }):
   })),
 });
 
+// เช็คว่าระดับผลยังไม่มีข้อความคำแนะนำ
 export const isMissing = (l: { text: string }) => !l.text.trim();
 
 export const MAX_HINT = 300;
@@ -112,6 +116,7 @@ export const SEV_PILL_USER = [
   "bg-[#fde6e7] text-[#a61e28]",
 ];
 
+// ข้อความช่วงคะแนนของระดับผล (ไม่มี min/max = เกณฑ์คำนวณในระบบ)
 export const rangeText = (l: { min: number | null; max: number | null }) =>
   l.min !== null && l.max !== null ? `คะแนน ${l.min}–${l.max}` : "เกณฑ์คำนวณในระบบ";
 
@@ -125,6 +130,7 @@ export function possibleRange(questions: SnapQuestion[]) {
   };
 }
 
+// ปุ่มไอคอนขนาดเล็ก (มี tooltip และโหมดอันตรายสีแดง)
 export function IconBtn({
   children,
   label,

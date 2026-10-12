@@ -11,6 +11,7 @@ type RootLayoutProps = Readonly<{
   children: ReactNode;
 }>;
 
+// เลย์เอาต์หลักของทั้งแอป กำหนดภาษาไทยและโหลด CSS ส่วนกลาง
 export default function RootLayout({ children }: RootLayoutProps) {
   return (
     <html lang="th">

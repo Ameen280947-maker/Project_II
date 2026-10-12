@@ -58,6 +58,7 @@ const mentalHealthAssessments: MentalHealthAssessment[] = [
    PAGE
 ========================================================= */
 
+// หน้าเมนูแบบประเมินความเสี่ยงด้านสุขภาพจิต แสดงการ์ดลิงก์ไปแต่ละแบบประเมิน
 export default function MentalHealthMenuPage() {
     return (
         <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">

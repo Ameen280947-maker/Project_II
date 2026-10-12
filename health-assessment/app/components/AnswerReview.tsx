@@ -14,6 +14,7 @@ type Answer = {
   answer: string;
 };
 
+// คอมโพเนนต์แสดงคำถาม-คำตอบของการประเมินครั้งนั้น (โหลดจาก API, พับ/กางได้)
 export default function AnswerReview({
   assessmentId,
   className = "",

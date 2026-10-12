@@ -62,6 +62,7 @@ type HistoryResponse = {
    PAGE
 ===================================================== */
 
+// หน้าประวัติการประเมิน: โหลดผลทั้งหมดของผู้ใช้ กรองตามแบบประเมิน และแสดงเป็นการ์ด
 export default function HistoryPage() {
   const router = useRouter();
 
@@ -82,6 +83,7 @@ export default function HistoryPage() {
   ===================================================== */
 
   useEffect(() => {
+    // ดึงประวัติจาก API ตาม userId (ไม่มี/ไม่ถูกต้องพาไป login) และเลือกหมวดจาก ?type= ถ้ามี
     const loadHistory = async () => {
       try {
         setLoading(true);
@@ -159,6 +161,7 @@ export default function HistoryPage() {
      ASSESSMENT TYPES
   ===================================================== */
 
+  // รายชื่อแบบประเมินที่มีในประวัติ (ไม่ซ้ำ) สำหรับปุ่มกรอง ขึ้นต้นด้วย "ทั้งหมด"
   const assessmentNames =
     useMemo(() => {
       return [
@@ -178,6 +181,7 @@ export default function HistoryPage() {
      FILTER
   ===================================================== */
 
+  // ประวัติที่ผ่านตัวกรองแบบประเมินที่เลือก
   const filteredHistory =
     useMemo(() => {
       if (
@@ -431,6 +435,7 @@ export default function HistoryPage() {
    HISTORY CARD
 ===================================================== */
 
+// การ์ดผลประเมินหนึ่งรายการ: ชื่อ ระดับผล คะแนน วันที่ และปุ่มดูคำแนะนำ
 function HistoryCard({
   item,
 }: {
@@ -578,6 +583,7 @@ const RESULT_STYLE: Record<DocColor, ReturnType<typeof makeStyle>> = {
   unknown: makeStyle("bg-[#f4f4f5]", "text-[#74757d]", "hover:bg-[#ebebed]"),
 };
 
+// รวมคลาสสีพื้น/ตัวอักษร/hover เป็นชุดสไตล์สำหรับไอคอน ป้าย กล่อง และปุ่ม
 function makeStyle(bg: string, text: string, hover: string) {
   return {
     icon: `${bg} ${text}`,
@@ -588,6 +594,7 @@ function makeStyle(bg: string, text: string, hover: string) {
   };
 }
 
+// เลือกชุดสีของผลประเมินตามสีระดับความเสี่ยงของกรมควบคุมโรค
 function getResultStyle(
   item: HistoryItem,
 ) {
@@ -603,6 +610,7 @@ function getResultStyle(
    RISK DISPLAY NAME
 ===================================================== */
 
+// แปลงระดับความเสี่ยงเป็นข้อความไทย (เฉพาะเบาหวานและบุหรี่ แบบอื่นคืนค่าเดิม)
 function getRiskDisplayName(
   riskLevel:
     | string
@@ -696,6 +704,7 @@ function getRiskDisplayName(
    SUMMARY CARD
 ===================================================== */
 
+// การ์ดสรุปตัวเลข พร้อมไอคอน หัวข้อ และหน่วยต่อท้าย
 function SummaryCard({
   icon,
   title,
@@ -748,6 +757,7 @@ function SummaryCard({
    ASSESSMENT NAME
 ===================================================== */
 
+// แปลงชื่อแบบประเมินภาษาอังกฤษเป็นชื่อภาษาไทย (ไม่พบคืนชื่อเดิม)
 function getAssessmentDisplayName(
   assessmentName: string,
 ) {
@@ -805,6 +815,7 @@ function getAssessmentDisplayName(
    FORMAT SCORE
 ===================================================== */
 
+// ข้อความคะแนนตามชนิดแบบประเมิน เช่น CVD/เบาหวานเป็น % BMI มีคำนำหน้า ความดันแสดงระดับ
 function formatScore(
   item: HistoryItem,
 ) {
@@ -895,6 +906,7 @@ function formatScore(
    BLOOD PRESSURE SCORE
 ===================================================== */
 
+// ข้อความผลความดันโลหิต (ใช้ระดับความเสี่ยง ไม่มีแสดง "-")
 function getBloodPressureScoreText(
   item: HistoryItem,
 ) {
@@ -909,6 +921,7 @@ function getBloodPressureScoreText(
    DATE TIME
 ===================================================== */
 
+// แปลงวันเวลาเป็นรูปแบบไทยพร้อมเวลา (แปลงไม่ได้คืนค่าเดิม)
 function formatDateTime(
   value: string,
 ) {
@@ -936,6 +949,7 @@ function formatDateTime(
    DATE SHORT
 ===================================================== */
 
+// แปลงวันที่เป็นรูปแบบไทยแบบย่อ (แปลงไม่ได้แสดง "-")
 function formatDateShort(
   value: string,
 ) {
@@ -964,6 +978,7 @@ function formatDateShort(
    DETAIL URL
 ===================================================== */
 
+// หาลิงก์หน้าคำแนะนำของผลประเมินตาม id/ชื่อแบบประเมิน (แบบที่สร้างเองใช้หน้ากลาง)
 function getDetailHref(
   item: HistoryItem,
 ) {

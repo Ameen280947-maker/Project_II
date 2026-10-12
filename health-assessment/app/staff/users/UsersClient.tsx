@@ -67,6 +67,7 @@ const shortDate = (iso?: string | null) =>
    PAGE
 ========================================================= */
 
+// หน้ารายชื่อผู้ใช้งาน: ค้นหา กรองสถานะ เรียงลำดับ แบ่งหน้า และระงับ/เปิดใช้งานบัญชี
 export default function UsersClient({ initialStatus }: { initialStatus: Filter }) {
   const [filter, setFilter] = useState<Filter>(initialStatus);
   const [sort, setSort] = useState<Sort>("recent");
@@ -114,6 +115,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- key รวม params + reload แล้ว
   }, [key]);
 
+  // เลือกผู้ใช้เพื่อดูรายละเอียด (จอเล็กเลื่อนลงไปที่แผงข้อมูล)
   const view = (id: number) => {
     setSelectedId(id);
     // จอเล็ก: แผงข้อมูลอยู่ใต้ตาราง เลื่อนลงไปให้เห็น
@@ -307,6 +309,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
 
 const smallBtn = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl border px-2.5 text-sm font-semibold transition";
 
+// ปุ่มระงับ/เปิดใช้งานตามสถานะบัญชี (กดแล้วเปิดกล่องยืนยัน)
 function ActionButton({
   user,
   suspended,
@@ -337,6 +340,7 @@ function ActionButton({
   );
 }
 
+// ป้ายสถานะบัญชี (ใช้งาน/ไม่ใช้งานเกิน 30 วัน/ระงับ)
 function StatusBadge({ status }: { status: Status }) {
   const st = STATUS_VIEW[status];
   return (
@@ -359,6 +363,7 @@ function pageNumbers(cur: number, total: number) {
   return out;
 }
 
+// ปุ่มเปลี่ยนหน้าของตารางรายชื่อ
 function PageBtn({
   children,
   label,
@@ -392,6 +397,7 @@ function PageBtn({
    แผง "ข้อมูลผู้ใช้"
 ========================================================= */
 
+// แผงข้อมูลผู้ใช้ที่เลือก: รายละเอียดบัญชี การใช้งานแยกตามแบบประเมิน และประวัติการจัดการ
 function UserPanel({
   userId,
   reload,
@@ -520,6 +526,7 @@ function UserPanel({
   );
 }
 
+// ช่องแสดงข้อมูล (ป้าย + ค่า) ในแผงผู้ใช้
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0 rounded-2xl bg-staff-soft px-4 py-3">
@@ -533,6 +540,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
    กล่องยืนยัน ระงับ (ต้องระบุเหตุผล) / เปิดใช้งาน
 ========================================================= */
 
+// กล่องยืนยันระงับ (ต้องใส่เหตุผล) หรือเปิดใช้งานบัญชี
 function ActionDialog({ pending, onClose, onDone }: { pending: Pending; onClose: () => void; onDone: () => void }) {
   const { user, action } = pending;
   const suspend = action === "suspend";
@@ -543,11 +551,13 @@ function ActionDialog({ pending, onClose, onDone }: { pending: Pending; onClose:
 
   useEffect(() => {
     firstRef.current?.focus();
+    // ปิดกล่องเมื่อกด Escape
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
 
+  // ส่งคำขอระงับ/เปิดใช้งานบัญชีไปที่ API
   const submit = async () => {
     setSaving(true);
     setError("");

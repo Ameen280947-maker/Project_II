@@ -44,6 +44,7 @@ const LEVEL_STYLE = {
   info: "bg-[#e8eefc] text-[#1e3a8a]",
 };
 
+// หน้าจัดการข้อผิดพลาดของระบบ: กรองตามสถานะ ค้นหา เปลี่ยนสถานะ และบันทึกวิธีแก้ไข
 export default function AdminErrorsPage() {
   const [tab, setTab] = useState<Tab>("open");
   const [q, setQ] = useState("");
@@ -55,6 +56,7 @@ export default function AdminErrorsPage() {
   const [resolving, setResolving] = useState<Log | null>(null);
   const [note, setNote] = useState("");
 
+  // โหลดรายการข้อผิดพลาดตามแท็บสถานะและคำค้น พร้อมจำนวนในแต่ละสถานะ
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ status: tab, q });
@@ -73,6 +75,7 @@ export default function AdminErrorsPage() {
     return () => clearTimeout(t);
   }, [load]);
 
+  // เปลี่ยนสถานะของรายการข้อผิดพลาด (พร้อมบันทึกวิธีแก้) แล้วโหลดรายการใหม่
   const updateStatus = async (log: Log, status: Log["status"], resolutionNote = "") => {
     const res = await adminFetch("/api/admin/errors", {
       method: "PATCH",
@@ -84,6 +87,7 @@ export default function AdminErrorsPage() {
     load();
   };
 
+  // ลบรายการที่แก้ไขแล้วและข้ามไปทั้งหมด (ถามยืนยันก่อน)
   const clearClosed = async () => {
     if (!window.confirm("ลบรายการที่ 'แก้ไขแล้ว' และ 'ข้ามไป' ทั้งหมด?")) return;
     const res = await adminFetch("/api/admin/errors", { method: "DELETE" });
@@ -213,6 +217,7 @@ export default function AdminErrorsPage() {
   );
 }
 
+// กล่อง Modal กลางจอ ปิดได้ด้วยปุ่ม X, คลิกพื้นหลัง หรือกด Esc
 function Modal({
   title,
   onClose,

@@ -28,6 +28,7 @@ type ResultResponse = {
   message?: string;
 };
 
+// หน้าผลและคำแนะนำ CVD: ครอบเนื้อหาด้วย Suspense (เพราะใช้ useSearchParams)
 export default function RecommendationHealthPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -36,6 +37,7 @@ export default function RecommendationHealthPage() {
   );
 }
 
+// เนื้อหาหน้าผล CVD: อ่าน assessmentId จาก URL แล้วโหลดผลมาแสดง
 function RecommendationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -48,6 +50,7 @@ function RecommendationContent() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    // โหลดผลประเมิน Thai CVD ตาม assessmentId (session หมดอายุให้กลับหน้า login)
     const loadResult = async () => {
       if (!assessmentId) {
         setError("ไม่พบ assessmentId");

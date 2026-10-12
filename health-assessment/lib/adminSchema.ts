@@ -43,6 +43,7 @@ declare global {
   var adminTablesReady: Promise<void> | undefined;
 }
 
+// สร้างตารางของฝั่งแอดมิน (ถ้ายังไม่มี) แค่ครั้งเดียว โดย cache promise ไว้ใน global
 export function ensureAdminTables(): Promise<void> {
   if (!global.adminTablesReady) {
     global.adminTablesReady = pool

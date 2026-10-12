@@ -11,19 +11,24 @@ import { IconBtn, newKey, type EQuestion } from "./shared";
 
 type Choice = EQuestion["choices"][number];
 
+// แท็บคำถาม: แสดงรายการคำถาม เพิ่ม ลบ เลื่อนลำดับ และแก้ไขแต่ละข้อ
 export default function QuestionsTab({ questions, onChange }: { questions: EQuestion[]; onChange: (qs: EQuestion[]) => void }) {
   const [editing, setEditing] = useState<string | null>(null);
 
+  // แก้ไขข้อมูลคำถามตาม key
   const update = (key: string, patch: Partial<EQuestion>) => onChange(questions.map((q) => (q.key === key ? { ...q, ...patch } : q)));
+  // สลับลำดับคำถามขึ้น/ลง
   const move = (i: number, d: -1 | 1) => {
     const next = [...questions];
     [next[i], next[i + d]] = [next[i + d], next[i]];
     onChange(next);
   };
+  // ลบคำถาม (ถามยืนยันก่อน)
   const remove = (key: string) => {
     if (!confirm("ลบคำถามข้อนี้? (ผลประเมินเดิมของผู้ใช้จะไม่หาย)")) return;
     onChange(questions.filter((q) => q.key !== key));
   };
+  // เพิ่มคำถามใหม่ (ใช้ตัวเลือกของคำถามแบบตัวเลือกข้อแรกเป็นแม่แบบ) แล้วเปิดแก้ไข
   const add = () => {
     const tpl = questions.find((q) => q.type === "choice")?.choices.map((c) => ({ text: c.text, score: c.score }));
     const q: EQuestion = {
@@ -66,6 +71,7 @@ export default function QuestionsTab({ questions, onChange }: { questions: EQues
   );
 }
 
+// การ์ดคำถามหนึ่งข้อ: แสดง/แก้ไขข้อความ ตัวเลือก และคะแนน พร้อมปุ่มเลื่อน/ลบ
 function QuestionCard({
   q,
   index,
@@ -85,6 +91,7 @@ function QuestionCard({
   onMove: (d: -1 | 1) => void;
   onRemove: () => void;
 }) {
+  // แก้ไขตัวเลือกลำดับที่ j ของคำถามนี้
   const setChoice = (j: number, patch: Partial<Choice>) => onChange({ choices: q.choices.map((c, k) => (k === j ? { ...c, ...patch } : c)) });
 
   return (

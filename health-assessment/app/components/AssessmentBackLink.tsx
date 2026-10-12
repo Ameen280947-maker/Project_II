@@ -6,6 +6,7 @@ import { ChevronLeft } from "lucide-react";
    ใช้เหมือนกันทุกแบบประเมิน
 ========================================================= */
 
+// ลิงก์ปุ่ม "ย้อนกลับ" แบบเรียบ ๆ ที่หัวหน้าแบบประเมิน
 export default function AssessmentBackLink({
   href,
   label = "ย้อนกลับ",

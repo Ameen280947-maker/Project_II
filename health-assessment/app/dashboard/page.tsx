@@ -280,9 +280,11 @@ const FALLBACK_CONFIG: TypeConfig = {
    HELPERS
 ========================================================= */
 
+// หาค่าตั้งค่าการแสดงผลของแบบประเมินจากชื่อ (ไม่พบใช้ค่าสำรอง)
 const getConfig = (name?: string | null): TypeConfig =>
   TYPE_CONFIG[String(name || "").toLowerCase().trim()] ?? FALLBACK_CONFIG;
 
+// เช็กว่าเป็นแบบประเมินความดันโลหิตหรือไม่
 const isBloodPressure = (a: Assessment) =>
   String(a.assessment_name || "").toLowerCase().trim() === "blood pressure";
 
@@ -294,6 +296,7 @@ const scoreOf = (a?: Assessment | null): number => {
   return raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
 };
 
+// แปลงคะแนนเป็นข้อความ (จำนวนเต็มแสดงตรง ๆ ทศนิยม 2 ตำแหน่ง ไม่มีค่าแสดง "-")
 const formatScore = (score: number | null | undefined) => {
   if (score === null || score === undefined) return "-";
   const n = Number(score);
@@ -301,6 +304,7 @@ const formatScore = (score: number | null | undefined) => {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 };
 
+// ข้อความคะแนนที่แสดงบนการ์ด: ความดันแสดงเป็น ตัวบน/ตัวล่าง แบบอื่นแสดงคะแนนรวม
 const displayScore = (a: Assessment) => {
   if (isBloodPressure(a)) {
     const sys = Number(a.systolic);
@@ -313,6 +317,7 @@ const displayScore = (a: Assessment) => {
   return formatScore(scoreOf(a));
 };
 
+// หาระดับความเสี่ยง (ปกติ/ระวัง/สูง) จากคะแนนตามเกณฑ์ หรือจาก risk_level ที่บันทึกไว้
 const getLevel = (a: Assessment): Level => {
   // 9Q ที่ตอบข้อคิดทำร้ายตนเอง = เสี่ยงสูงเสมอ ไม่ว่าคะแนนรวมเท่าไร
   if (a.self_harm_flag) return "high";
@@ -323,6 +328,7 @@ const getLevel = (a: Assessment): Level => {
   return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
+// แปลงวันที่เป็นรูปแบบไทยแบบย่อ เช่น 12 ต.ค. 69
 const formatShortDate = (date: string) =>
   new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
@@ -330,6 +336,7 @@ const formatShortDate = (date: string) =>
    PAGE
 ========================================================= */
 
+// หน้า Dashboard: โหลดข้อมูลสรุปผลประเมินของผู้ใช้ แล้วแสดงสถานะโหลด/ผิดพลาด/เนื้อหา
 export default function DashboardPage() {
   const router = useRouter();
 
@@ -339,6 +346,7 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState("");
 
   useEffect(() => {
+    // ดึงข้อมูล Dashboard จาก API ตาม userId ถ้า session หมดอายุพากลับไปหน้า login
     const loadDashboard = async () => {
       try {
         setLoading(true);
@@ -408,6 +416,7 @@ export default function DashboardPage() {
    LAYOUT: แถบเมนูซ้าย + เนื้อหา
 ========================================================= */
 
+// โครงหน้า: แถบเมนูด้านซ้าย + พื้นที่เนื้อหา
 function PageShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[#F6F5F1] text-[#16181D] font-[family-name:var(--font-plex-thai)]">
@@ -421,6 +430,7 @@ function PageShell({ children }: { children: ReactNode }) {
    CONTENT
 ========================================================= */
 
+// เนื้อหาหลักของ Dashboard: คำทักทาย การ์ดสรุป ผลรายแบบประเมิน กราฟ และคำแนะนำ
 function DashboardContent({
   data,
   userName,
@@ -593,6 +603,7 @@ function DashboardContent({
   );
 }
 
+// หาผลประเมินครั้งก่อนหน้าของแบบประเมินเดียวกัน (ครั้งล่าสุดที่เก่ากว่าครั้งปัจจุบัน)
 const findPrevious = (all: Assessment[], current: Assessment) =>
   all
     .filter(
@@ -606,6 +617,7 @@ const findPrevious = (all: Assessment[], current: Assessment) =>
    SMALL PIECES
 ========================================================= */
 
+// หัวข้อของแต่ละส่วน มีข้อความเล็กด้านบน ชื่อหัวข้อ และส่วนเสริมด้านขวา
 function SectionHead({ eyebrow, title, aside }: { eyebrow: string; title: string; aside?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
@@ -630,6 +642,7 @@ function useToggle(key: string, initial: boolean) {
       return initial;
     }
   });
+  // เปลี่ยนสถานะเปิด/ปิด แล้วบันทึกลง localStorage
   const setOpen = (value: boolean) => {
     setOpenState(value);
     try {
@@ -639,6 +652,7 @@ function useToggle(key: string, initial: boolean) {
   return [open, () => setOpen(!open)] as const;
 }
 
+// ปุ่มแสดง/ซ่อนส่วนเนื้อหา พร้อมไอคอนลูกศรหมุนตามสถานะ
 function ToggleButton({
   open,
   onClick,
@@ -666,6 +680,7 @@ function ToggleButton({
   );
 }
 
+// การ์ดตัวเลขสรุป (KPI) พร้อมชื่อ หน่วย และไอคอน
 function KpiCard({
   label,
   value,
@@ -720,6 +735,7 @@ const TREND_GROUPS: { key: string; label: string; categoryId: number; names: str
 // - กดแบบประเมิน → กราฟรายละเอียดของแบบนั้นแบบเดียว
 type TrendView = { kind: "all" } | { kind: "group"; key: string } | { kind: "type"; id: number };
 
+// การ์ดแนวโน้ม: ให้เลือกดูทั้งหมด/รายกลุ่ม/รายแบบประเมิน แล้วแสดงกราฟที่เหมาะสม
 function TrendCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
   const [view, setView] = useState<TrendView>({ kind: "all" });
   // หมวดของแบบประเมินที่เจ้าหน้าที่สร้างเอง: assessment id → { categoryId, name }
@@ -741,6 +757,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
       cancelled = true;
     };
   }, []);
+  // ดึงผลย้อนหลังที่มีคะแนนของแบบประเมินนั้น เรียงเก่า→ใหม่ เอาแค่ 8 ครั้งล่าสุด
   const history = (typeId: number) =>
     assessments
       .filter((a) => a.assessment_type_id === typeId && Number.isFinite(scoreOf(a)))
@@ -768,6 +785,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
   }
   // แบบประเมินหลักเรียงตามลำดับที่กำหนด แบบที่เจ้าหน้าที่สร้างต่อท้าย
   for (const [i, g] of TREND_GROUPS.entries()) {
+    // ลำดับของแบบประเมินในกลุ่มตามรายการที่กำหนด (ไม่อยู่ในรายการต่อท้าย)
     const rank = (a: Assessment) => {
       const n = g.names.indexOf(a.assessment_name.toLowerCase().trim());
       return n < 0 ? g.names.length : n;
@@ -786,6 +804,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
   const shown = chosen.length > 0 ? chosen : types;
   const isAll = view.kind === "all" || chosen.length === 0;
 
+  // คลาส CSS ของปุ่มตัวเลือก (เลือกอยู่ = พื้นเข้ม)
   const chipCls = (on: boolean) =>
     `min-h-9 rounded-full border px-4 text-sm font-semibold transition ${
       on
@@ -872,6 +891,7 @@ function TypeTrend({ list }: { list: Assessment[] }) {
 
   useEffect(() => {
     let cancelled = false;
+    // โหลดคำตอบและคะแนนรายข้อของการประเมินตาม id (ไม่มี id คืนรายการว่าง)
     const load = (id?: number) =>
       id
         ? fetch(`/api/history/answers?assessmentId=${id}`, { cache: "no-store" })
@@ -945,12 +965,16 @@ function HistoryRadar({ list }: { list: Assessment[] }) {
   const min = cfg.min ?? 0;
   const max = cfg.chartMax ?? cfg.max ?? (Math.max(...scores) * 1.25 || 1);
   const range = max - min || 1;
+  // แปลงคะแนนเป็นสัดส่วน 0–1 ตามช่วงต่ำสุด–สูงสุดของกราฟ
   const ratio = (v: number) => Math.min(1, Math.max(0, (v - min) / range));
   const delta = Math.round((scores[scores.length - 1] - scores[scores.length - 2]) * 100) / 100;
 
   const n = list.length;
+  // มุมของแกนที่ i (เริ่มจากด้านบน วนตามเข็มนาฬิกา)
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  // พิกัด x,y บนแกนที่ i ที่ระยะ r จากจุดกลาง
   const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
+  // สร้างจุดของวงรูปหลายเหลี่ยมที่ระยะ r สำหรับวาดเส้นพื้นหลัง
   const ring = (r: number) => list.map((_, i) => point(i, r).join(",")).join(" ");
   const pts = list.map((a, i) => point(i, ratio(scoreOf(a))));
   const bands = [...(cfg.bands ?? [])].sort((a, b) => b.to - a.to);
@@ -1046,9 +1070,13 @@ function HistoryRadar({ list }: { list: Assessment[] }) {
 // กราฟแมงมุมรายข้อ: ระยะจากกลาง = คะแนนข้อนั้นเทียบคะแนนเต็มของข้อ
 function QuestionRadar({ rows, prevById }: { rows: AnswerScore[]; prevById: Map<number, AnswerScore> | null }) {
   const n = rows.length;
+  // มุมของแกนที่ i (เริ่มจากด้านบน วนตามเข็มนาฬิกา)
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  // พิกัด x,y บนแกนที่ i ที่ระยะ r จากจุดกลาง
   const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
+  // สร้างจุดของวงรูปหลายเหลี่ยมที่ระยะ r สำหรับวาดเส้นพื้นหลัง
   const ring = (r: number) => rows.map((_, i) => point(i, r).join(",")).join(" ");
+  // สัดส่วนคะแนนข้อนั้นเทียบคะแนนเต็ม (0–1) ไม่มีคะแนนให้เป็น 0
   const ratio = (r?: AnswerScore) => (r && r.score !== null && r.maxScore ? Math.min(1, Math.max(0, r.score / r.maxScore)) : 0);
 
   const current = rows.map((r, i) => point(i, ratio(r)));
@@ -1191,6 +1219,7 @@ function ScoreTrend({ list }: { list: Assessment[] }) {
   );
 }
 
+// ป้ายแสดงคะแนนเพิ่ม/ลดจากครั้งก่อน (เพิ่ม = แดง, ลด = เขียว)
 function DeltaPill({ delta }: { delta: number | null }) {
   if (delta === null || !Number.isFinite(delta))
     return <span className="px-2.5 py-1 rounded-full text-[13px] font-semibold bg-[#F3F1EC] text-[#4A4F59]">ข้อมูล 1 ครั้ง</span>;
@@ -1220,6 +1249,7 @@ const ZONES: { level: Level; color: string }[] = [
 // วางจุดไว้กลางช่วงของระดับนั้น (ปกติ 0–⅓, ควรระวัง ⅓–⅔, ควรพบผู้เชี่ยวชาญ ⅔–1)
 const radiusOf = (level: Level) => (LEVEL_STYLE[level].n * 2 - 1) / 6;
 
+// กราฟแมงมุมรวม: แต่ละแกนคือแบบประเมิน แสดงระดับความเสี่ยงล่าสุดเทียบครั้งก่อน
 function RadarCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
   const axes = items.filter((a) => getLevel(a) !== "unknown");
   const unrated = items.filter((a) => getLevel(a) === "unknown");
@@ -1234,8 +1264,11 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
   }
 
   const n = axes.length;
+  // มุมของแกนที่ i (เริ่มจากด้านบน วนตามเข็มนาฬิกา)
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
+  // พิกัด x,y บนแกนที่ i ที่ระยะ r จากจุดกลาง
   const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
+  // สร้างจุดของวงรูปหลายเหลี่ยมที่ระยะ r สำหรับวาดเส้นพื้นหลัง
   const ring = (r: number) => axes.map((_, i) => point(i, r).join(",")).join(" ");
 
   const current = axes.map((a, i) => ({ a, level: getLevel(a), xy: point(i, radiusOf(getLevel(a))) }));
@@ -1331,6 +1364,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
    ASSESSMENT CARD
 ========================================================= */
 
+// การ์ดผลล่าสุดของแบบประเมินหนึ่ง: ระดับ คะแนน และส่วนต่างจากครั้งก่อน กดเพื่อดูประวัติ
 function AssessmentCard({
   assessment: a,
   previous,
@@ -1395,6 +1429,7 @@ function AssessmentCard({
    RECOMMENDATIONS
 ========================================================= */
 
+// กล่องคำแนะนำ: เลือกแบบที่เสี่ยงสูงสุด 4 อันดับ (ข้อคิดทำร้ายตนเองขึ้นก่อน) มาแสดงคำแนะนำ
 function Recommendations({ items, open, onToggle }: { items: Assessment[]; open: boolean; onToggle?: () => void }) {
   const needAttention = items
     .filter((a) => getLevel(a) === "high" || getLevel(a) === "mid")
@@ -1475,6 +1510,7 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
    STATES
 ========================================================= */
 
+// หน้าจอระหว่างกำลังโหลด Dashboard
 function LoadingState() {
   return (
     <main className="min-h-screen flex items-center justify-center">
@@ -1486,6 +1522,7 @@ function LoadingState() {
   );
 }
 
+// หน้าจอแจ้งโหลดข้อมูลไม่สำเร็จ พร้อมปุ่มลองอีกครั้ง
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <main className="min-h-screen p-8">
@@ -1501,6 +1538,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
+// กล่องแจ้งว่ายังไม่มีผลประเมิน พร้อมปุ่มเริ่มทำแบบประเมิน
 function EmptyState({ onStart }: { onStart: () => void }) {
   return (
     <div className="bg-white border border-[#E9E6DE] rounded-[20px] p-12 text-center">

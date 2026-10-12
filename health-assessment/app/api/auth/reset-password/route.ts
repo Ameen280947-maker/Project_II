@@ -26,6 +26,7 @@ type ResetPasswordBody = {
    POST /api/auth/reset-password
 ========================================================= */
 
+// POST: ตรวจ reset token แล้วอัปเดตรหัสผ่านใหม่ของผู้ใช้
 export async function POST(
   request: NextRequest,
 ) {

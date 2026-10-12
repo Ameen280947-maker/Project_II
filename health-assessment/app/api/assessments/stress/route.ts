@@ -46,6 +46,7 @@ async function getStressAssessmentTypeId() {
    GET
 ========================================================= */
 
+// GET: ส่ง assessmentId = คืนผลและคำตอบ ST-5, ไม่ส่ง = คืนคำถาม ST-5
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);

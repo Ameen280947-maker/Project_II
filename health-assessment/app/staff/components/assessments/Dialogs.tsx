@@ -20,6 +20,7 @@ import type { CategoryOption } from "./shared";
    - หมวดใหม่ถูกสร้างพร้อมแบบประเมินใน transaction เดียว (POST /api/staff/assessments)
 ========================================================= */
 
+// กล่องสร้างแบบประเมินใหม่: กรอกชื่อ คำอธิบาย เลือกหรือสร้างหมวดหมู่ แล้วส่งไป API
 export function CreateDialog({
   categories,
   onClose,
@@ -43,6 +44,7 @@ export function CreateDialog({
   const nameTaken = isNew && categories.some((c) => c.name.trim().toLowerCase() === catName.trim().toLowerCase());
   const ready = name.trim() && category && (!isNew || (catName.trim() && !nameTaken));
 
+  // ส่งคำขอสร้างแบบประเมิน (พร้อมสร้างหมวดใหม่ถ้าเลือก)
   const submit = async () => {
     setSaving(true);
     setError("");
@@ -174,6 +176,7 @@ export function ThemePicker({ value, onChange }: { value: CategoryTheme; onChang
    ยืนยันการลบแบบประเมิน (พิมพ์ชื่อให้ตรงก่อนลบ)
 ========================================================= */
 
+// กล่องยืนยันลบแบบประเมิน ต้องพิมพ์ชื่อให้ตรงก่อนลบ
 export function DeleteDialog({
   typeId,
   name,
@@ -192,6 +195,7 @@ export function DeleteDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  // ส่งคำขอลบแบบประเมินพร้อมชื่อที่พิมพ์ยืนยัน
   const submit = async () => {
     setBusy(true);
     setError("");

@@ -42,6 +42,7 @@ async function invalidateLatestOtp(
   );
 }
 
+// สร้าง response 429 แจ้งว่ากรอก OTP ผิดเกินจำนวนครั้งที่กำหนด
 function tooManyAttemptsResponse() {
   return NextResponse.json(
     {
@@ -89,6 +90,7 @@ async function failedAttemptResponse(
    POST /api/auth/verify-otp
 ========================================================= */
 
+// POST: ตรวจรหัส OTP ของอีเมล ถ้าถูกต้องออก reset token สำหรับตั้งรหัสผ่านใหม่
 export async function POST(
   request: NextRequest,
 ) {

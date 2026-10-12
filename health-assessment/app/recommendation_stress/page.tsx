@@ -53,6 +53,7 @@ function getRiskColor(level: string): RiskColor {
    CONTENT
 ========================================================= */
 
+// เนื้อหาหน้าผลความเครียด: โหลดผลตาม assessmentId แล้วแสดงระดับและคำแนะนำ
 function StressRecommendationContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
@@ -73,6 +74,7 @@ function StressRecommendationContent() {
     ======================================================= */
 
     useEffect(() => {
+        // โหลดผลประเมินความเครียดตาม assessmentId จาก API
         const loadResult = async () => {
             if (!assessmentId) {
                 setError("ไม่พบ assessmentId");

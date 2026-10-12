@@ -10,6 +10,7 @@ import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 
+// POST: ตรวจชื่อผู้ใช้และรหัสผ่าน แล้วตั้ง session cookie เมื่อเข้าสู่ระบบสำเร็จ
 export async function POST(
   request: NextRequest,
 ) {

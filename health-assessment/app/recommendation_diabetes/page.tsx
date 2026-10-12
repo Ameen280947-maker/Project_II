@@ -83,6 +83,7 @@ const UNKNOWN_RISK = { name: "ไม่ทราบระดับความ�
    PAGE
 ========================================================= */
 
+// หน้าผลและคำแนะนำความเสี่ยงเบาหวาน: ครอบเนื้อหาด้วย Suspense
 export default function RecommendationDiabetesPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -91,6 +92,7 @@ export default function RecommendationDiabetesPage() {
   );
 }
 
+// เนื้อหาหน้าผลเบาหวาน: โหลดผลตาม assessmentId แล้วแสดงระดับความเสี่ยงและคำแนะนำ
 function RecommendationDiabetesContent() {
   const searchParams =
     useSearchParams();
@@ -135,6 +137,7 @@ function RecommendationDiabetesContent() {
   ========================================================= */
 
   useEffect(() => {
+    // โหลดผลประเมินเบาหวาน (ถ้า URL ไม่มี assessmentId ให้ใช้ค่าที่เก็บใน localStorage)
     const loadResult =
       async () => {
         try {

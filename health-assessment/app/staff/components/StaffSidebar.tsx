@@ -29,6 +29,7 @@ const MENU: { href: string; label: string; icon: ReactNode }[] = [
   { href: "/staff/reports", label: "รายงานและสถิติ", icon: <BarChart3 size={21} /> },
 ];
 
+// แถบเมนูนำทางของ staff พร้อมชื่อผู้ใช้และปุ่มออกจากระบบ (รองรับจอเล็ก/จอใหญ่)
 export default function StaffSidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -39,6 +40,7 @@ export default function StaffSidebar() {
     setName(localStorage.getItem("staffUsername") || "เจ้าหน้าที่");
   }, []);
 
+  // เช็คว่าเมนูตรงกับ path ปัจจุบันหรือไม่ (ใช้ไฮไลต์เมนูที่เลือก)
   const isActive = (href: string) =>
     href === "/staff" ? pathname === "/staff" : pathname === href || pathname.startsWith(href + "/");
 

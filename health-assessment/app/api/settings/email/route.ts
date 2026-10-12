@@ -16,6 +16,7 @@ import { logSystemError } from "@/lib/errorLogger";
 // รูปแบบเดียวกับหน้าสมัครสมาชิก (ต้องมีโดเมนท้าย เช่น .com)
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// PATCH: เปลี่ยนอีเมลของบัญชี หลังยืนยันรหัสผ่านปัจจุบัน
 export async function PATCH(request: NextRequest) {
   let body: { userId?: string | number; email?: string; password?: string };
   try {

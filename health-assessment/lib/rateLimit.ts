@@ -12,6 +12,7 @@ type Bucket = {
   resetAt: number; // ms
 };
 
+// ตัวนับจำนวนครั้งต่อ key ในช่วงเวลาคงที่ (fixed window) เก็บใน memory
 export class FixedWindowCounter {
   private buckets = new Map<string, Bucket>();
 
@@ -20,6 +21,7 @@ export class FixedWindowCounter {
     private readonly windowMs: number,
   ) {}
 
+  // คืน bucket ของ key ที่ยังไม่หมดเวลา (หมดเวลาแล้วจะลบทิ้งและคืน null)
   private current(key: string, now = Date.now()) {
     const bucket = this.buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
@@ -50,6 +52,7 @@ export class FixedWindowCounter {
     return 1;
   }
 
+  // ล้างตัวนับของ key นี้ (เริ่มนับใหม่)
   reset(key: string) {
     this.buckets.delete(key);
   }
@@ -75,6 +78,7 @@ declare global {
     | undefined;
 }
 
+// ตัวนับ rate limit ของระบบ OTP (ขอ OTP / กรอก OTP ผิด) ใช้ร่วมกันทุก route
 export const otpRateLimits = (globalThis.otpRateLimits ??= {
   // ขอ OTP ได้สูงสุด 3 ครั้ง / อีเมล / 15 นาที
   forgotPassword: new FixedWindowCounter(3, 15 * 60 * 1000),

@@ -34,8 +34,10 @@ import { diffSnapshots, type Change } from "@/lib/staff/assessmentHistory";
    DELETE { typeId, confirmName }           → ลบแบบประเมินที่สร้างใหม่และยังไม่มีใครทำ
 ========================================================= */
 
+// สร้าง response JSON แจ้งข้อผิดพลาด (ค่าเริ่มต้น status 400)
 const fail = (message: string, status = 400) => NextResponse.json({ success: false, message }, { status });
 
+// GET: คืนรายการแบบประเมิน / รายละเอียด / ประวัติการแก้ไข / เวอร์ชัน ตาม query
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -93,6 +95,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// ดึงเนื้อหาสำหรับแก้ไข (ฉบับร่างถ้ามี ไม่งั้นเนื้อหาที่ใช้งานอยู่) พร้อมข้อมูลเวอร์ชัน
 async function getDetail(typeId: number) {
   const t = await pool.query("SELECT assessment_name, is_active, category_id FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
   const type = t.rows[0];
@@ -167,6 +170,7 @@ type HistoryEntry = {
   changes?: Change[];
 };
 
+// รวมประวัติการเผยแพร่แต่ละเวอร์ชัน (เทียบกับครั้งก่อน) และการเปิด/ปิดใช้งาน
 async function listChanges(typeId: number): Promise<HistoryEntry[]> {
   const [versions, toggles] = await Promise.all([
     pool.query<{ version_id: number; published_at: Date; published_by: number | null; username: string | null; snapshot: Snapshot }>(
@@ -196,6 +200,7 @@ async function listChanges(typeId: number): Promise<HistoryEntry[]> {
   return entries.sort((a, b) => b.at.localeCompare(a.at));
 }
 
+// คืน snapshot ของเวอร์ชันที่เผยแพร่แล้ว (ดูอย่างเดียว)
 async function getVersion(versionId: number) {
   const { rows } = await pool.query(
     `SELECT v.version_id, v.assessment_type_id, v.version_no, v.published_at, v.snapshot, u.username
@@ -237,6 +242,7 @@ async function recHistory(recId: number) {
 
 /* ---------- บันทึกฉบับร่าง ---------- */
 
+// ดึงชื่อแบบประเมินและเช็กว่าเป็นแบบทั่วไป (generic) หรือไม่ (lock = ล็อกแถวไว้)
 async function liveBase(db: Pick<typeof pool, "query">, typeId: number, lock = false) {
   const { rows } = await db.query(
     `SELECT t.assessment_name,
@@ -248,6 +254,7 @@ async function liveBase(db: Pick<typeof pool, "query">, typeId: number, lock = f
   return rows[0] ? { name: rows[0].assessment_name as string, generic: rows[0].generic as boolean } : null;
 }
 
+// PUT: ตรวจและบันทึก snapshot เป็นฉบับร่างของแบบประเมิน
 export async function PUT(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -280,6 +287,7 @@ export async function PUT(request: NextRequest) {
 
 /* ---------- เปิด/ปิดใช้งาน ---------- */
 
+// PATCH: เปิด/ปิดใช้งานแบบประเมิน หรือย้ายหมวดหมู่ (ถ้าส่ง categoryId)
 export async function PATCH(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -313,6 +321,7 @@ export async function PATCH(request: NextRequest) {
 
 /* ---------- ย้ายหมวดหมู่ (มีผลทันที) ---------- */
 
+// ย้ายแบบประเมินไปหมวดอื่น (แบบประเมินหลักของระบบย้ายไม่ได้)
 async function changeCategory(typeId: number, rawCategoryId: unknown, staffId: number) {
   const categoryId = Number(rawCategoryId);
   if (!Number.isInteger(categoryId) || categoryId <= 0) return fail("กรุณาเลือกหมวดหมู่");
@@ -340,6 +349,7 @@ async function changeCategory(typeId: number, rawCategoryId: unknown, staffId: n
 
 /* ---------- สร้างใหม่ / ทิ้งฉบับร่าง / เผยแพร่ ---------- */
 
+// POST: เผยแพร่ / ทิ้งฉบับร่าง ตาม action หรือสร้างแบบประเมินใหม่ (สร้างหมวดใหม่พร้อมกันได้)
 export async function POST(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -423,6 +433,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
+// ลบฉบับร่างของแบบประเมิน และบันทึก access log
 async function discard(typeId: number, staffId: number) {
   if (!typeId) return fail("ข้อมูลไม่ถูกต้อง");
   try {
@@ -436,6 +447,7 @@ async function discard(typeId: number, staffId: number) {
   }
 }
 
+// เผยแพร่: เขียนเนื้อหาลงตารางจริงและสร้างเวอร์ชันใหม่ใน transaction เดียว
 async function publish(typeId: number, rawSnapshot: unknown, staffId: number) {
   if (!typeId) return fail("ข้อมูลไม่ถูกต้อง");
   const client = await pool.connect();
@@ -500,6 +512,7 @@ async function publish(typeId: number, rawSnapshot: unknown, staffId: number) {
 
 /* ---------- ลบแบบประเมิน ---------- */
 
+// DELETE: ลบแบบประเมินที่สร้างใหม่และยังไม่มีใครทำ
 export async function DELETE(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;

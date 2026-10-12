@@ -42,6 +42,7 @@ type Question = {
    MAIN COMPONENT WITH SUSPENSE
 ========================================================= */
 
+// เนื้อหาแบบประเมินซึมเศร้า 9Q: โหลดคำถาม ให้เลือกคำตอบ แล้วส่งผล
 function Depression9QContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -61,6 +62,7 @@ function Depression9QContent() {
       setUserId(localStorage.getItem("userId"));
     }
 
+    // โหลดคำถาม 9Q จาก API
     async function loadQuestions() {
       try {
         setLoading(true);
@@ -89,6 +91,7 @@ function Depression9QContent() {
     loadQuestions();
   }, []);
 
+  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
   function selectAnswer(questionId: number, choiceId: number) {
     setAnswers((prev) => ({
       ...prev,
@@ -97,6 +100,7 @@ function Depression9QContent() {
     setError("");
   }
 
+  // ตรวจว่าตอบครบ (ไม่ครบเลื่อนไปข้อแรกที่ขาด) แล้ว POST ผล 9Q และพาไปหน้าถัดไป
   async function submitAssessment() {
     setError("");
 
@@ -419,6 +423,7 @@ function Depression9QContent() {
   );
 }
 
+// หน้าแบบประเมิน 9Q: ครอบเนื้อหาด้วย Suspense พร้อมไอคอนโหลด
 export default function Depression9QPage() {
   return (
     <Suspense

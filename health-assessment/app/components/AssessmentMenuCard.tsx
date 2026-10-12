@@ -21,6 +21,7 @@ const TONES: Record<CardTone, { card: string; icon: string; deco: string }> = {
   pink: { card: "bg-[#fce9f0] hover:bg-[#f9dfe9]", icon: "text-[#b4235a]", deco: "text-[#efc1d3]" },
 };
 
+// การ์ดลิงก์ไปยังแบบประเมิน แสดงชื่อและไอคอน สีตามโทนที่กำหนด
 export default function AssessmentMenuCard({
   title,
   href,

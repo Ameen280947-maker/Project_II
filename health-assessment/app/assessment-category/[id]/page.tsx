@@ -18,6 +18,7 @@ import { THEME_INFO, cardToneFor, type AssessmentCategory } from "@/lib/assessme
 
 const NOT_FOUND_TEXT = "ไม่พบหมวดหมู่นี้ หรือยังไม่มีแบบประเมินที่เปิดใช้งาน";
 
+// หน้าหมวดหมู่แบบประเมินตาม id: โหลดหมวดจาก API แล้วแสดงรายการแบบประเมินในหมวด
 export default function AssessmentCategoryPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();

@@ -50,6 +50,7 @@ const USER_STORAGE_KEYS = [
   "rememberLogin",
 ];
 
+// ลบข้อมูลผู้ใช้ทั้งหมดที่เก็บไว้ใน localStorage
 function clearUserStorage() {
   for (const key of USER_STORAGE_KEYS) {
     localStorage.removeItem(key);
@@ -64,6 +65,7 @@ function clearUserStorage() {
    จำ path ปลายทางไว้ก่อนเปลี่ยนหน้า แถบเมนูของหน้าใหม่จึงไฮไลต์ถูกตั้งแต่แรก ไม่กระพริบ */
 const FROM_HISTORY_KEY = "sidebarFromHistory";
 
+// จำ path หน้าผลที่เปิดมาจากหน้าประวัติไว้ใน sessionStorage (ใช้ไฮไลต์เมนูประวัติ)
 export function markFromHistory(href: string) {
   try {
     sessionStorage.setItem(FROM_HISTORY_KEY, href.split("?")[0]);
@@ -72,8 +74,10 @@ export function markFromHistory(href: string) {
   }
 }
 
+// ฟังก์ชัน subscribe เปล่าสำหรับ useSyncExternalStore (ค่าไม่ต้องติดตามการเปลี่ยนแปลง)
 const noopSubscribe = () => () => {};
 
+// คอมโพเนนต์แถบเมนูด้านซ้ายฝั่งผู้ใช้ (ย่อ/ขยายได้, ลิ้นชักบนมือถือ) พร้อมจำนวนแจ้งเตือนที่ยังไม่อ่าน
 export default function Sidebar() {
   const pathname = usePathname();
   const fromHistory = useSyncExternalStore(
@@ -167,6 +171,7 @@ export default function Sidebar() {
     return () => cancelAnimationFrame(t);
   }, []);
 
+  // สลับสถานะย่อ/ขยายแถบเมนู และจำค่าไว้ใน localStorage
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
@@ -197,6 +202,7 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
+    // โหลดจำนวนแจ้งเตือนที่ต้องสนใจมาแสดงเป็นตัวเลขบนเมนู
     const fetchUnread = async () => {
       try {
         const userId = localStorage.getItem("userId");
@@ -228,6 +234,7 @@ export default function Sidebar() {
      LOGOUT
   ========================================================= */
 
+  // ออกจากระบบ: ลบ session ฝั่ง server และข้อมูลในเครื่อง แล้วกลับไปหน้า login
   const logout = async () => {
     // ลบ session cookie ฝั่ง server ก่อน (ถ้าเรียกไม่สำเร็จก็ยังออกจากระบบในเครื่องต่อ)
     try {
@@ -498,6 +505,7 @@ type SidebarItemProps = {
   collapsed?: boolean;
 };
 
+// รายการเมนูหนึ่งรายการในแถบด้านซ้าย (ไอคอน ชื่อ badge และ tooltip ตอนย่อ)
 function SidebarItem({
   href,
   icon,

@@ -23,6 +23,7 @@ export type CategoryRow = {
   builtIn: boolean;
 };
 
+// อ่านหมวดหมู่แบบประเมินทั้งหมดจากฐานข้อมูล (หมวดเดิมก่อน แล้วตามด้วยหมวดที่ staff สร้าง)
 export async function listCategories(db: Queryable = pool): Promise<CategoryRow[]> {
   const { rows } = await db.query(
     `SELECT category_id, name, subtitle, theme, route_path, is_builtin

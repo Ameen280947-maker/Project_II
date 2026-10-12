@@ -25,6 +25,7 @@ export const TYPE_LABELS: Record<string, string> = {
   "PHQ-2": "คัดกรองซึมเศร้า 2Q",
 };
 
+// แปลงชื่อแบบประเมินเป็นชื่อไทยสำหรับฝั่ง staff (ไม่มีในตารางคืนชื่อเดิม)
 export const typeLabel = (name: string) => TYPE_LABELS[name] ?? name;
 
 // ค่าผลที่เก็บเป็นภาษาอังกฤษในตาราง assessment → ข้อความไทยสำหรับแสดงผล
@@ -32,6 +33,7 @@ const RISK_TEXT: Record<string, Record<string, string>> = {
   "Diabetes TDS": { low: "เสี่ยงน้อย", moderate: "เสี่ยงปานกลาง", high: "เสี่ยงสูง", very_high: "เสี่ยงสูงมาก" },
 };
 
+// แปลงระดับผลเป็นข้อความไทยสำหรับแสดงผล (ว่าง = "-")
 export const riskLabel = (assessmentName: string, riskLevel: string | null | undefined) => {
   const risk = String(riskLevel ?? "").trim();
   return RISK_TEXT[assessmentName]?.[risk] ?? (risk || "-");
@@ -96,6 +98,7 @@ const fromText = (risk: string): Severity => {
 // ระดับของแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม (โหลดจากฐานข้อมูลด้วย loadCustomSeverities ฝั่งเซิร์ฟเวอร์)
 const CUSTOM: Record<string, Record<string, Severity>> = {};
 
+// แทนที่ตารางระดับของแบบประเมินที่เจ้าหน้าที่สร้างเพิ่มด้วยค่าชุดใหม่
 export function setCustomSeverities(map: Record<string, Record<string, Severity>>) {
   for (const k of Object.keys(CUSTOM)) delete CUSTOM[k];
   Object.assign(CUSTOM, map);
@@ -109,6 +112,7 @@ export const severityForRank = (i: number, n: number): Severity => {
   return Math.round((i * 3) / (n - 1)) as Severity;
 };
 
+// หา severity (0–3) ของระดับผล: ดูจากตาราง MAP / CUSTOM ก่อน ไม่พบจึงเดาจากข้อความ
 export const severityOf = (assessmentName: string, riskLevel: string | null | undefined): Severity => {
   const risk = String(riskLevel ?? "").trim();
   if (!risk) return 0;

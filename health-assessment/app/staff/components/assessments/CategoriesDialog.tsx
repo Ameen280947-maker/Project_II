@@ -18,6 +18,7 @@ import type { CategoryOption } from "./shared";
 
 type Mode = { kind: "edit"; id: number } | { kind: "delete"; id: number } | null;
 
+// หน้าต่างจัดการหมวดหมู่: แสดงรายการหมวด และสลับเป็นฟอร์มแก้ไข/ลบของแต่ละหมวด
 export default function CategoriesDialog({
   categories,
   onClose,
@@ -30,6 +31,7 @@ export default function CategoriesDialog({
 }) {
   const [mode, setMode] = useState<Mode>(null);
   const [message, setMessage] = useState("");
+  // เมื่อแก้ไข/ลบสำเร็จ: ปิดฟอร์ม แสดงข้อความ และโหลดข้อมูลใหม่
   const done = (m: string) => {
     setMode(null);
     setMessage(m);
@@ -133,6 +135,7 @@ function EditForm({
   const nameTaken = categories.some((c) => c.id !== category.id && c.name.trim().toLowerCase() === name.trim().toLowerCase());
   const unchanged = name.trim() === category.name && subtitle.trim() === (category.subtitle ?? "") && theme === category.theme;
 
+  // บันทึกชื่อ คำอธิบาย และสีของหมวดผ่าน API
   const save = async () => {
     setSaving(true);
     setError("");
@@ -190,6 +193,7 @@ function DeleteForm({
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
+  // ลบหมวดและย้ายแบบประเมินในหมวดไปหมวดที่เลือก (หรือไม่มีหมวด)
   const remove = async () => {
     setDeleting(true);
     setError("");

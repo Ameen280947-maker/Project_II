@@ -16,6 +16,7 @@ type ForgotPasswordResponse = {
   message?: string;
 };
 
+// หน้าลืมรหัสผ่าน: กรอกอีเมลเพื่อรับรหัส OTP
 export default function ForgotPasswordPage() {
   const router = useRouter();
 
@@ -31,6 +32,7 @@ export default function ForgotPasswordPage() {
      SUBMIT EMAIL
   ========================================================= */
 
+  // ตรวจรูปแบบอีเมลแล้วขอส่งรหัส OTP ไปที่อีเมลนั้น
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
@@ -480,6 +482,7 @@ export default function ForgotPasswordPage() {
    STEP COMPONENT
 ========================================================= */
 
+// แสดงขั้นตอนหนึ่งขั้น: หมายเลข หัวข้อ และคำอธิบาย
 function Step({
   number,
   title,

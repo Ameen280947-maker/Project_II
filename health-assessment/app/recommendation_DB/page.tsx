@@ -65,7 +65,7 @@ const DOT: Record<RiskColor, string> = {
   gray: "bg-[#a3a4ab]",
 };
 
-// ระดับที่ควรแนะนำให้ประเมินโรคหัวใจและหลอดเลือดเพิ่ม
+// หน้าผลและคำแนะนำความดันโลหิต: ครอบเนื้อหาด้วย Suspense
 export default function BloodPressureRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -74,6 +74,7 @@ export default function BloodPressureRecommendationPage() {
   );
 }
 
+// เนื้อหาหน้าผลความดัน: โหลดผลตาม assessmentId แล้วแสดงค่าความดันและคำแนะนำ
 function RecommendationContent() {
   const searchParams =
     useSearchParams();
@@ -99,6 +100,7 @@ function RecommendationContent() {
   ========================================================= */
 
   useEffect(() => {
+    // โหลดผลประเมินความดันโลหิตตาม assessmentId (session หมดอายุให้กลับหน้า login)
     const loadResult =
       async () => {
         if (!assessmentId) {

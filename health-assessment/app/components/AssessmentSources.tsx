@@ -12,6 +12,7 @@ import { BookOpen } from "lucide-react";
 
 type Sources = { assessmentSource?: string | null; recommendationSource?: string | null };
 
+// hook โหลดแหล่งอ้างอิงจาก API ตาม query (คืน null ถ้ายังไม่มีข้อมูลของ query นี้)
 function useSources(query: string | null) {
   const [data, setData] = useState<{ query: string; sources: Sources } | null>(null);
 
@@ -32,6 +33,7 @@ function useSources(query: string | null) {
   return data?.query === query ? data.sources : null;
 }
 
+// แสดงบรรทัดแหล่งอ้างอิงของแบบประเมินในหน้าทำแบบประเมิน
 export function AssessmentSourceNote({ typeId, className = "" }: { typeId: number | null | undefined; className?: string }) {
   const sources = useSources(typeId ? `typeId=${typeId}` : null);
   if (!sources?.assessmentSource) return null;
@@ -44,6 +46,7 @@ export function AssessmentSourceNote({ typeId, className = "" }: { typeId: numbe
   );
 }
 
+// แสดงแหล่งอ้างอิงของคำแนะนำและแบบประเมินในหน้าผลการประเมิน
 export function ResultSources({ assessmentId, className = "" }: { assessmentId: string | number | null | undefined; className?: string }) {
   const sources = useSources(assessmentId ? `assessmentId=${assessmentId}` : null);
   if (!sources || (!sources.recommendationSource && !sources.assessmentSource)) return null;

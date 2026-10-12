@@ -47,6 +47,7 @@ export const LIMITS = { questions: 60, choices: 20, levels: 20, genericLevels: [
 
 /* ---------- อ่านเนื้อหาที่ใช้งานอยู่ → snapshot ---------- */
 
+// อ่านข้อมูลแบบประเมิน คำถาม ตัวเลือก และระดับผลจากตารางจริง แล้วรวมเป็น snapshot (ไม่พบคืน null)
 export async function buildSnapshot(db: Db, typeId: number): Promise<Snapshot | null> {
   const [t, q, c, r] = await Promise.all([
     db.query("SELECT assessment_name, description, source FROM assessment_types WHERE assessment_type_id = $1", [typeId]),
@@ -136,17 +137,21 @@ export async function ensureBaselines(typeIds: number[]) {
    normalizeSnapshot: ผ่อนปรน (ฉบับร่างยังกรอกไม่ครบได้) แต่รูปแบบและความยาวต้องถูก
    validateForPublish: เข้มงวด ใช้ตอนเผยแพร่ */
 
+// แปลงเป็นข้อความ ตัดช่องว่าง และจำกัดความยาวไม่เกิน max ตัวอักษร
 const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
+// แปลงเป็นจำนวนเต็ม (ว่างหรือไม่ใช่ตัวเลข = null)
 const intOrNull = (v: unknown) => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : null;
 };
+// แปลงเป็น id ที่เป็นจำนวนเต็มบวก ไม่ถูกต้องคืน undefined
 const idOf = (v: unknown) => {
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? n : undefined;
 };
 
+// ตรวจและจัดรูปแบบ snapshot ที่ส่งมาจากหน้าเว็บ คืน Snapshot หรือข้อความผิดพลาด
 export function normalizeSnapshot(raw: unknown, base: { name: string; generic: boolean }): Snapshot | string {
   const s = (raw ?? {}) as Record<string, unknown>;
   if (!Array.isArray(s.questions) || !Array.isArray(s.levels)) return "ข้อมูลไม่ถูกต้อง";
@@ -204,6 +209,7 @@ export function normalizeSnapshot(raw: unknown, base: { name: string; generic: b
   };
 }
 
+// ตรวจความครบถ้วนก่อนเผยแพร่ (คำถาม ตัวเลือก ช่วงคะแนนต่อกัน ชื่อระดับไม่ซ้ำ) คืนข้อความผิดพลาดหรือ null
 export function validateForPublish(snap: Snapshot): string | null {
   if (!snap.questions.length) return "ต้องมีคำถามอย่างน้อย 1 ข้อ";
   for (const [i, q] of snap.questions.entries()) {

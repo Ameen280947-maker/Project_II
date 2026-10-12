@@ -7,6 +7,7 @@ const USERNAME_MAX = 30;
 // ต้องมีโดเมนท้าย เช่น .com .ac.th
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
+// POST: ตรวจข้อมูลสมัครสมาชิก แฮชรหัสผ่าน แล้วสร้างบัญชีผู้ใช้ใหม่
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

@@ -45,6 +45,7 @@ type SubmitResponse = {
   message?: string;
 };
 
+// หน้าแบบประเมินพฤติกรรมการกินอาหาร: แสดงคำถามทีละข้อ แล้วส่งคำตอบไปประเมินผล
 export default function DietAssessmentPage() {
   const router = useRouter();
 
@@ -62,6 +63,7 @@ export default function DietAssessmentPage() {
   ===================================================== */
 
   useEffect(() => {
+    // โหลดคำถามแบบประเมินอาหารจาก API
     const loadQuestions = async () => {
       try {
         setLoading(true);
@@ -191,6 +193,7 @@ export default function DietAssessmentPage() {
      SELECT ANSWER
   ===================================================== */
 
+  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
   const selectAnswer = (
     questionId: number,
     choiceId: number,
@@ -205,6 +208,7 @@ export default function DietAssessmentPage() {
      NEXT
   ===================================================== */
 
+  // ตรวจว่าตอบข้อปัจจุบันแล้ว จึงไปข้อถัดไป
   const nextQuestion = () => {
     if (!currentQuestion) {
       return;
@@ -230,6 +234,7 @@ export default function DietAssessmentPage() {
      PREVIOUS
   ===================================================== */
 
+  // ย้อนกลับไปข้อก่อนหน้า
   const previousQuestion = () => {
     setError("");
 
@@ -244,6 +249,7 @@ export default function DietAssessmentPage() {
      SUBMIT
   ===================================================== */
 
+  // ตรวจว่าตอบครบทุกข้อ แล้ว POST ผลแบบประเมินอาหาร และพาไปหน้าคำแนะนำ
   const submitAssessment = async () => {
     if (
       questions.length === 0 ||

@@ -44,6 +44,7 @@ type Result = {
    COMPONENT CONTENT
 ========================================================= */
 
+// เนื้อหาหน้าผล 9Q: โหลดผลตาม assessmentId แล้วแสดงระดับภาวะซึมเศร้าและคำแนะนำ
 function Depression9QRecommendationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -60,6 +61,7 @@ function Depression9QRecommendationContent() {
       return;
     }
 
+    // โหลดผลประเมิน 9Q ของผู้ใช้ตาม assessmentId จาก API
     async function loadResult() {
       try {
         setLoading(true);
@@ -231,6 +233,7 @@ function Depression9QRecommendationContent() {
   );
 }
 
+// หน้าผลและคำแนะนำ 9Q: ครอบเนื้อหาด้วย Suspense
 export default function Depression9QRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>

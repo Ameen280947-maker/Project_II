@@ -23,6 +23,7 @@ type SubmitResponse = {
   message?: string;
 };
 
+// หน้าแบบประเมินความดันโลหิต: กรอกค่าตัวบน/ตัวล่าง แล้วส่งไปประเมินผล
 export default function BloodPressureAssessmentPage() {
   const router = useRouter();
 
@@ -43,6 +44,7 @@ export default function BloodPressureAssessmentPage() {
      บันทึกลง Database
   ========================================================= */
 
+  // ตรวจค่าความดันที่กรอก แล้ว POST ไปบันทึกผลและพาไปหน้าคำแนะนำความดัน
   const handleAssessment =
     async () => {
       try {
@@ -327,6 +329,7 @@ export default function BloodPressureAssessmentPage() {
    Pressure input
 ========================================================= */
 
+// ช่องกรอกค่าความดันโลหิต (mmHg) พร้อมป้ายชื่อ
 function PressureInput({
   label,
   value,

@@ -32,6 +32,7 @@ interface NotificationBellProps {
   onNavigate?: () => void;
 }
 
+// คอมโพเนนต์กระดิ่งแจ้งเตือน: โหลดแจ้งเตือนทุก 1 นาที แสดงรายการแบบแท็บ และกดอ่าน/ไปยังหน้าที่เกี่ยวข้อง
 export default function NotificationBell({ className = "", onNavigate }: NotificationBellProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
@@ -41,6 +42,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
   const [activeTab, setActiveTab] = useState<"all" | "due" | "upcoming">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // โหลดรายการแจ้งเตือนและสรุปจำนวน (ยังไม่อ่าน / ครบกำหนด) ของผู้ใช้จาก API
   const fetchNotifications = async () => {
     try {
       const userId = localStorage.getItem("userId");
@@ -82,6 +84,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
     };
   }, [isOpen]);
 
+  // ทำเครื่องหมายว่าอ่านแล้ว: ระบุ id = อ่านรายการเดียว, ไม่ระบุ = อ่านทั้งหมด
   const markAsRead = async (notificationId?: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
@@ -112,6 +115,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
     }
   };
 
+  // กดที่แจ้งเตือน: ทำเครื่องหมายอ่าน ปิด dropdown แล้วไปยังหน้าที่แจ้งเตือนกำหนด
   const handleAction = (notif: CalculatedNotification) => {
     if (!notif.isRead && notif.notificationId) {
       markAsRead(notif.notificationId);
@@ -138,6 +142,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
     return true;
   });
 
+  // เลือกสี ป้ายข้อความ และไอคอนของแจ้งเตือนตามสถานะ/ความเร่งด่วน
   const getUrgencyBadge = (urgency: string, status: string) => {
     if (status === "overdue") {
       return {

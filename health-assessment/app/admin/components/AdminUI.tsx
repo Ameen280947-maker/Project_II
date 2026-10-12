@@ -7,6 +7,7 @@ import { CheckCircle2, AlertTriangle, XCircle, Loader2 } from "lucide-react";
    ชิ้นส่วน UI ที่ใช้ร่วมกันในหน้า Admin (โทนน้ำเงินเข้ม)
 ========================================================= */
 
+// ส่วนหัวของหน้า admin: ไอคอน หัวข้อ คำอธิบาย และปุ่มด้านขวา (ถ้ามี)
 export function PageHeader({
   icon,
   title,
@@ -34,6 +35,7 @@ export function PageHeader({
   );
 }
 
+// กล่องการ์ดพื้นขาวมุมโค้ง ใช้ห่อเนื้อหาในหน้า admin
 export function Card({
   children,
   className = "",
@@ -50,6 +52,7 @@ export function Card({
   );
 }
 
+// การ์ดแสดงตัวเลขสถิติ พร้อมไอคอน ป้ายชื่อ และคำอธิบายเพิ่มเติม
 export function StatCard({
   icon,
   label,
@@ -83,6 +86,7 @@ const STATUS_STYLE: Record<Status, { cls: string; text: string; Icon: typeof Che
   error: { cls: "bg-[#fdecec] text-[#b91c1c]", text: "มีปัญหา", Icon: XCircle },
 };
 
+// ป้ายสถานะสี ok / warning / error พร้อมไอคอน
 export function StatusBadge({ status, label }: { status: Status; label?: string }) {
   const s = STATUS_STYLE[status];
   return (
@@ -95,6 +99,7 @@ export function StatusBadge({ status, label }: { status: Status; label?: string 
   );
 }
 
+// ปุ่มหลักสีน้ำเงิน แสดงไอคอนหมุนและปิดการกดระหว่างโหลด
 export function PrimaryButton({
   children,
   loading,
@@ -113,6 +118,7 @@ export function PrimaryButton({
   );
 }
 
+// ปุ่มรองแบบขอบเส้น พื้นขาว
 export function GhostButton({
   children,
   className = "",
@@ -128,6 +134,7 @@ export function GhostButton({
   );
 }
 
+// กล่องข้อความแจ้งผลสำเร็จ (เขียว) หรือผิดพลาด (แดง)
 export function Notice({
   kind,
   children,
@@ -148,6 +155,7 @@ export function Notice({
   );
 }
 
+// กล่องแสดงสถานะ "กำลังโหลด..." พร้อมไอคอนหมุน
 export function LoadingBlock() {
   return (
     <div className="flex items-center justify-center gap-2 py-20 text-[#64748b]">

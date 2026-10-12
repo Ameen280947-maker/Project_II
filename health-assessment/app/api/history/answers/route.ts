@@ -29,6 +29,7 @@ type AnswerRow = {
   max_score: string | number | null;
 };
 
+// GET: คืนคำตอบรายข้อของผลประเมินหนึ่งครั้ง (เฉพาะของผู้ใช้เอง)
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);

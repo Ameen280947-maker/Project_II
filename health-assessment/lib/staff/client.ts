@@ -7,10 +7,12 @@
    - ค่าของ staff เก็บใน staffUserId / staffUsername แยกจากของผู้ใช้ทั่วไป
 ========================================================= */
 
+// ลบข้อมูล staff (staffUserId / staffUsername) ออกจาก localStorage
 export function clearStaffSession() {
   ["staffUserId", "staffUsername"].forEach((k) => localStorage.removeItem(k));
 }
 
+// เรียก API ฝั่ง staff แบบไม่ใช้ cache แนบ x-staff-id และ throw error ถ้าสถานะไม่ ok
 export async function staffFetch<T = unknown>(url: string, init: RequestInit = {}): Promise<T> {
   const staffId = typeof window !== "undefined" ? localStorage.getItem("staffUserId") : null;
   const res = await fetch(url, {
@@ -29,6 +31,7 @@ export async function staffFetch<T = unknown>(url: string, init: RequestInit = {
   return json as T;
 }
 
+// แปลงเวลาเป็นข้อความแบบ "x นาทีที่แล้ว" / "เมื่อวาน" หรือวันที่แบบไทยถ้าเกิน 7 วัน
 export const relativeTime = (iso: string) => {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
   if (diff < 60) return "เมื่อสักครู่";

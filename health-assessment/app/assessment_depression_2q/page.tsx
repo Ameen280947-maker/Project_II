@@ -46,6 +46,7 @@ type Answer = {
    PAGE
 ========================================================= */
 
+// หน้าแบบคัดกรองภาวะซึมเศร้า 2Q: ตอบทีละข้อ แล้วส่งผล (อาจต่อไปทำ 9Q)
 export default function Depression2QPage() {
   const router = useRouter();
 
@@ -73,6 +74,7 @@ export default function Depression2QPage() {
       setUserId(storedId);
     }
 
+    // โหลดคำถาม 2Q จาก API
     const loadQuestions = async () => {
       try {
         setLoading(true);
@@ -121,6 +123,7 @@ export default function Depression2QPage() {
      SELECT ANSWER
   ======================================================= */
 
+  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
   const handleSelectAnswer = (
     questionId: number,
     choiceId: number
@@ -148,6 +151,7 @@ export default function Depression2QPage() {
      NEXT QUESTION
   ======================================================= */
 
+  // ตรวจว่าตอบข้อปัจจุบันแล้ว จากนั้นไปข้อถัดไป หรือส่งผลถ้าเป็นข้อสุดท้าย
   const handleNext = () => {
     if (!currentQuestionData) {
       return;
@@ -181,6 +185,7 @@ export default function Depression2QPage() {
      PREVIOUS QUESTION
   ======================================================= */
 
+  // ย้อนกลับไปข้อก่อนหน้า
   const handlePrevious = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion((previous) => previous - 1);
@@ -197,6 +202,7 @@ export default function Depression2QPage() {
      SUBMIT 2Q
   ======================================================= */
 
+  // ตรวจว่าตอบครบ แล้ว POST ผล 2Q และพาไปหน้า 9Q หรือหน้าคำแนะนำตามผลที่ได้
   const handleSubmit = async () => {
     try {
       setSubmitting(true);

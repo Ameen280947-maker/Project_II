@@ -11,6 +11,7 @@ import type { Pool, PoolClient } from "pg";
 
 type Db = Pool | PoolClient;
 
+// ตั้ง version_id ของผลประเมินเป็นเวอร์ชันที่เผยแพร่ล่าสุดของแบบประเมิน (ไม่ throw)
 export async function markAssessmentSaved(
   db: Db,
   { typeId, assessmentId }: { userId?: number; typeId: number; assessmentId: number },

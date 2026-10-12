@@ -203,6 +203,7 @@ export async function GET(request: NextRequest) {
 
 const LIFETIME_QUESTION_ORDER = 2;
 
+// หาข้อที่ต้องข้าม (ข้อหลังข้อ 2) เมื่อผู้ใช้ตอบว่าไม่สูบบุหรี่
 function getSkippedQuestionIds(
   choices: ChoiceRow[],
   answers: Record<string, unknown>,

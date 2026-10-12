@@ -24,10 +24,12 @@ const MENU: { href: string; label: string; short: string; icon: ReactNode }[] = 
   { href: "/admin/backup", label: "สำรองข้อมูล", short: "สำรอง", icon: <HardDriveDownload size={21} /> },
 ];
 
+// คอมโพเนนต์แถบเมนูของแอดมิน (แถบซ้ายบนจอใหญ่ / แถบล่างบนมือถือ) พร้อมปุ่มออกจากระบบ
 export default function AdminSidebar({ username }: { username: string }) {
   const pathname = usePathname();
   const router = useRouter();
 
+  // ออกจากระบบฝั่งแอดมิน แล้วพากลับไปหน้า login
   const logout = async () => {
     // ลบเฉพาะ cookie ของ admin (session_admin) แท็บที่เปิดเป็นผู้ใช้หรือ staff ยังใช้งานต่อได้
     // admin ไม่ได้เก็บค่าใน localStorage จึงไม่ต้องลบ

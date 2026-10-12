@@ -32,6 +32,7 @@ type Answer = {
     score: number;
 };
 
+// หน้าแบบประเมินการนอนหลับ: แสดงคำถามทีละข้อ แล้วส่งคำตอบไปบันทึกผล
 export default function SleepAssessmentPage() {
     const router = useRouter();
 
@@ -55,6 +56,7 @@ export default function SleepAssessmentPage() {
     // =====================================================
 
     useEffect(() => {
+        // โหลดคำถามแบบประเมินการนอนจาก API
         async function loadQuestions() {
             try {
                 setLoading(true);
@@ -179,6 +181,7 @@ export default function SleepAssessmentPage() {
     // Submit
     // =====================================================
 
+    // ตรวจว่าตอบครบทุกข้อ แล้ว POST ผลการนอนและพาไปหน้าคำแนะนำ
     async function handleSubmit() {
         if (
             !questions.length ||

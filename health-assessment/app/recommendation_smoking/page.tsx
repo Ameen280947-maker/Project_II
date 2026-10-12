@@ -56,6 +56,7 @@ type RecommendationResponse = {
    PAGE
 ========================================================= */
 
+// หน้าผลและคำแนะนำการสูบบุหรี่: ครอบเนื้อหาด้วย Suspense
 export default function SmokingRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -64,6 +65,7 @@ export default function SmokingRecommendationPage() {
   );
 }
 
+// เนื้อหาหน้าผลการสูบบุหรี่: โหลดผลและคำตอบตาม assessmentId แล้วแสดงคำแนะนำ
 function SmokingRecommendationContent() {
   const searchParams = useSearchParams();
 
@@ -79,6 +81,7 @@ function SmokingRecommendationContent() {
   ======================================================= */
 
   useEffect(() => {
+    // โหลดผลประเมินการสูบบุหรี่และคำตอบตาม assessmentId จาก API
     const loadResult = async () => {
       if (!assessmentId) {
         setError("ไม่พบ assessmentId");
@@ -235,6 +238,7 @@ function SmokingRecommendationContent() {
    RISK INFO
 ========================================================= */
 
+// แปลงระดับความเสี่ยง (ไทย/อังกฤษ) เป็นป้ายข้อความภาษาไทยและสี
 function getRiskInfo(
   riskLevel: string | null | undefined,
 ): { label: string; color: RiskColor } {
@@ -264,6 +268,7 @@ function getRiskInfo(
    DEFAULT RECOMMENDATION
 ========================================================= */
 
+// คืนข้อความคำแนะนำเริ่มต้นตามระดับความเสี่ยง (ใช้เมื่อไม่มีคำแนะนำจากระบบ)
 function getDefaultRecommendation(riskLevel: string | null | undefined) {
   const level = String(riskLevel ?? "").toLowerCase();
 
@@ -305,6 +310,7 @@ const RISK_BOX_STYLES = {
   },
 };
 
+// กล่องแสดงช่วงคะแนนและระดับความเสี่ยง ไฮไลต์เมื่อตรงกับผลของผู้ใช้
 function RiskBox({
   range,
   title,

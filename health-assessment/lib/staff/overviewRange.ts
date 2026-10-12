@@ -25,6 +25,7 @@ function todayInBangkok() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
 }
 
+// แปลง "YYYY-MM-DD" เป็น Date (UTC) ถ้าวันที่ไม่มีจริงคืน null
 function toUtcDate(s: string) {
   const [y, m, d] = s.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
@@ -32,12 +33,14 @@ function toUtcDate(s: string) {
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? date : null;
 }
 
+// บวก/ลบจำนวนวันจากวันที่ "YYYY-MM-DD" แล้วคืนในรูปแบบเดิม
 export function addDays(s: string, days: number) {
   const d = toUtcDate(s)!;
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
 }
 
+// นับจำนวนวันในช่วง from ถึง to (รวมทั้งสองวัน)
 export function spanDays(from: string, to: string) {
   return Math.round((toUtcDate(to)!.getTime() - toUtcDate(from)!.getTime()) / 86_400_000) + 1;
 }
@@ -68,6 +71,7 @@ export function bucketLabel(key: string, bucket: Bucket, days: number, multiYear
 
 /* ---------- อ่านช่วงเวลาจาก query ---------- */
 
+// อ่านช่วงวันที่จาก query (from/to หรือ range แบบเดิม) พร้อมตรวจความถูกต้อง คืน from/to หรือ error
 export function parseRange(params: URLSearchParams): { from: string; to: string } | { error: string } {
   const today = todayInBangkok();
   const legacy = params.get("range");

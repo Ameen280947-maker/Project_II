@@ -25,6 +25,7 @@ const THAI_NAMES: Record<string, string> = {
 // เทียบแบบไม่สนตัวพิมพ์ เพราะบางหน้าส่งชื่อมาเป็นตัวพิมพ์เล็ก
 const BY_LOWER = new Map(Object.entries(THAI_NAMES).map(([k, v]) => [k.toLowerCase(), v]));
 
+// แปลงชื่อแบบประเมิน (อังกฤษ) เป็นชื่อไทย ถ้าไม่รู้จักคืนชื่อเดิม
 export const assessmentThaiName = (name: string | null | undefined) => {
   const raw = String(name ?? "").trim();
   return BY_LOWER.get(raw.toLowerCase()) ?? raw;
@@ -35,6 +36,7 @@ const RISK_TEXT: Record<string, Record<string, string>> = {
   "diabetes tds": { low: "เสี่ยงน้อย", moderate: "เสี่ยงปานกลาง", high: "เสี่ยงสูง", very_high: "เสี่ยงสูงมาก" },
 };
 
+// แปลงระดับผลที่เก็บเป็นภาษาอังกฤษเป็นข้อความไทยตามแบบประเมิน ถ้าไม่มีในตารางคืนค่าเดิม
 export const riskLevelThai = (name: string | null | undefined, riskLevel: string | null | undefined) => {
   const risk = String(riskLevel ?? "").trim();
   return RISK_TEXT[String(name ?? "").trim().toLowerCase()]?.[risk] ?? risk;

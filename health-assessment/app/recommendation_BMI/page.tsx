@@ -61,6 +61,7 @@ const DOT: Record<RiskColor, string> = {
     gray: "bg-[#a3a4ab]",
 };
 
+// หน้าผลและคำแนะนำ BMI: ครอบเนื้อหาด้วย Suspense (เพราะใช้ useSearchParams)
 export default function BmiResultPage() {
     return (
         <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -69,6 +70,7 @@ export default function BmiResultPage() {
     );
 }
 
+// เนื้อหาหน้าผล BMI: โหลดผลตาม assessmentId แล้วแสดงระดับและการ์ดคำแนะนำ
 function BmiResultContent() {
     const searchParams = useSearchParams();
     const assessmentId = searchParams.get("assessmentId");
@@ -78,6 +80,7 @@ function BmiResultContent() {
     const [error, setError] = useState("");
 
     useEffect(() => {
+        // โหลดผลประเมิน BMI ตาม assessmentId จาก API
         const loadResult = async () => {
             if (!assessmentId) {
                 setError("ไม่พบ assessmentId");

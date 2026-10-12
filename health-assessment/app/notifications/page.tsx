@@ -19,6 +19,7 @@ import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
 import type { CalculatedNotification } from "@/lib/notificationRules";
 
+// หน้าการแจ้งเตือน: แสดงกำหนดประเมินซ้ำของแต่ละแบบประเมิน กรองตามหมวดและสถานะได้
 export default function NotificationsPage() {
   const router = useRouter();
   const [notifications, setNotifications] = useState<CalculatedNotification[]>([]);
@@ -28,6 +29,7 @@ export default function NotificationsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "due" | "upcoming" | "scheduled">("all");
   const [showGuidelines, setShowGuidelines] = useState(false);
 
+  // ดึงรายการแจ้งเตือนของผู้ใช้จาก API
   const fetchNotifications = async () => {
     try {
       setLoading(true);
@@ -61,6 +63,7 @@ export default function NotificationsPage() {
     fetchNotifications();
   }, []);
 
+  // ทำเครื่องหมายว่าอ่านการแจ้งเตือนทั้งหมดแล้ว (ทั้งในฐานข้อมูลและบนหน้าจอ)
   const markAllRead = async () => {
     try {
       const userId = localStorage.getItem("userId");
@@ -96,6 +99,7 @@ export default function NotificationsPage() {
   const upcomingCount = notifications.filter((n) => n.status === "upcoming").length;
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
+  // แปลงวันที่เป็นรูปแบบไทย (ไม่มีวันที่แสดง "-")
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString("th-TH", {

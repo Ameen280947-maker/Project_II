@@ -199,6 +199,7 @@ export function ScoreCircle({
    หัวข้อส่วนเนื้อหาเฉพาะแบบประเมิน + การ์ดแนวทาง
 ========================================================= */
 
+// หัวข้อส่วนเนื้อหาเฉพาะของแบบประเมิน (ไอคอน + ชื่อหัวข้อ) แล้วตามด้วยเนื้อหา
 export function RecommendationSection({
   icon,
   title,
@@ -221,6 +222,7 @@ export function RecommendationSection({
   );
 }
 
+// การ์ดแนวทางปฏิบัติหนึ่งข้อ: ไอคอนสีตามโทน หัวข้อ และรายละเอียด
 export function AdviceCard({
   tone,
   icon,
@@ -247,6 +249,7 @@ export function AdviceCard({
    โหลด / ผิดพลาด
 ========================================================= */
 
+// โครงหน้าพื้นฐาน: แถบเมนูด้านซ้าย + พื้นที่เนื้อหา
 function Shell({ children }: { children: ReactNode }) {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
@@ -258,6 +261,7 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
+// หน้าแสดงสถานะกำลังโหลดผลการประเมิน
 export function RecommendationLoading({ tone }: { tone: CardTone }) {
   return (
     <Shell>
@@ -271,6 +275,7 @@ export function RecommendationLoading({ tone }: { tone: CardTone }) {
   );
 }
 
+// หน้าแจ้งว่าแสดงผลไม่ได้ พร้อมปุ่มกลับไปทำแบบประเมิน
 export function RecommendationError({
   tone,
   message,
@@ -306,6 +311,7 @@ export function RecommendationError({
    หน้าคำแนะนำ
 ========================================================= */
 
+// โครงหน้าคำแนะนำหลังทำแบบประเมิน: คะแนน ระดับผล คำแนะนำ แหล่งอ้างอิง และปุ่มท้ายหน้า
 export default function RecommendationLayout({
   tone,
   assessmentKey,

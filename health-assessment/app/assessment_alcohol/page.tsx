@@ -251,6 +251,7 @@ const QUESTIONS: Question[] = [
    PAGE
 ========================================================= */
 
+// หน้าแบบประเมินการดื่มแอลกอฮอล์: แสดงคำถามทีละข้อ แล้วส่งคำตอบไปคำนวณผล
 export default function AlcoholAssessmentPage() {
   const router = useRouter();
 
@@ -339,6 +340,7 @@ export default function AlcoholAssessmentPage() {
      SELECT ANSWER
   ====================================================== */
 
+  // บันทึกคำตอบของข้อที่เลือก และล้างข้อความแจ้งเตือน
   const selectAnswer = (
     questionId: number,
     value: number,
@@ -355,6 +357,7 @@ export default function AlcoholAssessmentPage() {
      NEXT
   ====================================================== */
 
+  // ไปข้อถัดไป หรือส่งผลทันทีถ้าข้อ 1 ตอบว่าไม่เคยดื่ม/เลิกดื่มแล้ว หรือเป็นข้อสุดท้าย
   const nextQuestion = () => {
     if (
       selectedValue === undefined
@@ -410,6 +413,7 @@ export default function AlcoholAssessmentPage() {
      SUBMIT
   ====================================================== */
 
+  // POST คำตอบไปบันทึกผลแอลกอฮอล์ แล้วพาไปหน้าคำแนะนำ
   const submitAssessment = async (
     finalAnswers: Record<
       number,

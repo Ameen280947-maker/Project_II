@@ -25,6 +25,7 @@ type SmokingAssessment = {
   questions?: SmokingQuestion[];
 };
 
+// หน้าแบบประเมินการสูบบุหรี่: แสดงคำถาม (ข้ามข้อที่เหลือถ้าไม่เคยสูบ) แล้วส่งผล
 export default function SmokingAssessmentPage() {
   const router = useRouter();
 
@@ -48,6 +49,7 @@ export default function SmokingAssessmentPage() {
   ===================================================== */
 
   useEffect(() => {
+    // โหลดชุดคำถามแบบประเมินการสูบบุหรี่จาก API
     const loadAssessment = async () => {
       try {
         setLoading(true);
@@ -100,6 +102,7 @@ export default function SmokingAssessmentPage() {
      SELECT ANSWER
   ===================================================== */
 
+  // บันทึกคำตอบที่ผู้ใช้เลือกของข้อนั้น
   const handleAnswer = (
     questionId: number,
     answer: string
@@ -128,6 +131,7 @@ export default function SmokingAssessmentPage() {
      SUBMIT
   ===================================================== */
 
+  // ตรวจว่าตอบครบเฉพาะข้อที่แสดง แล้ว POST ผลและพาไปหน้าคำแนะนำ
   const handleSubmit = async () => {
     if (visibleQuestions.length === 0) {
       return;

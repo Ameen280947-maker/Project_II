@@ -10,6 +10,7 @@ import type { CardTone } from "@/app/components/AssessmentMenuCard";
 export const CATEGORY_THEMES = ["red", "green", "blue", "amber", "violet", "teal", "pink"] as const;
 export type CategoryTheme = (typeof CATEGORY_THEMES)[number];
 
+// เช็คว่าค่าที่ได้เป็นชื่อสีของหมวดที่รองรับหรือไม่
 export const isCategoryTheme = (v: unknown): v is CategoryTheme =>
   typeof v === "string" && (CATEGORY_THEMES as readonly string[]).includes(v);
 
@@ -90,6 +91,7 @@ export type AssessmentCategory = {
   assessments: CategoryAssessment[];
 };
 
+// ลิงก์หน้าเมนูของหมวด: ใช้ route_path ถ้ามี ไม่งั้นใช้หน้ากลาง /assessment-category/<id>
 export const categoryHref = (c: { id: number; routePath: string | null }) => c.routePath ?? `/assessment-category/${c.id}`;
 
 /* ===== โทนการ์ดของแบบประเมินที่สร้างเพิ่ม (เลือกตาม id ให้สีคงที่ทุกครั้ง) ===== */

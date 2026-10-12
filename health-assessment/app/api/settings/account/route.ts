@@ -13,6 +13,7 @@ import { logSystemError } from "@/lib/errorLogger";
 const USERNAME_MIN = 3;
 const USERNAME_MAX = 30;
 
+// PATCH: เปลี่ยนชื่อผู้ใช้ (ตรวจความยาวและห้ามซ้ำกับบัญชีอื่น)
 export async function PATCH(request: NextRequest) {
   let body: { userId?: string | number; username?: string };
   try {

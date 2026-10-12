@@ -7,6 +7,7 @@ import UsersClient, { type Filter } from "./UsersClient";
 
 const STATUSES: Filter[] = ["all", "active", "inactive", "suspended"];
 
+// อ่าน ?status จาก URL แล้วส่งเป็นแท็บเริ่มต้นให้ UsersClient
 export default async function StaffUsersPage({
   searchParams,
 }: {

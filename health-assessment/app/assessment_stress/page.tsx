@@ -36,6 +36,7 @@ type Question = {
    PAGE
 ========================================================= */
 
+// หน้าแบบประเมินความเครียด ST-5: แสดงคำถาม 5 ข้อและส่งคำตอบไปคำนวณผล
 export default function StressAssessmentPage() {
     const router = useRouter();
 
@@ -61,6 +62,7 @@ export default function StressAssessmentPage() {
     ======================================================= */
 
     useEffect(() => {
+        // โหลดคำถามแบบประเมินความเครียดจาก API
         const loadQuestions =
             async () => {
                 try {
@@ -108,6 +110,7 @@ export default function StressAssessmentPage() {
        SELECT ANSWER
     ======================================================= */
 
+    // บันทึกตัวเลือกที่ผู้ใช้เลือกของข้อนั้น และล้างข้อความแจ้งเตือน
     const handleAnswerChange = (
         questionId: number,
         optionId: number,
@@ -124,6 +127,7 @@ export default function StressAssessmentPage() {
        GET USER ID
     ======================================================= */
 
+    // หา userId จาก localStorage (ลองหลาย key และรองรับทั้งตัวเลขและ JSON)
     const getUserId = () => {
         const possibleKeys = [
             "userId",
@@ -192,6 +196,7 @@ export default function StressAssessmentPage() {
        SUBMIT
     ======================================================= */
 
+    // ตรวจว่าตอบครบ 5 ข้อ สร้างข้อมูลคำตอบพร้อมคะแนน แล้ว POST และพาไปหน้าคำแนะนำ
     const handleSubmit =
         async () => {
             setError("");

@@ -44,11 +44,13 @@ const ROLE_LABEL: Record<string, string> = {
   system_admin: "System Admin",
 };
 
+// หน้าตรวจสอบระบบของแอดมิน: สถานะส่วนต่าง ๆ ของระบบและสถิติภาพรวม
 export default function AdminSystemPage() {
   const [data, setData] = useState<SystemData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // โหลดผลตรวจสอบระบบและสถิติจาก API
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
