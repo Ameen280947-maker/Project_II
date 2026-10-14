@@ -10,10 +10,7 @@ import pool from "@/lib/db";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// รูปแบบ body: อีเมล, resetToken ที่ได้หลังยืนยัน OTP และรหัสผ่านใหม่
 type ResetPasswordBody = {
   email?: string;
 
@@ -22,11 +19,7 @@ type ResetPasswordBody = {
   newPassword?: string;
 };
 
-/* =========================================================
-   POST /api/auth/reset-password
-========================================================= */
-
-// POST: ตรวจ reset token แล้วอัปเดตรหัสผ่านใหม่ของผู้ใช้
+// API: ตรวจ token รีเซ็ตที่ยืนยัน OTP แล้ว ตั้งรหัสผ่านใหม่และปิดใช้ token ภายใน transaction
 export async function POST(
   request: NextRequest,
 ) {
@@ -37,10 +30,8 @@ export async function POST(
     false;
 
   try {
-    /* =====================================================
-       BODY
-    ===================================================== */
 
+    // ตรวจข้อมูลที่ส่งมา: ครบ รหัสผ่าน ≥ 8 ตัว และ token เป็น hex 64 ตัว
     const body =
       (await request.json()) as ResetPasswordBody;
 
@@ -60,10 +51,6 @@ export async function POST(
       String(
         body.newPassword ?? "",
       );
-
-    /* =====================================================
-       VALIDATION
-    ===================================================== */
 
     if (
       !email ||
@@ -99,14 +86,6 @@ export async function POST(
       );
     }
 
-    /*
-      resetToken ที่เราสร้างจาก
-
-      crypto.randomBytes(32).toString("hex")
-
-      จะเป็น hexadecimal 64 ตัวอักษร
-    */
-
     if (
       !/^[a-f0-9]{64}$/i.test(
         resetToken,
@@ -125,20 +104,13 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       START TRANSACTION
-    ===================================================== */
-
+    // เริ่ม transaction และล็อกแถวผู้ใช้จากอีเมล
     await client.query(
       "BEGIN",
     );
 
     transactionStarted =
       true;
-
-    /* =====================================================
-       FIND USER
-    ===================================================== */
 
     const userResult =
       await client.query<{
@@ -193,13 +165,7 @@ export async function POST(
           .user_id,
       );
 
-    /* =====================================================
-       HASH RESET TOKEN
-
-       หน้า verify-otp เก็บใน DB เป็น SHA256
-       ดังนั้นตรงนี้ต้อง hash แบบเดียวกัน
-    ===================================================== */
-
+    // ตรวจ token (hash) ที่ยังไม่ถูกใช้และยังไม่หมดอายุ
     const resetTokenHash =
       crypto
         .createHash(
@@ -211,16 +177,6 @@ export async function POST(
         .digest(
           "hex",
         );
-
-    /* =====================================================
-       CHECK RESET TOKEN
-
-       ต้อง:
-       - เป็นของ user คนนี้
-       - token hash ตรง
-       - ยังไม่ถูกใช้
-       - ยังไม่หมดอายุ
-    ===================================================== */
 
     const tokenResult =
       await client.query<{
@@ -283,21 +239,12 @@ export async function POST(
           .reset_id,
       );
 
-    /* =====================================================
-       HASH PASSWORD ใหม่
-
-       ห้ามเก็บ Password เป็นข้อความธรรมดา
-    ===================================================== */
-
+    // อัปเดตรหัสผ่านใหม่ แล้วปิดใช้ token ทั้งหมดของผู้ใช้ และ commit
     const passwordHash =
       await bcrypt.hash(
         newPassword,
         12,
       );
-
-    /* =====================================================
-       UPDATE PASSWORD
-    ===================================================== */
 
     const updateResult =
       await client.query<{
@@ -333,12 +280,6 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       MARK RESET TOKEN AS USED
-
-       Token นี้ใช้ได้ครั้งเดียว
-    ===================================================== */
-
     await client.query(
       `
       UPDATE password_reset_tokens
@@ -350,12 +291,6 @@ export async function POST(
       `,
       [resetId],
     );
-
-    /* =====================================================
-       INVALIDATE RESET TOKENS อื่นของ USER
-
-       ป้องกัน Token เก่ากลับมาใช้ต่อ
-    ===================================================== */
 
     await client.query(
       `
@@ -370,10 +305,6 @@ export async function POST(
       [userId],
     );
 
-    /* =====================================================
-       COMMIT
-    ===================================================== */
-
     await client.query(
       "COMMIT",
     );
@@ -381,10 +312,7 @@ export async function POST(
     transactionStarted =
       false;
 
-    /* =====================================================
-       SUCCESS
-    ===================================================== */
-
+    // log ผลสำเร็จและตอบข้อมูลผู้ใช้กลับ
     console.log(
       "====================================",
     );
@@ -428,10 +356,8 @@ export async function POST(
       },
     });
   } catch (error) {
-    /* =====================================================
-       ROLLBACK
-    ===================================================== */
 
+    // จัดการ error: rollback ถ้า transaction ค้างอยู่ แล้วคืน 500
     if (
       transactionStarted
     ) {

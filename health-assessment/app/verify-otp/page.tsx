@@ -20,10 +20,7 @@ import {
   useSearchParams,
 } from "next/navigation";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ผลตอบกลับจาก /api/auth/verify-otp (resetToken ใช้ต่อในหน้าตั้งรหัสผ่านใหม่)
 type VerifyOtpResponse = {
   success: boolean;
 
@@ -32,11 +29,7 @@ type VerifyOtpResponse = {
   resetToken?: string;
 };
 
-/* =========================================================
-   CONTENT
-========================================================= */
-
-// เนื้อหาหน้ายืนยัน OTP: รับอีเมลจาก URL ให้กรอกรหัส OTP
+// เนื้อหาหน้ายืนยัน OTP: รับอีเมลจาก query แล้วให้กรอกรหัส 6 หลักเพื่อไปตั้งรหัสผ่านใหม่
 function VerifyOtpContent() {
   const router =
     useRouter();
@@ -44,22 +37,12 @@ function VerifyOtpContent() {
   const searchParams =
     useSearchParams();
 
-  /* =========================================================
-     EMAIL
-
-     รับมาจาก:
-     /verify-otp?email=example@gmail.com
-  ========================================================= */
-
   const email =
     searchParams.get(
       "email",
     ) ?? "";
 
-  /* =========================================================
-     STATE
-  ========================================================= */
-
+  // state ของฟอร์ม: รหัส OTP ข้อความ error และสถานะกำลังตรวจสอบ
   const [
     otp,
     setOtp,
@@ -75,11 +58,7 @@ function VerifyOtpContent() {
     setLoading,
   ] = useState(false);
 
-  /* =========================================================
-     VERIFY OTP
-  ========================================================= */
-
-  // ส่ง OTP ไปตรวจสอบ ถ้าถูกต้องได้ resetToken แล้วพาไปหน้าตั้งรหัสผ่านใหม่
+  // ตรวจรูปแบบ OTP แล้วส่ง POST /api/auth/verify-otp ถ้าผ่านพาไปหน้า /reset-password พร้อม resetToken
   const handleSubmit =
     async (
       event: FormEvent<HTMLFormElement>,
@@ -90,19 +69,12 @@ function VerifyOtpContent() {
         setLoading(true);
         setError("");
 
-        /* =========================
-           EMAIL CHECK
-        ========================= */
-
+        // ตรวจข้อมูลที่กรอก: ต้องมีอีเมล และ OTP เป็นตัวเลข 6 หลัก
         if (!email) {
           throw new Error(
             "ไม่พบข้อมูลอีเมล กรุณาเริ่มขั้นตอนลืมรหัสผ่านใหม่อีกครั้ง",
           );
         }
-
-        /* =========================
-           OTP CHECK
-        ========================= */
 
         const normalizedOtp =
           otp.trim();
@@ -117,10 +89,7 @@ function VerifyOtpContent() {
           );
         }
 
-        /* =========================
-           API
-        ========================= */
-
+        // ส่งอีเมลและ OTP ไปตรวจที่ API
         const response =
           await fetch(
             "/api/auth/verify-otp",
@@ -146,12 +115,9 @@ function VerifyOtpContent() {
             },
           );
 
+        // ตรวจผลลัพธ์: ต้องสำเร็จและได้ resetToken กลับมา
         const data =
           (await response.json()) as VerifyOtpResponse;
-
-        /* =========================
-           VERIFY FAILED
-        ========================= */
 
         if (
           !response.ok ||
@@ -163,10 +129,6 @@ function VerifyOtpContent() {
           );
         }
 
-        /* =========================
-           RESET TOKEN CHECK
-        ========================= */
-
         if (
           !data.resetToken
         ) {
@@ -175,13 +137,7 @@ function VerifyOtpContent() {
           );
         }
 
-        /* =====================================================
-           ไปหน้า Reset Password
-
-           URL:
-           /reset-password?token=xxxxx&email=xxxxx
-        ===================================================== */
-
+        // ไปหน้าตั้งรหัสผ่านใหม่พร้อม token และอีเมล
         const params =
           new URLSearchParams({
             token:
@@ -193,6 +149,7 @@ function VerifyOtpContent() {
         router.push(
           `/reset-password?${params.toString()}`,
         );
+      // จัดการ error: log และแสดงข้อความให้ผู้ใช้
       } catch (
         verifyError
       ) {
@@ -212,10 +169,7 @@ function VerifyOtpContent() {
       }
     };
 
-  /* =========================================================
-     ไม่มี Email
-  ========================================================= */
-
+  // ไม่มีอีเมลใน URL → แสดงหน้าแจ้งให้เริ่มขั้นตอนลืมรหัสผ่านใหม่
   if (!email) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fbf7f7] px-5">
@@ -257,33 +211,18 @@ function VerifyOtpContent() {
     );
   }
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#fbf7f7] px-5 py-10">
-
-      {/* =====================================================
-          BACKGROUND
-      ====================================================== */}
 
       <div className="pointer-events-none absolute -left-32 -top-32 h-[380px] w-[380px] rounded-full bg-[#fff0f2] blur-3xl" />
 
       <div className="pointer-events-none absolute -bottom-40 -right-28 h-[430px] w-[430px] rounded-full bg-[#f8e6e9] blur-3xl" />
 
-      {/* =====================================================
-          CONTAINER
-      ====================================================== */}
-
       <div className="relative z-10 flex min-h-[calc(100vh-80px)] items-center justify-center">
 
         <section className="w-full max-w-[500px] rounded-[32px] border border-[#eee5e6] bg-white p-8 shadow-[0_25px_70px_rgba(35,25,30,0.08)] sm:p-10">
 
-          {/* =================================================
-              BACK
-          ================================================== */}
-
+          {/* ลิงก์ย้อนกลับ */}
           <Link
             href={`/forgot-password`}
             className="flex w-fit items-center gap-2 text-sm font-semibold text-[#777780] transition hover:text-[#b91c2b]"
@@ -297,10 +236,7 @@ function VerifyOtpContent() {
 
           </Link>
 
-          {/* =================================================
-              ICON
-          ================================================== */}
-
+          {/* ส่วนหัว: ไอคอน ชื่อหน้า และอีเมลที่กำลังยืนยัน */}
           <div className="mt-8 text-center">
 
             <div className="mx-auto grid h-24 w-24 place-items-center rounded-full bg-[#f8e8ea] text-[#b91c2b]">
@@ -312,10 +248,6 @@ function VerifyOtpContent() {
 
             </div>
 
-            {/* =================================================
-                TITLE
-            ================================================== */}
-
             <h1 className="mt-7 text-3xl font-black">
               ยืนยันรหัส OTP
             </h1>
@@ -324,10 +256,6 @@ function VerifyOtpContent() {
               กรุณากรอกรหัสยืนยัน 6 หลัก
               ที่ระบบสร้างสำหรับบัญชีของคุณ
             </p>
-
-            {/* =================================================
-                EMAIL
-            ================================================== */}
 
             <div className="mt-5 rounded-2xl bg-[#faf8f8] px-5 py-4">
 
@@ -343,20 +271,13 @@ function VerifyOtpContent() {
 
           </div>
 
-          {/* =================================================
-              FORM
-          ================================================== */}
-
+          {/* ฟอร์มกรอก OTP 6 หลัก ข้อความ error และปุ่มยืนยัน */}
           <form
             onSubmit={
               handleSubmit
             }
             className="mt-8"
           >
-
-            {/* =================================================
-                OTP
-            ================================================== */}
 
             <label className="block">
 
@@ -407,19 +328,11 @@ function VerifyOtpContent() {
 
             </label>
 
-            {/* =================================================
-                ERROR
-            ================================================== */}
-
             {error && (
               <div className="mt-5 rounded-2xl border border-[#f2d3d7] bg-[#fff0f2] p-4 text-center text-sm font-semibold text-[#b91c2b]">
                 {error}
               </div>
             )}
-
-            {/* =================================================
-                SUBMIT
-            ================================================== */}
 
             <button
               type="submit"
@@ -445,10 +358,7 @@ function VerifyOtpContent() {
 
           </form>
 
-          {/* =================================================
-              SECURITY INFO
-          ================================================== */}
-
+          {/* กล่องอธิบายขั้นตอนหลังยืนยัน OTP */}
           <div className="mt-6 flex items-start gap-3 rounded-2xl bg-[#faf8f8] p-4">
 
             <ShieldCheck
@@ -472,13 +382,7 @@ function VerifyOtpContent() {
   );
 }
 
-/* =========================================================
-   PAGE + SUSPENSE
-
-   useSearchParams ต้องอยู่ภายใต้ Suspense
-========================================================= */
-
-// หน้ายืนยัน OTP ห่อด้วย Suspense (เพราะใช้ useSearchParams)
+// หน้า: ยืนยัน OTP ห่อด้วย Suspense เพราะใช้ useSearchParams
 export default function VerifyOtpPage() {
   return (
     <Suspense

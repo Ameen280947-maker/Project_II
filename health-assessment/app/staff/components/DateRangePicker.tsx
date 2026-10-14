@@ -4,40 +4,31 @@ import { useState } from "react";
 import { CalendarDays } from "lucide-react";
 import { inputCls } from "./ui";
 
-/* =========================================================
-   เลือกช่วงเวลา (ใช้ในหน้ารายงานและสถิติ)
-   - DateRangeField : ช่องแสดงช่วง "1 ก.ย. 2569 → 30 ก.ย. 2569 · 30 วัน" กดแล้วเลือกวันเริ่ม/วันสิ้นสุด
-   - QuickRanges    : ปุ่ม "เลือกเร็ว" กรอกวันที่ให้ (ไม่มี state ของตัวเอง ไฮไลต์เมื่อวันที่ตรงกับปุ่ม)
-   - ค่าเริ่มต้น = เดือนที่แล้วแบบเต็ม · ไตรมาส = ไตรมาสปฏิทิน (ไม่ใช่ปีงบประมาณ)
-   - วันที่เป็นเวลาไทย รูปแบบ YYYY-MM-DD รวมทั้งสองวัน (ตรงกับ parseRange ฝั่ง API)
-   - คิดจากสตริงวันที่ของวันนี้ (todayInBangkok) ไม่ใช้ toISOString กับเวลาปัจจุบัน
-========================================================= */
-
-// คืนวันที่ของวันนี้ตามเวลาไทยในรูปแบบ YYYY-MM-DD
+// คืนวันที่วันนี้ตามเขตเวลากรุงเทพฯ รูปแบบ YYYY-MM-DD
 export const todayInBangkok = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
 
-// เลื่อนวันที่ (YYYY-MM-DD) ไปข้างหน้า/ถอยหลังตามจำนวนวัน
+// เลื่อนวันที่ YYYY-MM-DD ไปข้างหน้า/ถอยหลังตามจำนวนวัน
 export const shiftDate = (ymd: string, days: number) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 };
 
-// แปลงวันที่ YYYY-MM-DD เป็นข้อความวันที่ภาษาไทยแบบย่อ
+// แปลงวันที่ YYYY-MM-DD เป็นรูปแบบไทยแบบย่อ
 export const formatThaiDate = (ymd: string) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(y, m - 1, d).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
 };
 
-// ข้อความช่วงวันที่ภาษาไทย (ถ้าวันเดียวกันแสดงวันเดียว)
+// ข้อความช่วงวันที่ภาษาไทย (วันเดียวแสดงวันเดียว)
 export const rangeText = (from: string, to: string) =>
   from === to ? formatThaiDate(from) : `${formatThaiDate(from)} – ${formatThaiDate(to)}`;
 
 // เติม 0 ข้างหน้าให้เป็นเลข 2 หลัก
 const pad = (n: number) => String(n).padStart(2, "0");
-// วันสุดท้ายของเดือน m (1-12) ของปี y
+// คืนวันสุดท้ายของเดือน m ปี y รูปแบบ YYYY-MM-DD
 const lastDayOf = (y: number, m: number) => `${y}-${pad(m)}-${pad(new Date(Date.UTC(y, m, 0)).getUTCDate())}`;
 
-// ช่วงเลือกเร็ว: คืน [from, to] จากวันนี้ (YYYY-MM-DD)
+// ช่วงวันที่สำเร็จรูป: เดือนที่แล้ว ไตรมาสที่แล้ว ปีที่แล้ว เดือนนี้ (คำนวณจากวันนี้)
 export const QUICK_RANGES: { key: string; label: string; range: (today: string) => [string, string] }[] = [
   {
     key: "lastMonth",
@@ -52,7 +43,7 @@ export const QUICK_RANGES: { key: string; label: string; range: (today: string) 
     label: "ไตรมาสที่แล้ว",
     range: (t) => {
       const y = Number(t.slice(0, 4));
-      const q = Math.floor((Number(t.slice(5, 7)) - 1) / 3); // 0-3 = ไตรมาสปัจจุบัน
+      const q = Math.floor((Number(t.slice(5, 7)) - 1) / 3);
       const [py, pq] = q === 0 ? [y - 1, 3] : [y, q - 1];
       return [`${py}-${pad(pq * 3 + 1)}-01`, lastDayOf(py, pq * 3 + 3)];
     },
@@ -68,15 +59,15 @@ export const QUICK_RANGES: { key: string; label: string; range: (today: string) 
   { key: "thisMonth", label: "เดือนนี้", range: (t) => [`${t.slice(0, 7)}-01`, t] },
 ];
 
+// ช่วงวันที่ที่เลือกพร้อมผลตรวจความถูกต้อง
 export type DateRange = {
   from: string;
   to: string;
-  // ยังไม่ครบ/ไม่ถูกต้อง → ไม่ต้องเรียก API
   invalid: boolean;
   error: string;
 };
 
-/* state ของช่วงเวลา: ค่าเริ่มต้น = เดือนที่แล้วแบบเต็ม */
+// Hook: เก็บช่วงวันที่ (เริ่มต้นเดือนที่แล้ว) พร้อมตรวจความถูกต้องของช่วง
 export function useDateRange() {
   const today = todayInBangkok();
   const [initFrom, initTo] = QUICK_RANGES[0].range(today);
@@ -98,17 +89,18 @@ export function useDateRange() {
     setFrom(f);
     setTo(t);
   };
-  // รีเซ็ตกลับเป็นช่วงเริ่มต้น (เดือนที่แล้ว)
+  // คืนช่วงวันที่กลับเป็นค่าเริ่มต้น
   const reset = () => setRange(initFrom, initTo);
   return { range, today, setFrom, setTo, setRange, reset };
 }
 
+// ค่าที่ useDateRange คืนมา ใช้เป็น props ของตัวเลือกวันที่
 type RangeState = ReturnType<typeof useDateRange>;
 
-// จำนวนวันในช่วง (รวมทั้งสองวัน)
+// นับจำนวนวันในช่วง (รวมวันเริ่มและวันสิ้นสุด)
 const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1;
 
-/* ===== ช่องช่วงเวลา: กดเพื่อเลือกวันเริ่ม/วันสิ้นสุด ===== */
+// ช่องเลือกช่วงวันที่แบบป๊อปอัป แสดงจำนวนวันและข้อความ error
 export default function DateRangeField({ state }: { state: RangeState }) {
   const { range, today, setFrom, setTo } = state;
   const [open, setOpen] = useState(false);
@@ -176,7 +168,7 @@ export default function DateRangeField({ state }: { state: RangeState }) {
   );
 }
 
-/* ===== ปุ่มเลือกเร็ว (กรอกวันที่ลงช่อง) ===== */
+// ปุ่มเลือกช่วงวันที่ด่วน (เดือนที่แล้ว ไตรมาสที่แล้ว ปีที่แล้ว เดือนนี้)
 export function QuickRanges({ state }: { state: RangeState }) {
   const { range, today, setRange } = state;
   return (

@@ -11,10 +11,7 @@ import {
     HeartPulse,
 } from "lucide-react";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ข้อมูลการ์ดแบบประเมินสุขภาพจิต 1 ใบ (ชื่อ ลิงก์ ไอคอน สี)
 type MentalHealthAssessment = {
     title: string;
     href: string;
@@ -26,10 +23,7 @@ type MentalHealthAssessment = {
     tone: CardTone;
 };
 
-/* =========================================================
-   DATA
-========================================================= */
-
+// รายการแบบประเมินด้านสุขภาพจิต (ความเครียด, ซึมเศร้า 2Q)
 const mentalHealthAssessments: MentalHealthAssessment[] = [
     {
         title: "ความเครียดสะสม",
@@ -54,32 +48,17 @@ const mentalHealthAssessments: MentalHealthAssessment[] = [
     },
 ];
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าเมนูแบบประเมินความเสี่ยงด้านสุขภาพจิต แสดงการ์ดลิงก์ไปแต่ละแบบประเมิน
+// หน้า: เมนูเลือกแบบประเมินด้านสุขภาพจิต
 export default function MentalHealthMenuPage() {
     return (
         <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
             <div className="flex min-h-screen">
 
-                {/* =================================================
-            SIDEBAR
-        ================================================= */}
-
                 <Sidebar />
-
-                {/* =================================================
-            MAIN CONTENT
-        ================================================= */}
 
                 <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
-                    {/* =================================================
-              HEADER
-          ================================================= */}
-
+                    {/* ส่วนหัว: ชื่อหมวดสุขภาพจิต */}
                     <header>
                         <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
                             Health Assessment
@@ -94,10 +73,7 @@ export default function MentalHealthMenuPage() {
 
                     </header>
 
-                    {/* =================================================
-              ASSESSMENT CARDS
-          ================================================= */}
-
+                    {/* การ์ดแบบประเมินสุขภาพจิต + แบบประเมินเพิ่มเติมในหมวด */}
                     <div className="mt-8 grid gap-6 lg:grid-cols-2">
                       {mentalHealthAssessments.map((assessment) => (
                         <AssessmentMenuCard
@@ -108,14 +84,10 @@ export default function MentalHealthMenuPage() {
                           tone={assessment.tone}
                         />
                       ))}
-                      {/* แบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดนี้ */}
                       <CategoryAssessmentCards routePath="/assessment-menu-mental-health" />
                     </div>
 
-                    {/* =================================================
-              BACK BUTTON
-          ================================================= */}
-
+                    {/* ปุ่มย้อนกลับ */}
                     <div className="mt-7 flex justify-end">
 
                         <Link

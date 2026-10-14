@@ -6,11 +6,7 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   GET /api/assessments/status?typeId=...
-   สถานะเปิด/ปิดของแบบประเมิน ใช้แสดงแจ้งเตือนในหน้าทำแบบประเมิน
-========================================================= */
-
+// API: ตรวจว่าแบบประเมิน typeId เปิดใช้งานอยู่หรือไม่ (assessment_types.is_active)
 export async function GET(request: Request) {
   const auth = requireUser(request);
   if (!auth.ok) return auth.response;

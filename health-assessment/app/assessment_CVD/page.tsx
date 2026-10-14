@@ -25,10 +25,7 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ตัวเลือกคำตอบหนึ่งรายการ พร้อมคะแนน
 type Choice = {
   choiceId: number;
   choiceText: string;
@@ -36,6 +33,7 @@ type Choice = {
   displayOrder: number;
 };
 
+// คำถามหนึ่งข้อของแบบประเมิน Thai CVD
 type Question = {
   questionId: number;
   questionText: string;
@@ -52,6 +50,7 @@ type Question = {
   choices: Choice[];
 };
 
+// โปรไฟล์สุขภาพของผู้ใช้ที่ใช้เติมค่าเริ่มต้นในฟอร์ม
 type Profile = {
   age: number | null;
 
@@ -87,6 +86,7 @@ type Profile = {
     | null;
 };
 
+// รูปแบบ response จาก GET /api/assessments/thai-cvd (คำถาม + โปรไฟล์)
 type LoadResponse = {
   success: boolean;
 
@@ -101,6 +101,7 @@ type LoadResponse = {
   message?: string;
 };
 
+// รูปแบบ response จาก POST /api/assessments/thai-cvd
 type SubmitResponse = {
   success: boolean;
 
@@ -115,6 +116,7 @@ type SubmitResponse = {
   message?: string;
 };
 
+// รูปแบบ response จาก PUT /api/profile
 type UpdateProfileResponse = {
   success: boolean;
 
@@ -125,19 +127,12 @@ type UpdateProfileResponse = {
   hasProfile?: boolean;
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าแบบประเมินความเสี่ยงโรคหัวใจและหลอดเลือด (Thai CVD Risk) จากข้อมูลสุขภาพในโปรไฟล์
+// หน้า: ประเมินความเสี่ยงโรคหัวใจและหลอดเลือด (Thai CVD) จากข้อมูลโปรไฟล์และค่าสุขภาพ
 export default function AssessmentPage() {
   const router =
     useRouter();
 
-  /* =========================================================
-     QUESTIONS
-  ========================================================= */
-
+  // state ของหน้า: คำถาม ผู้ใช้ ค่าสุขภาพในฟอร์ม โปรไฟล์เดิม และสถานะโหลด/บันทึก/error
   const [
     questions,
     setQuestions,
@@ -145,12 +140,6 @@ export default function AssessmentPage() {
     useState<Question[]>(
       [],
     );
-
-  /* =========================================================
-     PROFILE DATA
-     
-     ข้อมูลเหล่านี้ดึงจาก health_profile
-  ========================================================= */
 
   const [
     age,
@@ -202,13 +191,6 @@ export default function AssessmentPage() {
   ] =
     useState(0);
 
-  /* =========================================================
-     ORIGINAL PROFILE
-
-     ใช้เก็บค่าก่อนแก้ไข
-     เพื่อให้ปุ่ม "ยกเลิก" กลับไปค่าเดิมได้
-  ========================================================= */
-
   const [
     originalProfile,
     setOriginalProfile,
@@ -233,35 +215,17 @@ export default function AssessmentPage() {
       weight: number;
     } | null>(null);
 
-  /* =========================================================
-     EDIT MODE
-
-     false = ล็อกข้อมูล
-     true = กำลังแก้ไข
-  ========================================================= */
-
   const [
     isEditingProfile,
     setIsEditingProfile,
   ] =
     useState(false);
 
-  /* =========================================================
-     ASSESSMENT DATA
-
-     SBP เป็นข้อมูลเฉพาะของการประเมิน
-     จึงแก้ได้ตลอด
-  ========================================================= */
-
   const [
     systolic,
     setSystolic,
   ] =
     useState(120);
-
-  /* =========================================================
-     STATE
-  ========================================================= */
 
   const [
     loading,
@@ -301,10 +265,7 @@ export default function AssessmentPage() {
       null,
     );
 
-  /* =========================================================
-     QUESTION BY ORDER
-  ========================================================= */
-
+  // map คำถามตาม displayOrder เพื่อหาคำถามแต่ละข้อได้เร็ว
   const questionByOrder =
     useMemo(() => {
       return new Map(
@@ -317,12 +278,9 @@ export default function AssessmentPage() {
       );
     }, [questions]);
 
-  /* =========================================================
-     LOAD USER + PROFILE + QUESTIONS
-  ========================================================= */
-
+  // โหลดคำถามและโปรไฟล์ตอนเปิดหน้า
   useEffect(() => {
-    // โหลดผู้ใช้ โปรไฟล์ และคำถาม CVD จาก API แล้วเติมค่าเริ่มต้นลงฟอร์ม
+    // ตรวจ userId ใน localStorage แล้วโหลดคำถามและโปรไฟล์จาก GET /api/assessments/thai-cvd
     const loadAssessment =
       async () => {
         try {
@@ -332,10 +290,7 @@ export default function AssessmentPage() {
 
           setSuccessMessage("");
 
-          /* =================================================
-             USER ID
-          ================================================= */
-
+          // ตรวจ userId ถ้าไม่มีหรือไม่ถูกต้องให้ไปหน้า login
           const storedUserId =
             localStorage.getItem(
               "userId",
@@ -377,10 +332,7 @@ export default function AssessmentPage() {
             currentUserId,
           );
 
-          /* =================================================
-             LOAD THAI CVD API
-          ================================================= */
-
+          // ดึงคำถามและโปรไฟล์จาก API
           const response =
             await fetch(
               `/api/assessments/thai-cvd?userId=${currentUserId}`,
@@ -405,26 +357,14 @@ export default function AssessmentPage() {
             );
           }
 
-          /* =================================================
-             QUESTIONS
-          ================================================= */
-
           setQuestions(
             data.questions ??
               [],
           );
 
-          /* =================================================
-             PROFILE
-          ================================================= */
-
+          // ไม่มีโปรไฟล์ → ไปกรอกที่หน้า /profile, มี → เติมค่าลงฟอร์ม
           const profile =
             data.profile;
-
-          /*
-            ถ้ายังไม่มี Profile
-            ให้ไปกรอกข้อมูลครั้งแรก
-          */
 
           if (!profile) {
             router.replace(
@@ -433,10 +373,6 @@ export default function AssessmentPage() {
 
             return;
           }
-
-          /* =================================================
-             AGE
-          ================================================= */
 
           const profileAge =
             profile.age !== null
@@ -448,10 +384,6 @@ export default function AssessmentPage() {
           setAge(
             profileAge,
           );
-
-          /* =================================================
-             GENDER
-          ================================================= */
 
           let profileGender:
             | "female"
@@ -486,10 +418,6 @@ export default function AssessmentPage() {
             profileGender,
           );
 
-          /* =================================================
-             HEIGHT
-          ================================================= */
-
           const profileHeight =
             profile.height_cm !==
             null
@@ -501,10 +429,6 @@ export default function AssessmentPage() {
           setHeight(
             profileHeight,
           );
-
-          /* =================================================
-             WEIGHT
-          ================================================= */
 
           const profileWeight =
             profile.weight_kg !==
@@ -518,10 +442,6 @@ export default function AssessmentPage() {
             profileWeight,
           );
 
-          /* =================================================
-             WAIST
-          ================================================= */
-
           const profileWaist =
             profile.waist_cm !==
             null
@@ -534,10 +454,6 @@ export default function AssessmentPage() {
             profileWaist,
           );
 
-          /* =================================================
-             SMOKING
-          ================================================= */
-
           const profileSmoking =
             profile.smoking ===
             true;
@@ -545,10 +461,6 @@ export default function AssessmentPage() {
           setSmoking(
             profileSmoking,
           );
-
-          /* =================================================
-             DIABETES
-          ================================================= */
 
           const profileDiabetes =
             profile.has_diabetes ===
@@ -558,13 +470,6 @@ export default function AssessmentPage() {
             profileDiabetes,
           );
 
-          /* =================================================
-             FAMILY DIABETES
-             
-             เก็บค่าเดิมไว้ด้วย
-             ไม่ hard-code false
-          ================================================= */
-
           const profileFamilyDiabetes =
             profile.family_diabetes ===
             true;
@@ -573,10 +478,7 @@ export default function AssessmentPage() {
             profileFamilyDiabetes,
           );
 
-          /* =================================================
-             SAVE ORIGINAL PROFILE
-          ================================================= */
-
+          // เก็บค่าเดิมไว้สำหรับปุ่มยกเลิกการแก้ไข
           setOriginalProfile({
             age:
               profileAge,
@@ -624,11 +526,7 @@ export default function AssessmentPage() {
     void loadAssessment();
   }, [router]);
 
-  /* =========================================================
-     START EDITING
-  ========================================================= */
-
-  // เปิดโหมดแก้ไขข้อมูลสุขภาพ และล้างข้อความแจ้งเตือนเดิม
+  // เปิดโหมดแก้ไขข้อมูลสุขภาพในฟอร์ม
   const startEditingProfile =
     () => {
       setError("");
@@ -640,11 +538,7 @@ export default function AssessmentPage() {
       );
     };
 
-  /* =========================================================
-     CANCEL EDITING
-  ========================================================= */
-
-  // ยกเลิกการแก้ไข: คืนค่าข้อมูลสุขภาพเดิมทั้งหมด แล้วปิดโหมดแก้ไข
+  // ยกเลิกการแก้ไขและคืนค่าข้อมูลสุขภาพเดิมกลับเข้าฟอร์ม
   const cancelEditingProfile =
     () => {
       if (
@@ -692,15 +586,7 @@ export default function AssessmentPage() {
       setSuccessMessage("");
     };
 
-  /* =========================================================
-     SAVE PROFILE
-     
-     ใช้ API ที่มีอยู่แล้ว
-     
-     PUT /api/profile
-  ========================================================= */
-
-  // ตรวจค่าข้อมูลสุขภาพที่แก้ไข แล้วบันทึกลงโปรไฟล์ผ่าน PUT /api/profile
+  // ตรวจความถูกต้องของค่าที่กรอกแล้วบันทึกโปรไฟล์ผ่าน PUT /api/profile
   const saveProfile =
     async () => {
       try {
@@ -712,20 +598,13 @@ export default function AssessmentPage() {
 
         setSuccessMessage("");
 
-        /* =================================================
-           VALIDATE USER
-        ================================================= */
-
         if (!userId) {
           throw new Error(
             "ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่",
           );
         }
 
-        /* =================================================
-           VALIDATE AGE
-        ================================================= */
-
+        // ตรวจช่วงค่าอายุ ส่วนสูง น้ำหนัก และรอบเอว
         if (
           !Number.isInteger(
             age,
@@ -737,10 +616,6 @@ export default function AssessmentPage() {
             "อายุต้องอยู่ระหว่าง 18-100 ปี",
           );
         }
-
-        /* =================================================
-           VALIDATE HEIGHT
-        ================================================= */
 
         if (
           !Number.isFinite(
@@ -754,10 +629,6 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =================================================
-           VALIDATE WEIGHT
-        ================================================= */
-
         if (
           !Number.isFinite(
             weight,
@@ -769,10 +640,6 @@ export default function AssessmentPage() {
             "น้ำหนักต้องอยู่ระหว่าง 30-250 กก.",
           );
         }
-
-        /* =================================================
-           VALIDATE WAIST
-        ================================================= */
 
         if (
           !Number.isFinite(
@@ -786,17 +653,7 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =================================================
-           UPDATE PROFILE
-           
-           สำคัญ:
-           API ของคุณใช้ user_id
-           ไม่ใช่ userId
-           
-           และใช้ PUT
-           ไม่ใช่ PATCH
-        ================================================= */
-
+        // บันทึกโปรไฟล์ที่ API
         const response =
           await fetch(
             "/api/profile",
@@ -850,10 +707,7 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =================================================
-           UPDATE ORIGINAL PROFILE
-        ================================================= */
-
+        // อัปเดตค่าเดิมเป็นค่าที่บันทึกแล้วและปิดโหมดแก้ไข
         setOriginalProfile({
           age,
 
@@ -871,10 +725,6 @@ export default function AssessmentPage() {
 
           weight,
         });
-
-        /* =================================================
-           EXIT EDIT MODE
-        ================================================= */
 
         setIsEditingProfile(
           false,
@@ -904,11 +754,7 @@ export default function AssessmentPage() {
       }
     };
 
-  /* =========================================================
-     GET CHOICE ID BY SCORE
-  ========================================================= */
-
-  // หา choiceId ของคำถามจากคะแนนที่ตรงกัน (ไม่พบคืน null)
+  // หา choiceId ของคำถามที่มีคะแนนตรงกับค่าที่ระบุ
   const getChoiceIdByScore = (
     question:
       | Question
@@ -927,11 +773,7 @@ export default function AssessmentPage() {
     );
   };
 
-  /* =========================================================
-     START ASSESSMENT
-  ========================================================= */
-
-  // ตรวจข้อมูลครบถ้วน แล้ว POST คำตอบไปคำนวณความเสี่ยง CVD และพาไปหน้าคำแนะนำ
+  // แปลงข้อมูลสุขภาพเป็นคำตอบแต่ละข้อ ส่ง POST /api/assessments/thai-cvd แล้วไปหน้าผลลัพธ์
   const startAssessment =
     async () => {
       try {
@@ -943,10 +785,6 @@ export default function AssessmentPage() {
 
         setSuccessMessage("");
 
-        /* =================================================
-           ห้ามเริ่มประเมินถ้ายังอยู่ใน Edit Mode
-        ================================================= */
-
         if (
           isEditingProfile
         ) {
@@ -955,20 +793,13 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =================================================
-           USER
-        ================================================= */
-
         if (!userId) {
           throw new Error(
             "ไม่พบข้อมูลผู้ใช้งาน กรุณาเข้าสู่ระบบใหม่",
           );
         }
 
-        /* =================================================
-           QUESTIONS
-        ================================================= */
-
+        // หาคำถามทั้ง 7 ข้อตามลำดับ (อายุ เพศ บุหรี่ เบาหวาน ความดัน รอบเอว ส่วนสูง)
         const ageQuestion =
           questionByOrder.get(
             1,
@@ -1018,10 +849,7 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =================================================
-           CHOICE IDS
-        ================================================= */
-
+        // แปลงค่า เพศ/บุหรี่/เบาหวาน เป็น choiceId ตามคะแนน
         const genderChoiceId =
           getChoiceIdByScore(
             genderQuestion,
@@ -1063,10 +891,7 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =================================================
-           VALIDATION
-        ================================================= */
-
+        // ตรวจค่าตัวเลขและช่วงที่ยอมรับได้
         if (
           !Number.isFinite(
             age,
@@ -1122,10 +947,7 @@ export default function AssessmentPage() {
           );
         }
 
-        /* =================================================
-           POST THAI CVD
-        ================================================= */
-
+        // ส่งคำตอบทั้ง 7 ข้อไปประเมินและบันทึกที่ API
         const response =
           await fetch(
             "/api/assessments/thai-cvd",
@@ -1202,6 +1024,7 @@ export default function AssessmentPage() {
             },
           );
 
+        // ตรวจผลลัพธ์แล้วไปหน้าคำแนะนำ
         const data =
           (await response.json()) as SubmitResponse;
 
@@ -1222,10 +1045,6 @@ export default function AssessmentPage() {
             "ไม่พบ assessmentId หลังบันทึกผล",
           );
         }
-
-        /* =================================================
-           RESULT PAGE
-        ================================================= */
 
         router.push(
           `/recommendation-CVD?assessmentId=${data.assessmentId}`,
@@ -1251,31 +1070,16 @@ export default function AssessmentPage() {
       }
     };
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
 
       <div className="flex min-h-screen">
 
-        {/* =================================================
-            SIDEBAR
-        ================================================= */}
-
         <Sidebar />
-
-        {/* =================================================
-            CONTENT
-        ================================================= */}
 
         <section className="min-w-0 flex-1 px-5 py-6 sm:px-8 lg:px-10">
 
-          {/* =================================================
-              HEADER
-          ================================================= */}
-
+          {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ความยินยอม และปุ่มย้อนกลับ */}
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
 
@@ -1300,26 +1104,17 @@ export default function AssessmentPage() {
 
             </div>
 
-            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
             <HealthConsentNotice />
             <AssessmentBackLink href="/assessment-menu" />
           </header>
-          {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
           <AssessmentSourceNote typeId={3} className="mt-3" />
 
-          {/* =================================================
-              LOADING
-          ================================================= */}
-
+          {/* ข้อความสถานะ: กำลังโหลด / error / บันทึกสำเร็จ */}
           {loading && (
             <div className="mt-6 rounded-2xl bg-white p-4 text-sm text-[#767780] shadow-sm">
               กำลังโหลดข้อมูลสุขภาพ...
             </div>
           )}
-
-          {/* =================================================
-              ERROR
-          ================================================= */}
 
           {error && (
             <div className="mt-6 flex items-start gap-3 rounded-2xl bg-[#fff0f2] p-4 text-sm font-medium text-[#b91c2b]">
@@ -1335,10 +1130,6 @@ export default function AssessmentPage() {
 
             </div>
           )}
-
-          {/* =================================================
-              SUCCESS
-          ================================================= */}
 
           {successMessage && (
             <div className="mt-6 flex items-start gap-3 rounded-2xl bg-[#f0faf3] p-4 text-sm font-medium text-[#27743a]">
@@ -1357,21 +1148,10 @@ export default function AssessmentPage() {
 
           <div className="mt-7 grid gap-6 xl:grid-cols-[minmax(0,1fr)_280px]">
 
-            {/* =================================================
-                LEFT
-            ================================================= */}
-
             <div className="space-y-6">
 
-              {/* =================================================
-                  PERSONAL INFORMATION
-              ================================================= */}
-
+              {/* การ์ดข้อมูลส่วนบุคคล: อายุ เพศ น้ำหนัก บุหรี่ เบาหวาน (แก้ไขได้) */}
               <section className="rounded-[26px] border border-[#eee5e6] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.045)]">
-
-                {/* =================================================
-                    TITLE
-                ================================================= */}
 
                 <div className="flex items-center justify-between gap-4">
 
@@ -1388,10 +1168,6 @@ export default function AssessmentPage() {
 
                   </div>
 
-                  {/* =================================================
-                      NOT EDITING
-                  ================================================= */}
-
                   {!isEditingProfile ? (
                     <button
                       type="button"
@@ -1404,13 +1180,7 @@ export default function AssessmentPage() {
                     </button>
                   ) : (
 
-                    /* =================================================
-                       EDITING
-                    ================================================= */
-
                     <div className="flex gap-2">
-
-                      {/* CANCEL */}
 
                       <button
                         type="button"
@@ -1430,8 +1200,6 @@ export default function AssessmentPage() {
                         ยกเลิก
 
                       </button>
-
-                      {/* SAVE */}
 
                       <button
                         type="button"
@@ -1459,10 +1227,6 @@ export default function AssessmentPage() {
 
                 </div>
 
-                {/* =================================================
-                    LOCK NOTICE
-                ================================================= */}
-
                 <div
                   className={`mt-5 flex items-center gap-2 rounded-2xl px-4 py-3 text-xs ${
                     isEditingProfile
@@ -1486,15 +1250,8 @@ export default function AssessmentPage() {
 
                 </div>
 
-                {/* =================================================
-                    AGE + GENDER
-                ================================================= */}
-
+                {/* อายุ (slider) และเพศ */}
                 <div className="mt-8 grid gap-8 md:grid-cols-2">
-
-                  {/* =================================================
-                      AGE
-                  ================================================= */}
 
                   <RangeField
                     label={
@@ -1518,10 +1275,6 @@ export default function AssessmentPage() {
                     }
                   />
 
-                  {/* =================================================
-                      GENDER
-                  ================================================= */}
-
                   <div>
 
                     <p className="font-semibold">
@@ -1533,8 +1286,6 @@ export default function AssessmentPage() {
                     </p>
 
                     <div className="mt-5 grid grid-cols-2 overflow-hidden rounded-2xl border border-[#e5e0e1]">
-
-                      {/* FEMALE */}
 
                       <button
                         type="button"
@@ -1559,8 +1310,6 @@ export default function AssessmentPage() {
                       >
                         หญิง
                       </button>
-
-                      {/* MALE */}
 
                       <button
                         type="button"
@@ -1593,10 +1342,7 @@ export default function AssessmentPage() {
 
                 </div>
 
-                {/* =================================================
-                    WEIGHT
-                ================================================= */}
-
+                {/* น้ำหนักจากข้อมูลทั่วไป (กรอกได้ในโหมดแก้ไข) */}
                 <div className="mt-6 rounded-2xl bg-[#faf8f8] p-4">
 
                   <div className="flex items-center justify-between gap-4">
@@ -1651,13 +1397,8 @@ export default function AssessmentPage() {
 
                 </div>
 
-                {/* =================================================
-                    SMOKING + DIABETES
-                ================================================= */}
-
+                {/* สวิตช์สูบบุหรี่ และเป็นเบาหวาน */}
                 <div className="mt-8 grid gap-5 md:grid-cols-2">
-
-                  {/* SMOKING */}
 
                   <ToggleCard
                     icon={
@@ -1689,8 +1430,6 @@ export default function AssessmentPage() {
                       !isEditingProfile
                     }
                   />
-
-                  {/* DIABETES */}
 
                   <ToggleCard
                     icon={
@@ -1727,10 +1466,7 @@ export default function AssessmentPage() {
 
               </section>
 
-              {/* =================================================
-                  HEALTH INFORMATION
-              ================================================= */}
-
+              {/* การ์ดข้อมูลสุขภาพ: ความดันตัวบน รอบเอว ส่วนสูง (slider) */}
               <section className="rounded-[26px] border border-[#eee5e6] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.045)]">
 
                 <h2 className="text-xl font-bold">
@@ -1738,10 +1474,6 @@ export default function AssessmentPage() {
                 </h2>
 
                 <div className="mt-8 grid gap-x-10 gap-y-10 md:grid-cols-2">
-
-                  {/* =================================================
-                      SBP
-                  ================================================= */}
 
                   <RangeField
                     label={
@@ -1761,10 +1493,6 @@ export default function AssessmentPage() {
                       setSystolic
                     }
                   />
-
-                  {/* =================================================
-                      WAIST
-                  ================================================= */}
 
                   <RangeField
                     label={
@@ -1787,10 +1515,6 @@ export default function AssessmentPage() {
                       !isEditingProfile
                     }
                   />
-
-                  {/* =================================================
-                      HEIGHT
-                  ================================================= */}
 
                   <RangeField
                     label={
@@ -1820,16 +1544,9 @@ export default function AssessmentPage() {
 
             </div>
 
-            {/* =================================================
-                RIGHT PANEL
-            ================================================= */}
-
+            {/* แถบด้านข้าง: ปุ่มเริ่มประเมิน */}
             <aside className="flex flex-col justify-end gap-5">
 
-
-              {/* =================================================
-                  START ASSESSMENT
-              ================================================= */}
 
               <button
                 type="button"
@@ -1873,10 +1590,7 @@ export default function AssessmentPage() {
 }
 
 
-/* =========================================================
-   RANGE FIELD
-========================================================= */
-
+// props ของ RangeField
 type RangeFieldProps = {
   label: string;
 
@@ -1895,7 +1609,7 @@ type RangeFieldProps = {
   readOnly?: boolean;
 };
 
-// ช่องแสดงค่าตัวเลขแบบแถบเลื่อน (range) พร้อมป้ายชื่อและหน่วย รองรับโหมดอ่านอย่างเดียว
+// คอมโพเนนต์: แถบเลื่อน (slider) ปรับค่าตัวเลขพร้อมหน่วยและช่วงต่ำสุด-สูงสุด
 function RangeField({
   label,
   value,
@@ -1905,6 +1619,7 @@ function RangeField({
   onChange,
   readOnly = false,
 }: RangeFieldProps) {
+  // คำนวณตำแหน่งแถบเป็นเปอร์เซ็นต์ (จำกัด 0–100)
   const percentage =
     ((value - min) /
       (max - min)) *
@@ -1921,10 +1636,6 @@ function RangeField({
 
   return (
     <div>
-
-      {/* =================================================
-          LABEL + VALUE
-      ================================================= */}
 
       <div className="flex items-end justify-between gap-4">
 
@@ -1955,10 +1666,6 @@ function RangeField({
         </div>
 
       </div>
-
-      {/* =================================================
-          RANGE
-      ================================================= */}
 
       <input
         type="range"
@@ -2002,10 +1709,6 @@ function RangeField({
         }}
       />
 
-      {/* =================================================
-          MIN MAX
-      ================================================= */}
-
       <div className="mt-3 flex justify-between text-xs text-[#898991]">
 
         <span>
@@ -2022,10 +1725,7 @@ function RangeField({
   );
 }
 
-/* =========================================================
-   TOGGLE CARD
-========================================================= */
-
+// props ของ ToggleCard
 type ToggleCardProps = {
   icon: ReactNode;
 
@@ -2040,7 +1740,7 @@ type ToggleCardProps = {
   readOnly?: boolean;
 };
 
-// การ์ดตัวเลือกใช่/ไม่ใช่ พร้อมไอคอน หัวข้อ คำอธิบาย และสวิตช์เปิดปิด
+// คอมโพเนนต์: การ์ดหัวข้อพร้อมสวิตช์เปิด/ปิด เช่น สูบบุหรี่หรือเป็นเบาหวาน
 function ToggleCard({
   icon,
   title,
@@ -2057,10 +1757,6 @@ function ToggleCard({
           : "border-[#eee8e9] bg-[#faf8f8]"
       }`}
     >
-
-      {/* =================================================
-          LEFT
-      ================================================= */}
 
       <div className="flex min-w-0 items-center gap-4">
 
@@ -2084,10 +1780,6 @@ function ToggleCard({
 
       </div>
 
-      {/* =================================================
-          TOGGLE
-      ================================================= */}
-
       <Toggle
         checked={
           checked
@@ -2104,11 +1796,7 @@ function ToggleCard({
   );
 }
 
-/* =========================================================
-   TOGGLE
-========================================================= */
-
-// ปุ่มสวิตช์เปิด/ปิด (toggle)
+// คอมโพเนนต์: สวิตช์ toggle เปิด/ปิด รองรับสถานะ disabled
 function Toggle({
   checked,
   onChange,

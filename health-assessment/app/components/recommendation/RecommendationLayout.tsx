@@ -10,27 +10,20 @@ import ResultActions from "@/app/components/ResultActions";
 import FollowUpActions from "@/app/components/recommendation/FollowUpActions";
 import { ResultSources } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   โครงหน้าคำแนะนำ ใช้รูปแบบเดียวกันทุกแบบประเมิน (อิงหน้าโรคหัวใจ)
-   ส่วนหัว (คำแนะนำ + ชื่อผล) | วงกลมคะแนน + ป้ายระดับ
-   → การ์ด "ผลและคำแนะนำ" → เนื้อหาเฉพาะแบบประเมิน (children)
-   → คำตอบของคุณ → หมายเหตุ → ปุ่มท้ายหน้า
-   สีตามโทนของแบบประเมิน (เดียวกับการ์ดในหน้าเมนู)
-========================================================= */
-
+// ชุดคลาสสีที่ใช้ในหน้าคำแนะนำของแต่ละ tone
 type ToneClasses = {
-  eyebrow: string; // ข้อความ/ไอคอนสีหลัก
-  accent: string; // ข้อความเน้นสีรอง
-  bar: string; // เส้นใต้หัวข้อ
-  panel: string; // การ์ดผลและคำแนะนำ
-  iconSoft: string; // วงไอคอนพื้นอ่อน
+  eyebrow: string;
+  accent: string;
+  bar: string;
+  panel: string;
+  iconSoft: string;
   spinner: string;
-  button: string; // ปุ่มทึบ
-  ring: string; // สีวงกลมคะแนน (hex)
-  ringTrack: string; // สีพื้นวงกลมคะแนน (hex)
+  button: string;
+  ring: string;
+  ringTrack: string;
 };
 
-// เขียนคลาสเต็มทุกตัว ให้ Tailwind สร้าง CSS ได้
+// ตารางสีของหน้าคำแนะนำแยกตาม tone ของแบบประเมิน
 export const RECOMMENDATION_TONES: Record<CardTone, ToneClasses> = {
   rose: {
     eyebrow: "text-[#b91c2b]",
@@ -122,9 +115,10 @@ export const RECOMMENDATION_TONES: Record<CardTone, ToneClasses> = {
   },
 };
 
-/* ป้ายระดับความเสี่ยง: สีตามความหมายของผล ไม่ใช่โทนของแบบประเมิน */
+// สีที่ใช้แทนระดับความเสี่ยง
 export type RiskColor = "green" | "yellow" | "orange" | "red" | "gray";
 
+// คลาสสีของป้ายระดับความเสี่ยง
 const RISK_BADGE: Record<RiskColor, string> = {
   green: "bg-[#eaf7e8] text-[#4f9857]",
   yellow: "bg-[#fff6d6] text-[#9a7300]",
@@ -133,7 +127,7 @@ const RISK_BADGE: Record<RiskColor, string> = {
   gray: "bg-[#f3f3f4] text-[#6b6c74]",
 };
 
-/* สีวงกลมคะแนนตามระดับความรุนแรง (ชุดเดียวกับป้ายระดับ) — ring = เส้น, track = พื้น, text = ตัวเลข */
+// สีวงแหวนคะแนน (เส้น/พื้น/ตัวเลข) ตามระดับความเสี่ยง
 const RISK_RING: Record<RiskColor, { ring: string; track: string; text: string }> = {
   green: { ring: "#5aa864", track: "#e2f2df", text: "#3f8a4a" },
   yellow: { ring: "#d9a300", track: "#fbefc4", text: "#9a7300" },
@@ -142,14 +136,10 @@ const RISK_RING: Record<RiskColor, { ring: string; track: string; text: string }
   gray: { ring: "#a3a4ab", track: "#ececee", text: "#6b6c74" },
 };
 
-// RecommendationLayout ส่งระดับผลลงมา → วงกลมคะแนนทุกแบบประเมินใช้สีตามความรุนแรงเหมือนกัน
+// Context ส่งสีความเสี่ยงให้ ScoreCircle ที่อยู่ข้างใน
 const RiskColorContext = createContext<RiskColor | null>(null);
 
-/* =========================================================
-   วงกลมคะแนน
-   progress 0-1 (สัดส่วนที่เติมสี), value = ตัวเลขกลางวง, unit = หน่วย/คะแนนเต็ม
-========================================================= */
-
+// วงกลมแสดงคะแนนแบบ conic-gradient ตามสัดส่วน progress และสีตามระดับความเสี่ยง
 export function ScoreCircle({
   tone,
   progress,
@@ -165,7 +155,6 @@ export function ScoreCircle({
 }) {
   const risk = useContext(RiskColorContext);
   const t = RECOMMENDATION_TONES[tone];
-  // อยู่ในหน้าคำแนะนำ → สีตามระดับความรุนแรง / ใช้เดี่ยว ๆ → สีตามโทนของแบบประเมิน
   const c = risk ? RISK_RING[risk] : { ring: t.ring, track: t.ringTrack, text: t.ring };
   const deg = Math.min(Math.max(progress, 0), 1) * 360;
 
@@ -195,11 +184,7 @@ export function ScoreCircle({
   );
 }
 
-/* =========================================================
-   หัวข้อส่วนเนื้อหาเฉพาะแบบประเมิน + การ์ดแนวทาง
-========================================================= */
-
-// หัวข้อส่วนเนื้อหาเฉพาะของแบบประเมิน (ไอคอน + ชื่อหัวข้อ) แล้วตามด้วยเนื้อหา
+// ส่วนหัวข้อพร้อมไอคอนสำหรับจัดกลุ่มเนื้อหาในหน้าคำแนะนำ
 export function RecommendationSection({
   icon,
   title,
@@ -222,7 +207,7 @@ export function RecommendationSection({
   );
 }
 
-// การ์ดแนวทางปฏิบัติหนึ่งข้อ: ไอคอนสีตามโทน หัวข้อ และรายละเอียด
+// การ์ดคำแนะนำหนึ่งข้อ มีไอคอน หัวข้อ และรายละเอียด
 export function AdviceCard({
   tone,
   icon,
@@ -245,11 +230,7 @@ export function AdviceCard({
   );
 }
 
-/* =========================================================
-   โหลด / ผิดพลาด
-========================================================= */
-
-// โครงหน้าพื้นฐาน: แถบเมนูด้านซ้าย + พื้นที่เนื้อหา
+// โครงหน้าพื้นฐาน Sidebar + พื้นที่เนื้อหา ใช้ร่วมกับหน้า loading/error
 function Shell({ children }: { children: ReactNode }) {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
@@ -261,7 +242,7 @@ function Shell({ children }: { children: ReactNode }) {
   );
 }
 
-// หน้าแสดงสถานะกำลังโหลดผลการประเมิน
+// หน้ากำลังโหลดผลการประเมิน (spinner ตามสี tone)
 export function RecommendationLoading({ tone }: { tone: CardTone }) {
   return (
     <Shell>
@@ -307,11 +288,7 @@ export function RecommendationError({
   );
 }
 
-/* =========================================================
-   หน้าคำแนะนำ
-========================================================= */
-
-// โครงหน้าคำแนะนำหลังทำแบบประเมิน: คะแนน ระดับผล คำแนะนำ แหล่งอ้างอิง และปุ่มท้ายหน้า
+// เลย์เอาต์หลักของหน้าผลลัพธ์/คำแนะนำ: คะแนน ระดับความเสี่ยง สรุป คำแนะนำ แหล่งอ้างอิง และปุ่มต่อเนื่อง
 export default function RecommendationLayout({
   tone,
   assessmentKey,
@@ -329,19 +306,13 @@ export default function RecommendationLayout({
   disclaimer = "ผลนี้เป็นการประเมินความเสี่ยงเบื้องต้น ไม่ใช่การวินิจฉัยโรค หากมีความผิดปกติหรือมีความกังวล ควรปรึกษาบุคลากรทางการแพทย์",
 }: {
   tone: CardTone;
-  /* assessment_name (ตัวพิมพ์เล็ก) ใช้เลือกแบบประเมินที่ควรทำต่อเมื่อผลเสี่ยงสูง */
   assessmentKey?: string;
-  /* ชื่อผลประเมิน (หัวข้อใหญ่ใต้ "คำแนะนำ") */
   title: ReactNode;
-  /* วงกลมคะแนนด้านขวา (ใช้ ScoreCircle) */
   score: ReactNode;
   riskLevel: string;
   riskColor: RiskColor;
-  /* ประโยคสรุปผลบรรทัดแรกในการ์ด "ผลและคำแนะนำ" */
   summary?: ReactNode;
-  /* ข้อความคำแนะนำจากฐานข้อมูล */
   recommendation?: ReactNode;
-  /* เนื้อหาเฉพาะแบบประเมิน */
   children?: ReactNode;
   assessmentId: string | number | null;
   editHref: string;
@@ -355,6 +326,7 @@ export default function RecommendationLayout({
     <Shell>
       <div className="px-5 py-8 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-[1250px]">
+          {/* ส่วนหัว: ชื่อผลประเมิน วงกลมคะแนน และป้ายระดับความเสี่ยง */}
           <header className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_230px] lg:items-start">
             <div>
               <p className={`text-xs font-bold uppercase tracking-[0.18em] ${t.eyebrow}`}>
@@ -373,6 +345,7 @@ export default function RecommendationLayout({
             </div>
           </header>
 
+          {/* กล่องสรุปผลและคำแนะนำ พร้อมแหล่งอ้างอิง */}
           <section className={`mt-8 rounded-[28px] border bg-gradient-to-br p-6 sm:p-8 ${t.panel}`}>
             <div className="flex items-start gap-4">
               <div className={`grid h-14 w-14 shrink-0 place-items-center rounded-full bg-white ${t.accent}`}>
@@ -391,12 +364,12 @@ export default function RecommendationLayout({
                 {recommendation && (
                   <div className="mt-4 whitespace-pre-line leading-8 text-[#666872]">{recommendation}</div>
                 )}
-                {/* แหล่งอ้างอิงที่เจ้าหน้าที่กรอก (ไม่ได้กรอก = ไม่แสดง) */}
                 <ResultSources assessmentId={assessmentId} className="mt-4" />
               </div>
             </div>
           </section>
 
+          {/* เนื้อหาเฉพาะของแต่ละแบบประเมิน และสรุปคำตอบที่ตอบไว้ */}
           {children}
 
           <AnswerReview assessmentId={assessmentId} className="mt-8" />
@@ -406,6 +379,7 @@ export default function RecommendationLayout({
             <p>{disclaimer}</p>
           </div>
 
+          {/* ข้อจำกัดความรับผิดชอบด้านบน และปุ่มท้ายหน้า (แนะนำแบบประเมินต่อถ้าเสี่ยง) */}
           {onMenuClick ? (
             <ResultActions tone={tone} editHref={editHref} menuHref={menuHref} onMenuClick={onMenuClick} />
           ) : (

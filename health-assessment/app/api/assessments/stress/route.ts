@@ -16,15 +16,7 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-/* =========================================================
-   HELPER
-   หา assessment type ของ Stress
-========================================================= */
-
+// ค้นหา assessment_type_id ของแบบประเมินความเครียดจากชื่อในตาราง assessment_types
 async function getStressAssessmentTypeId() {
     const result = await pool.query(
         `
@@ -42,11 +34,7 @@ async function getStressAssessmentTypeId() {
     return result.rows[0]?.assessment_type_id ?? null;
 }
 
-/* =========================================================
-   GET
-========================================================= */
-
-// GET: ส่ง assessmentId = คืนผลและคำตอบ ST-5, ไม่ส่ง = คืนคำถาม ST-5
+// API: ถ้ามี assessmentId คืนผลประเมินความเครียดพร้อมคำตอบและคำแนะนำ ไม่งั้นคืนชุดคำถามแบบประเมิน
 export async function GET(request: NextRequest) {
     try {
         const { searchParams } = new URL(request.url);
@@ -54,10 +42,6 @@ export async function GET(request: NextRequest) {
         const assessmentIdParam =
             searchParams.get("assessmentId") ||
             searchParams.get("recordId");
-
-        /* -----------------------------------------------------
-           หา assessment_type_id ของ Stress
-        ----------------------------------------------------- */
 
         const stressTypeId = await getStressAssessmentTypeId();
 
@@ -72,11 +56,7 @@ export async function GET(request: NextRequest) {
             );
         }
 
-        /* =====================================================
-           CASE 1
-           ดึงผลการประเมิน
-        ===================================================== */
-
+        // ส่วนดูผล: ตรวจสิทธิ์ → ดึงผลประเมิน คำตอบ และคำแนะนำ
         if (assessmentIdParam) {
             const auth = requireUser(request);
             if (!auth.ok) return auth.response;
@@ -95,10 +75,6 @@ export async function GET(request: NextRequest) {
                     { status: 400 },
                 );
             }
-
-            /* ---------------------------------------------------
-               ดึง Assessment
-            --------------------------------------------------- */
 
             const assessmentResult = await pool.query(
                 `
@@ -142,10 +118,6 @@ export async function GET(request: NextRequest) {
 
             const assessmentRow = assessmentResult.rows[0];
 
-            /* ---------------------------------------------------
-               ดึงคำตอบ
-            --------------------------------------------------- */
-
             const answersResult = await pool.query(
                 `
           SELECT
@@ -173,10 +145,6 @@ export async function GET(request: NextRequest) {
                 [assessmentId],
             );
 
-            /* ---------------------------------------------------
-               แปลงคำแนะนำจาก Database
-            --------------------------------------------------- */
-
             const recommendations =
                 assessmentRow.recommendation_text
                     ? assessmentRow.recommendation_text
@@ -186,10 +154,6 @@ export async function GET(request: NextRequest) {
                                 text.trim().length > 0,
                         )
                     : [];
-
-            /* ---------------------------------------------------
-               สีตามระดับความเครียด
-            --------------------------------------------------- */
 
             let color = "#65A85B";
 
@@ -267,11 +231,7 @@ export async function GET(request: NextRequest) {
             });
         }
 
-        /* =====================================================
-           CASE 2
-           ดึงคำถาม ST-5
-        ===================================================== */
-
+        // ส่วนทำแบบประเมิน: ดึงคำถาม+ตัวเลือก แล้วจัดกลุ่มเป็นรายข้อ
         const questionsResult = await pool.query(
             `
         SELECT
@@ -302,10 +262,6 @@ export async function GET(request: NextRequest) {
       `,
             [stressTypeId],
         );
-
-        /* -----------------------------------------------------
-           รวม Question + Choices
-        ----------------------------------------------------- */
 
         const questionMap = new Map<
             number,
@@ -372,29 +328,19 @@ export async function GET(request: NextRequest) {
     }
 }
 
-/* =========================================================
-   POST
-   บันทึกผลการประเมิน ST-5
-========================================================= */
-
+// API: ตรวจสิทธิ์/consent แล้วคำนวณคะแนนความเครียด บันทึกผลและคำตอบลงฐานข้อมูล
 export async function POST(
     request: NextRequest,
 ) {
+    // ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน และความยินยอม
     const body = await readJsonObject(request);
     if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
-
-    /* -----------------------------------------------------
-       User ID
-       ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
-    ----------------------------------------------------- */
 
     const auth = requireUser(request, body.userId ?? body.user_id);
     if (!auth.ok) return auth.response;
 
-    // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
     const closed = await rejectIfAssessmentClosed(12);
     if (closed) return closed;
-    // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
     const noConsent = await rejectIfNoHealthConsent(auth.userId);
     if (noConsent) return noConsent;
     const userId = auth.userId;
@@ -412,10 +358,6 @@ export async function POST(
             return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
         }
 
-        /* -----------------------------------------------------
-           หา Assessment Type
-        ----------------------------------------------------- */
-
         const stressTypeId = await getStressAssessmentTypeId();
 
         if (!stressTypeId) {
@@ -429,12 +371,7 @@ export async function POST(
             );
         }
 
-        /* -----------------------------------------------------
-           ตรวจคำตอบและคำนวณคะแนน
-           คะแนนดึงจาก question_choices ตาม optionId
-           ไม่ใช้ score ที่หน้าเว็บส่งมา
-        ----------------------------------------------------- */
-
+        // ตรวจคำตอบ คำนวณคะแนนรวมและระดับความเครียด
         const resolved = resolveChoiceAnswers(
             await loadActiveChoices(client, stressTypeId),
             answers.map((item) => ({
@@ -456,15 +393,6 @@ export async function POST(
             score: choice.score,
         }));
 
-        /* -----------------------------------------------------
-           ST-5 Interpretation
-    
-           0 - 4   เครียดน้อย
-           5 - 7   เครียดปานกลาง
-           8 - 9   เครียดมาก
-           10 -15  เครียดมากที่สุด
-        ----------------------------------------------------- */
-
         let riskLevel = "เครียดน้อย";
 
         if (
@@ -480,10 +408,6 @@ export async function POST(
         } else if (totalScore >= 10) {
             riskLevel = "เครียดมากที่สุด";
         }
-
-        /* -----------------------------------------------------
-           หา Recommendation
-        ----------------------------------------------------- */
 
         const recResult =
             await client.query(
@@ -503,15 +427,8 @@ export async function POST(
         const recommendationId =
             recResult.rows[0]?.rec_id ?? null;
 
-        /* -----------------------------------------------------
-           BEGIN TRANSACTION
-        ----------------------------------------------------- */
-
+        // บันทึกผลและคำตอบลง DB ใน transaction
         await client.query("BEGIN");
-
-        /* -----------------------------------------------------
-           Insert Assessment
-        ----------------------------------------------------- */
 
         const insertAssessmentResult =
             await client.query(
@@ -550,10 +467,6 @@ export async function POST(
                 .rows[0]
                 .assessment_id;
 
-        /* -----------------------------------------------------
-           Insert Answers
-        ----------------------------------------------------- */
-
         for (const item of answersToInsert) {
             await client.query(
                 `
@@ -585,13 +498,8 @@ export async function POST(
             );
         }
 
-        /* -----------------------------------------------------
-           COMMIT
-        ----------------------------------------------------- */
-
         await client.query("COMMIT");
 
-        /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
         await markAssessmentSaved(client, { userId: userId, typeId: stressTypeId, assessmentId: newAssessmentId });
 
         return NextResponse.json({

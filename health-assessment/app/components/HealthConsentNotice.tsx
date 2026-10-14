@@ -4,16 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ShieldOff } from "lucide-react";
 
-/* =========================================================
-   แจ้งเตือนเมื่อผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ (หน้าการตั้งค่า)
-   แสดงทับหน้าทำแบบประเมินตั้งแต่เปิดหน้า เพราะ API จะไม่รับผลประเมิน
-   ให้เลือกไปเปิดความยินยอม หรือกลับไปหน้าแบบประเมิน
-========================================================= */
-
-// ตรวจว่าผู้ใช้ถอนความยินยอมข้อมูลสุขภาพหรือไม่ ถ้าถอนแล้วจะแสดงหน้าต่างแจ้งเตือนทับหน้า
+// ตรวจ consent_health ของผู้ใช้จาก API settings ถ้าถอนความยินยอมแล้วจะแสดง dialog บล็อกการทำแบบประเมิน
 export default function HealthConsentNotice() {
+  // state บอกว่าผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพแล้วหรือไม่
   const [withdrawn, setWithdrawn] = useState(false);
 
+  // ตอนเปิดหน้า: ตรวจค่า consent_health จากการตั้งค่าของผู้ใช้
   useEffect(() => {
     let cancelled = false;
     const userId = localStorage.getItem("userId");
@@ -41,6 +37,7 @@ export default function HealthConsentNotice() {
       aria-labelledby="health-consent-title"
     >
       <div className="w-full max-w-md rounded-[28px] bg-white p-7 text-center shadow-[0_24px_60px_rgba(0,0,0,0.18)]">
+        {/* ไอคอนและข้อความแจ้งว่ายังไม่ได้ยินยอม */}
         <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-[#fff0f2] text-[#b91c2b]">
           <ShieldOff size={30} />
         </div>
@@ -51,6 +48,7 @@ export default function HealthConsentNotice() {
           คุณถอนความยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพไว้ ระบบจึงไม่สามารถบันทึกผลประเมินได้
           หากต้องการทำแบบประเมิน กรุณาเปิดความยินยอมที่หน้าการตั้งค่า
         </p>
+        {/* ปุ่มไปหน้าตั้งค่าความเป็นส่วนตัว หรือกลับหน้าแบบประเมิน */}
         <div className="mt-6 flex flex-col gap-3">
           <Link
             href="/settings#privacy"

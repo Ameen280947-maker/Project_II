@@ -7,13 +7,10 @@ import {
   type CategoryTheme,
 } from "@/lib/assessmentCategories";
 
-/* =========================================================
-   อ่านหมวดหมู่แบบประเมินจากฐานข้อมูล (ฝั่งเซิร์ฟเวอร์เท่านั้น)
-   - เรียงหมวดเดิมก่อน (ตาม display_order) แล้วตามด้วยหมวดที่ staff สร้าง (ตามลำดับที่สร้าง)
-========================================================= */
-
+// อะไรก็ได้ที่มีเมธอด query (pool หรือ client ใน transaction)
 type Queryable = Pick<typeof pool, "query">;
 
+// แถวหมวดหมู่จากตาราง assessment_categories
 export type CategoryRow = {
   id: number;
   name: string;
@@ -23,7 +20,7 @@ export type CategoryRow = {
   builtIn: boolean;
 };
 
-// อ่านหมวดหมู่แบบประเมินทั้งหมดจากฐานข้อมูล (หมวดเดิมก่อน แล้วตามด้วยหมวดที่ staff สร้าง)
+// ดึงหมวดหมู่แบบประเมินทั้งหมดจากตาราง assessment_categories (หมวดหลักขึ้นก่อน)
 export async function listCategories(db: Queryable = pool): Promise<CategoryRow[]> {
   const { rows } = await db.query(
     `SELECT category_id, name, subtitle, theme, route_path, is_builtin
@@ -40,13 +37,13 @@ export async function listCategories(db: Queryable = pool): Promise<CategoryRow[
   }));
 }
 
-/* ===== หมวดหมู่ + แบบประเมินที่สร้างเพิ่มและเปิดใช้งาน (สำหรับหน้าผู้ใช้) =====
-   - หมวดเดิมแสดงเสมอ หมวดที่ staff สร้างแสดงเมื่อมีแบบประเมินที่เปิดใช้งานอย่างน้อย 1 แบบ
-   - uncategorized = แบบประเมินที่ยังไม่มีหมวด */
+// รวมหมวดหมู่กับแบบประเมินที่เปิดใช้งานสำหรับผู้ใช้ แยกแบบประเมินที่ไม่มีหมวดออกมาต่างหาก
 export async function listPublicCategories(): Promise<{ categories: AssessmentCategory[]; uncategorized: CategoryAssessment[] }> {
   const [cats, types] = await Promise.all([listCategories(), listGenericTypes(true)]);
+  // ตัดเหลือเฉพาะฟิลด์ที่หน้าผู้ใช้ต้องใช้ของแบบประเมิน
   const strip = ({ id, name, description, questions }: (typeof types)[number]): CategoryAssessment => ({ id, name, description, questions });
 
+  // ผูกแบบประเมินเข้ากับหมวด ซ่อนหมวดที่สร้างเองแต่ไม่มีแบบประเมิน
   const categories = cats
     .map((c) => ({
       ...c,
@@ -54,6 +51,7 @@ export async function listPublicCategories(): Promise<{ categories: AssessmentCa
       assessments: types.filter((t) => t.categoryId === c.id).map(strip),
     }))
     .filter((c) => c.builtIn || c.assessments.length > 0);
+  // แบบประเมินที่ไม่มีหมวด หรือหมวดไม่มีอยู่แล้ว
   const known = new Set(cats.map((c) => c.id));
   const uncategorized = types.filter((t) => t.categoryId === null || !known.has(t.categoryId)).map(strip);
   return { categories, uncategorized };

@@ -6,32 +6,25 @@ import { ArrowRight } from "lucide-react";
 import { Legend } from "../ui";
 import type { Overview } from "./types";
 
-/* =========================================================
-   ชิ้นส่วนของหน้า "ภาพรวมระบบ" (กราฟ / การ์ดส่วนต่าง ๆ / รายการงานค้าง)
-   สีผล: ปกติ = risk-ok, ควรระวัง = risk-mid, เสี่ยงสูง = risk-high (ตามโทน staff)
-========================================================= */
-
-// จัดรูปแบบตัวเลขแบบไทย
+// จัดรูปแบบตัวเลขแบบไทยมีคอมมาคั่นหลักพัน
 const fmt = (n: number) => n.toLocaleString("th-TH");
 
-// ลายทแยงสำหรับแท่งที่ยังไม่ครบช่วง (เดือนปัจจุบัน)
+// ลายเส้นทแยงสำหรับแท่งกราฟของเดือนที่ยังไม่ครบ
 const HATCH = "repeating-linear-gradient(135deg, var(--color-staff-600) 0 2px, var(--color-staff-200) 2px 6px)";
 
-/* ---------- กราฟจำนวนการประเมินต่อช่วงเวลา (ช่วงนี้ vs ช่วงก่อน) ---------- */
-
-// กราฟแท่งจำนวนการประเมินช่วงนี้ พร้อมเส้นประของช่วงก่อนไว้เทียบ
+// กราฟแท่งจำนวนการทำแบบประเมินตามช่วงเวลา พร้อมเส้นประเทียบช่วงก่อนหน้า
 export function UsageChart({ chart }: { chart: Overview["chart"] }) {
+  // คำนวณสเกลกราฟ ความถี่ป้ายแกน และระยะห่างแท่งตามจำนวนข้อมูล
   const max = Math.max(1, ...chart.map((c) => Math.max(c.value, c.prev ?? 0)));
   const n = chart.length;
-  // แท่งเยอะ แสดงป้ายเว้นช่วง ไม่ให้ตัวหนังสือซ้อนกัน
   const labelStep = Math.max(1, Math.ceil(n / 7));
   const showAllValues = n <= 14;
-  // แท่งเยอะ: แสดงตัวเลขเฉพาะแท่งที่สูงที่สุด
   const peak = Math.max(0, ...chart.map((c) => c.value));
   const gap = n > 20 ? "gap-[2px]" : n > 10 ? "gap-1.5" : "gap-3";
 
   return (
     <div>
+      {/* แท่งกราฟช่วงนี้ พร้อมเส้นประของช่วงก่อน */}
       <div className={`flex h-56 items-end border-b border-staff-line ${gap}`}>
         {chart.map((c, i) => (
           <div
@@ -56,6 +49,7 @@ export function UsageChart({ chart }: { chart: Overview["chart"] }) {
           </div>
         ))}
       </div>
+      {/* ป้ายแกนเวลา */}
       <div className={`mt-2 flex ${gap}`}>
         {chart.map((c, i) => (
           <span key={i} className="min-w-0 flex-1 overflow-visible whitespace-nowrap text-center text-[11px] text-staff-muted">
@@ -67,7 +61,7 @@ export function UsageChart({ chart }: { chart: Overview["chart"] }) {
   );
 }
 
-// คำอธิบายกราฟการใช้งาน (ช่วงนี้/ช่วงก่อน)
+// คำอธิบายสัญลักษณ์ของกราฟการใช้งาน (ช่วงนี้ / ช่วงก่อน)
 export function UsageLegend() {
   return (
     <div className="flex gap-4 text-sm text-staff-muted">
@@ -80,13 +74,12 @@ export function UsageLegend() {
   );
 }
 
-/* ---------- ผลการประเมินโดยรวม (แท่งซ้อนแนวนอน) ---------- */
-
-// แท่งซ้อนสัดส่วนผล ปกติ/ควรระวัง/เสี่ยงสูง (ซ่อนถ้าข้อมูลน้อยกว่าเกณฑ์)
+// แถบสัดส่วนผลประเมิน ปกติ/ควรระวัง/เสี่ยงสูง ซ่อนเมื่อกลุ่มเล็กกว่า minGroup เพื่อความเป็นส่วนตัว
 export function OutcomeBreakdown({ outcome, minGroup }: { outcome: Overview["outcome"]; minGroup: number }) {
+  // รวมจำนวนผลแต่ละระดับ และเตรียมแถวสำหรับแสดง
   const c = outcome.counts;
   const total = c ? c.ok + c.mid + c.high : 0;
-  // คิดเป็นร้อยละของทั้งหมด (ปัดเศษ)
+  // คิดเปอร์เซ็นต์ของจำนวนเทียบกับผลรวมทั้งหมด
   const pct = (v: number) => (total ? Math.round((v / total) * 100) : 0);
   const rows = [
     { key: "ok", label: "ปกติ", color: "bg-risk-ok", v: c?.ok ?? 0 },
@@ -94,6 +87,7 @@ export function OutcomeBreakdown({ outcome, minGroup }: { outcome: Overview["out
     { key: "high", label: "เสี่ยงสูง", color: "bg-risk-high", v: c?.high ?? 0 },
   ];
 
+  // ไม่มีข้อมูล หรือกลุ่มเล็กเกินไป → แสดงข้อความแทนสัดส่วน
   if (!c || total === 0) {
     return (
       <div className="flex flex-col gap-3">
@@ -109,6 +103,7 @@ export function OutcomeBreakdown({ outcome, minGroup }: { outcome: Overview["out
 
   return (
     <div className="flex flex-col gap-4">
+      {/* แถบสัดส่วนสีรวม */}
       <div className="flex h-4 gap-[2px] overflow-hidden rounded-full bg-staff-bg">
         {rows
           .filter((r) => r.v > 0)
@@ -116,6 +111,7 @@ export function OutcomeBreakdown({ outcome, minGroup }: { outcome: Overview["out
             <span key={r.key} className={r.color} style={{ width: `${(r.v / total) * 100}%` }} title={`${r.label} ${pct(r.v)}% (${fmt(r.v)} ครั้ง)`} />
           ))}
       </div>
+      {/* รายการแต่ละระดับ: จำนวนครั้งและเปอร์เซ็นต์ */}
       <ul className="flex flex-col gap-2.5">
         {rows.map((r) => (
           <li key={r.key} className="flex items-center gap-3 text-sm">
@@ -130,9 +126,7 @@ export function OutcomeBreakdown({ outcome, minGroup }: { outcome: Overview["out
   );
 }
 
-/* ---------- การ์ด "ส่วนต่าง ๆ ของระบบ" ---------- */
-
-// การ์ดสรุปแต่ละส่วนของระบบพร้อมลิงก์ไปหน้าจัดการ
+// การ์ดสรุปของแต่ละระบบในหน้าภาพรวม มีไอคอน หัวข้อ เนื้อหา และลิงก์ไปหน้าที่เกี่ยวข้อง
 export function SystemCard({
   icon,
   title,
@@ -157,6 +151,7 @@ export function SystemCard({
           <p className="text-[13px] text-staff-muted">{subtitle}</p>
         </div>
       </div>
+      {/* เนื้อหาการ์ด และลิงก์ไปหน้าที่เกี่ยวข้อง */}
       <div className="mt-5 flex flex-1 flex-col gap-4">{children}</div>
       <Link
         href={href}
@@ -169,7 +164,7 @@ export function SystemCard({
   );
 }
 
-// กล่องตัวเลขสถิติขนาดเล็ก
+// กล่องตัวเลขสถิติเล็ก ๆ พร้อมป้ายชื่อและหมายเหตุ
 export function MiniStat({ label, value, note }: { label: string; value: ReactNode; note?: ReactNode }) {
   return (
     <div className="min-w-0 rounded-2xl bg-staff-soft px-3 py-2.5">
@@ -180,9 +175,7 @@ export function MiniStat({ label, value, note }: { label: string; value: ReactNo
   );
 }
 
-/* ---------- แท่งแนวนอน (แบบประเมินยอดนิยม) ---------- */
-
-// แท่งแนวนอนตามสัดส่วนค่า (ใช้แสดงแบบประเมินยอดนิยม)
+// กราฟแท่งแนวนอนเทียบค่าของแต่ละรายการกับค่าสูงสุด
 export function HBars({ items }: { items: { key: string | number; label: string; value: number }[] }) {
   const max = Math.max(1, ...items.map((i) => i.value));
   return (
@@ -204,13 +197,12 @@ export function HBars({ items }: { items: { key: string | number; label: string;
   );
 }
 
-/* ---------- แท่งรายเดือนขนาดเล็ก (เดือนปัจจุบันเป็นลายทแยง = ยังไม่ครบเดือน) ---------- */
-
-// กราฟแท่งรายเดือนขนาดเล็ก เดือนปัจจุบันเป็นลายทแยง
+// กราฟแท่งรายเดือน เดือนปัจจุบันที่ยังไม่ครบแสดงเป็นลายเส้นทแยง
 export function MonthlyBars({ months }: { months: Overview["reports"]["monthly"] }) {
   const max = Math.max(1, ...months.map((m) => m.value));
   return (
     <div>
+      {/* แท่งกราฟรายเดือน */}
       <div className="flex h-24 items-end gap-2 border-b border-staff-line">
         {months.map((m) => (
           <div
@@ -226,6 +218,7 @@ export function MonthlyBars({ months }: { months: Overview["reports"]["monthly"]
           </div>
         ))}
       </div>
+      {/* ชื่อเดือนใต้แท่ง */}
       <div className="mt-1 flex gap-2">
         {months.map((m) => (
           <span key={m.label} className={`min-w-0 flex-1 text-center text-[11px] ${m.current ? "font-semibold text-staff-ink" : "text-staff-muted"}`}>
@@ -237,9 +230,7 @@ export function MonthlyBars({ months }: { months: Overview["reports"]["monthly"]
   );
 }
 
-/* ---------- รายการงานค้าง ---------- */
-
-// ลิงก์รายการงานค้างพร้อมจำนวนและรายละเอียด
+// รายการงานที่ต้องทำ แสดงจำนวนค้างและลิงก์ไปจัดการ
 export function TaskItem({
   title,
   count,

@@ -24,8 +24,10 @@ import RecommendationLayout, {
   type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้า ใช้กับคอมโพเนนต์แสดงผลประเมิน
 const TONE = "blue";
 
+// รูปแบบผลประเมินความดันจาก API (systolic/diastolic ระดับ คำแนะนำ)
 type AssessmentResult = {
   assessmentId: number;
   userId: number;
@@ -37,17 +39,14 @@ type AssessmentResult = {
   assessedAt: string;
 };
 
+// รูปแบบ response ของ API ผลประเมิน
 type ResultResponse = {
   success: boolean;
   result?: AssessmentResult;
   message?: string;
 };
 
-/* =========================================================
-   เกณฑ์ระดับความดัน (ตรงกับ API, เอกสารอ้างอิง ตารางที่ 4)
-   color = สีตามความหมายของผล
-========================================================= */
-
+// ตารางเกณฑ์ระดับความดันโลหิต (ตัวบน/ตัวล่าง) พร้อมสีที่ใช้แสดง
 const BP_LEVELS: { level: string; range: string; color: RiskColor }[] = [
   { level: "ความดันต่ำกว่าเกณฑ์", range: "< 90 / < 60", color: "yellow" },
   { level: "ความดันอยู่ในระดับปกติ", range: "< 130 / < 85", color: "green" },
@@ -57,6 +56,7 @@ const BP_LEVELS: { level: string; range: string; color: RiskColor }[] = [
   { level: "ความดันโลหิตสูงอันตราย", range: "≥ 180 / ≥ 110", color: "red" },
 ];
 
+// คลาสสีของจุดนำหน้าแต่ละระดับในตารางเกณฑ์
 const DOT: Record<RiskColor, string> = {
   green: "bg-[#4f9857]",
   yellow: "bg-[#d9a400]",
@@ -65,7 +65,7 @@ const DOT: Record<RiskColor, string> = {
   gray: "bg-[#a3a4ab]",
 };
 
-// หน้าผลและคำแนะนำความดันโลหิต: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลและคำแนะนำการประเมินความดันโลหิต ครอบด้วย Suspense
 export default function BloodPressureRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -74,7 +74,8 @@ export default function BloodPressureRecommendationPage() {
   );
 }
 
-// เนื้อหาหน้าผลความดัน: โหลดผลตาม assessmentId แล้วแสดงค่าความดันและคำแนะนำ
+// เนื้อหาหน้า: แสดงค่าความดัน ระดับความเสี่ยง และคำแนะนำตาม assessmentId
+// ประกอบด้วยวงค่า systolic/diastolic กล่องค่าความดัน 2 ค่า และตารางเกณฑ์ระดับความดัน
 function RecommendationContent() {
   const searchParams =
     useSearchParams();
@@ -84,6 +85,7 @@ function RecommendationContent() {
       "assessmentId",
     );
 
+  // state ของหน้า: ผลประเมิน สถานะโหลด และ error
   const [result, setResult] =
     useState<AssessmentResult | null>(
       null,
@@ -95,12 +97,9 @@ function RecommendationContent() {
   const [error, setError] =
     useState("");
 
-  /* =========================================================
-     โหลดผลจาก Database
-  ========================================================= */
-
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
-    // โหลดผลประเมินความดันโลหิตตาม assessmentId (session หมดอายุให้กลับหน้า login)
+    // ดึงผลประเมินจาก /api/assessments/blood-pressure (401 → ลบ userId แล้วไปหน้า login)
     const loadResult =
       async () => {
         if (!assessmentId) {
@@ -127,7 +126,6 @@ function RecommendationContent() {
               },
             );
 
-          // session หมดอายุ → กลับไปหน้า login
           if (response.status === 401) {
             localStorage.removeItem("userId");
             window.location.replace("/login");
@@ -169,6 +167,7 @@ function RecommendationContent() {
     void loadResult();
   }, [assessmentId]);
 
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -180,11 +179,13 @@ function RecommendationContent() {
     return <RecommendationError tone={TONE} message={error} editHref="/assessment_DB" />;
   }
 
+  // ค่าที่คำนวณสำหรับแสดงผล (สีตามระดับความดัน, ชุดสีของโทน)
   const riskColor: RiskColor =
     BP_LEVELS.find((b) => b.level === result.riskLevel)?.color ?? "gray";
 
   const t = RECOMMENDATION_TONES[TONE];
 
+  // ส่วนแสดงผล: วงค่าความดัน สรุปผล และคำแนะนำ
   return (
     <>
       <RecommendationLayout
@@ -198,7 +199,6 @@ function RecommendationContent() {
         score={
           <ScoreCircle
             tone={TONE}
-            // เทียบตัวบนกับเกณฑ์ระดับอันตราย (180 mmHg)
             progress={result.systolic / 180}
             value={String(result.systolic)}
             unit={`/${result.diastolic}`}
@@ -221,10 +221,8 @@ function RecommendationContent() {
         assessmentId={assessmentId}
         editHref="/assessment_DB"
       >
-        {/* =====================================================
-            ค่าความดันที่วัดได้ + เกณฑ์แต่ละระดับ
-        ====================================================== */}
 
+        {/* กล่องค่าความดันตัวบนและตัวล่าง */}
         <RecommendationSection
           icon={<HeartPulse size={27} className={t.eyebrow} />}
           title="ค่าความดันโลหิตของคุณ"
@@ -243,6 +241,7 @@ function RecommendationContent() {
           </div>
         </RecommendationSection>
 
+        {/* ตารางเกณฑ์ระดับความดัน ไฮไลต์ระดับของผู้ใช้ */}
         <RecommendationSection
           icon={<Gauge size={27} className={t.eyebrow} />}
           title="เกณฑ์ระดับความดันโลหิต"
@@ -274,10 +273,7 @@ function RecommendationContent() {
   );
 }
 
-/* =========================================================
-   การ์ดค่าความดัน
-========================================================= */
-
+// กล่องแสดงค่าความดันหนึ่งค่า (ชื่อ ค่า หน่วย)
 function PressureResult({
   title,
   value,

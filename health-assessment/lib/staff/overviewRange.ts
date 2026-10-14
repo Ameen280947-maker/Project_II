@@ -1,39 +1,38 @@
-/* =========================================================
-   ช่วงเวลาของหน้า "ภาพรวม" Staff (ใช้ใน /api/staff/overview)
-   - from / to เป็นวันที่ตามเวลาไทย (รวมทั้งสองวัน)
-========================================================= */
-
+// ช่วงเวลาแบบเก่า (?range=week/month/quarter) เป็นจำนวนวัน และช่วงยาวสุดที่เลือกได้
 export const LEGACY_RANGES: Record<string, number> = { week: 7, month: 30, quarter: 90 };
 const MAX_SPAN_DAYS = 731;
 
+// ชื่อวันและเดือนแบบย่อภาษาไทย สำหรับป้ายแกนกราฟ
 const TH_DAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 const TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
+// หน่วยการจัดกลุ่มข้อมูลในกราฟ
 export type Bucket = "hour" | "day" | "week" | "month";
 
-// เวลาในฐานข้อมูล (timestamp ที่เก็บเป็น UTC) แปลงเป็นเวลาไทย
+// สร้างนิพจน์ SQL แปลงคอลัมน์เวลา UTC เป็นเวลาไทย (Asia/Bangkok)
 export const localOf = (col: string) => `((${col} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Bangkok')`;
+// เวลาประเมิน (a.assessed_at) แบบเวลาไทย สำหรับใช้ใน SQL
 export const LOCAL_ASSESSED = localOf("a.assessed_at");
-// ช่วงวันที่ $from ถึง $to (รวมทั้งสองวัน) ตามเวลาไทย
+// สร้างเงื่อนไข SQL กรองช่วงวันที่ from ถึง to (รวมวันสุดท้าย)
 export const inRange = (localExpr: string, fromParam: string, toParam: string) =>
   `${localExpr} >= ${fromParam}::date AND ${localExpr} < ${toParam}::date + 1`;
 
+// รูปแบบวันที่ YYYY-MM-DD
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-// วันนี้ตามเวลาไทย รูปแบบ YYYY-MM-DD
+// คืนวันที่วันนี้ตามเวลาไทยในรูปแบบ YYYY-MM-DD
 function todayInBangkok() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
 }
 
-// แปลง "YYYY-MM-DD" เป็น Date (UTC) ถ้าวันที่ไม่มีจริงคืน null
+// แปลง YYYY-MM-DD เป็น Date (UTC) และคืน null ถ้าเป็นวันที่ที่ไม่มีจริง
 function toUtcDate(s: string) {
   const [y, m, d] = s.split("-").map(Number);
   const date = new Date(Date.UTC(y, m - 1, d));
-  // ตัดวันที่ไม่มีจริง เช่น 2026-02-31
   return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d ? date : null;
 }
 
-// บวก/ลบจำนวนวันจากวันที่ "YYYY-MM-DD" แล้วคืนในรูปแบบเดิม
+// บวก/ลบจำนวนวันจากวันที่ YYYY-MM-DD
 export function addDays(s: string, days: number) {
   const d = toUtcDate(s)!;
   d.setUTCDate(d.getUTCDate() + days);
@@ -45,7 +44,7 @@ export function spanDays(from: string, to: string) {
   return Math.round((toUtcDate(to)!.getTime() - toUtcDate(from)!.getTime()) / 86_400_000) + 1;
 }
 
-// ความละเอียดกราฟตามความยาวช่วง
+// เลือกหน่วยการจัดกลุ่มกราฟ (ชั่วโมง/วัน/สัปดาห์/เดือน) ตามความยาวช่วงเวลา
 export function bucketFor(days: number): Bucket {
   if (days <= 1) return "hour";
   if (days <= 31) return "day";
@@ -53,6 +52,7 @@ export function bucketFor(days: number): Bucket {
   return "month";
 }
 
+// รูปแบบ to_char ของ PostgreSQL สำหรับสร้าง key ของแต่ละช่วง
 export const KEY_FORMAT: Record<Bucket, string> = {
   hour: "YYYY-MM-DD HH24",
   day: "YYYY-MM-DD",
@@ -60,7 +60,7 @@ export const KEY_FORMAT: Record<Bucket, string> = {
   month: "YYYY-MM",
 };
 
-// แปลง key ของช่วงเวลา (มาจาก SQL) เป็นป้ายภาษาไทย
+// แปลง key ของช่วงเวลาเป็นป้ายแกนกราฟภาษาไทย (เวลา ชื่อวัน วันที่ หรือเดือน)
 export function bucketLabel(key: string, bucket: Bucket, days: number, multiYear: boolean) {
   if (bucket === "hour") return `${key.slice(11, 13)}:00`;
   const [y, m, d] = key.split("-").map(Number);
@@ -69,20 +69,20 @@ export function bucketLabel(key: string, bucket: Bucket, days: number, multiYear
   return `${d} ${TH_MONTHS[m - 1]}`;
 }
 
-/* ---------- อ่านช่วงเวลาจาก query ---------- */
-
-// อ่านช่วงวันที่จาก query (from/to หรือ range แบบเดิม) พร้อมตรวจความถูกต้อง คืน from/to หรือ error
+// อ่านและตรวจช่วงวันที่จาก query (from/to หรือ range แบบเก่า) ไม่เกิน 2 ปี คืน {from,to} หรือ {error}
 export function parseRange(params: URLSearchParams): { from: string; to: string } | { error: string } {
   const today = todayInBangkok();
   const legacy = params.get("range");
   const fromParam = params.get("from");
   const toParam = params.get("to");
 
+  // ไม่ระบุ from/to → ใช้ช่วงแบบเก่า (ค่าเริ่มต้น 7 วัน)
   if (!fromParam && !toParam) {
     const days = LEGACY_RANGES[legacy ?? ""] ?? 7;
     return { from: addDays(today, -(days - 1)), to: today };
   }
 
+  // ตรวจรูปแบบวันที่ ลำดับ ไม่เกินวันนี้ และไม่เกิน 2 ปี
   if (!fromParam || !toParam || !DATE_RE.test(fromParam) || !DATE_RE.test(toParam) || !toUtcDate(fromParam) || !toUtcDate(toParam)) {
     return { error: "รูปแบบวันที่ไม่ถูกต้อง" };
   }

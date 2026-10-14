@@ -7,13 +7,7 @@ import type { Change } from "@/lib/staff/assessmentHistory";
 import { Empty, ErrorBox, thDate } from "../ui";
 import { rangeText, type Snapshot } from "./shared";
 
-/* =========================================================
-   แท็บ "ประวัติการแก้ไข"
-   - แต่ละครั้งที่เผยแพร่: สิ่งที่เปลี่ยนเทียบกับครั้งก่อน (ค่าเดิม → ค่าใหม่)
-   - กด "ดูเนื้อหาทั้งหมด" เพื่อดูข้อมูลเดิมทั้งชุดของครั้งนั้น (อ่านอย่างเดียว)
-   - การเปิด/ปิดใช้งาน แสดงเป็นรายการในประวัติด้วย
-========================================================= */
-
+// รายการหนึ่งในไทม์ไลน์ประวัติ (เผยแพร่ เนื้อหาตั้งต้น เปิด/ปิดใช้งาน) พร้อมจุดที่เปลี่ยน
 type Entry = {
   kind: "publish" | "baseline" | "enable" | "disable";
   at: string;
@@ -22,6 +16,7 @@ type Entry = {
   changes?: Change[];
 };
 
+// หัวข้อภาษาไทยของแต่ละชนิดรายการ
 const TITLE: Record<Entry["kind"], string> = {
   publish: "แก้ไขและเผยแพร่",
   baseline: "เนื้อหาตั้งต้น (ก่อนเริ่มบันทึกประวัติการแก้ไข)",
@@ -29,6 +24,7 @@ const TITLE: Record<Entry["kind"], string> = {
   disable: "ปิดใช้งานแบบประเมิน",
 };
 
+// สีจุดบนเส้นไทม์ไลน์ตามชนิดรายการ
 const DOT: Record<Entry["kind"], string> = {
   publish: "bg-staff-600",
   baseline: "bg-staff-300",
@@ -36,13 +32,16 @@ const DOT: Record<Entry["kind"], string> = {
   disable: "bg-risk-crit",
 };
 
+// ลำดับหมวดที่ใช้จัดกลุ่มจุดที่เปลี่ยน
 const SECTIONS: Change["section"][] = ["ข้อมูลทั่วไป", "คำถามและคะแนน", "เกณฑ์ผลและคำแนะนำ"];
 
-// แท็บประวัติ: โหลดรายการเผยแพร่/เปิด-ปิดใช้งานของแบบประเมินแล้วแสดงเป็นไทม์ไลน์
+// แท็บประวัติการแก้ไข: ดึงรายการเผยแพร่/เปิด-ปิดใช้งานของแบบประเมินมาแสดงเป็นไทม์ไลน์
+// รับ typeId และ refreshKey (เปลี่ยนเมื่อต้องโหลดใหม่) → GET /api/staff/assessments?type=&changes=1
 export default function HistoryTab({ typeId, refreshKey }: { typeId: number; refreshKey: string }) {
   const reqKey = `${typeId}|${refreshKey}`;
   const [result, setResult] = useState<{ key: string; entries?: Entry[]; error?: string } | null>(null);
 
+  // โหลดประวัติจาก API เมื่อเปลี่ยนแบบประเมินหรือรีเฟรช
   useEffect(() => {
     let cancelled = false;
     staffFetch<{ entries: Entry[] }>(`/api/staff/assessments?type=${typeId}&changes=1`)
@@ -53,6 +52,7 @@ export default function HistoryTab({ typeId, refreshKey }: { typeId: number; ref
     };
   }, [typeId, refreshKey]);
 
+  // สถานะกำลังโหลด / error / ไม่มีข้อมูล
   if (result?.key !== reqKey) return <div className="h-40 animate-pulse rounded-2xl bg-staff-soft" />;
   if (result.error) return <ErrorBox message={result.error} />;
   const entries = result.entries ?? [];
@@ -63,6 +63,7 @@ export default function HistoryTab({ typeId, refreshKey }: { typeId: number; ref
       <p className="text-sm text-staff-muted">
         การแก้ไขจะบันทึกในประวัติเมื่อกด &quot;เผยแพร่&quot; แสดงค่าเดิมและค่าใหม่ของแต่ละจุดที่เปลี่ยน
       </p>
+      {/* ไทม์ไลน์รายการประวัติ */}
       <ol className="relative">
         {entries.map((e, i) => (
           <li key={`${e.kind}-${e.at}-${i}`} className="relative flex gap-3 pb-4 last:pb-0">
@@ -76,7 +77,8 @@ export default function HistoryTab({ typeId, refreshKey }: { typeId: number; ref
   );
 }
 
-// การ์ดหนึ่งรายการในประวัติ: หัวข้อ วันเวลา ผู้ทำ และจุดที่เปลี่ยนแยกตามส่วน
+// การ์ดหนึ่งรายการในไทม์ไลน์ แสดงผู้แก้ เวลา และจุดที่เปลี่ยนแยกตามหมวด
+// ถ้ามี versionId จะมีปุ่มดูเนื้อหาเต็มของเวอร์ชันนั้น (SnapshotViewer)
 function EntryCard({ entry }: { entry: Entry }) {
   const changes = entry.changes ?? [];
   return (
@@ -87,6 +89,7 @@ function EntryCard({ entry }: { entry: Entry }) {
         {entry.kind === "publish" && ` · ${changes.length.toLocaleString("th-TH")} จุดที่เปลี่ยน`}
       </p>
 
+      {/* จุดที่เปลี่ยนแยกตามหมวด */}
       {changes.length > 0 && (
         <div className="mt-3 flex flex-col gap-3">
           {SECTIONS.map((section) => {
@@ -111,7 +114,7 @@ function EntryCard({ entry }: { entry: Entry }) {
   );
 }
 
-// แถวแสดงการเปลี่ยนแปลงหนึ่งจุด (ประเภท ค่าเดิม → ค่าใหม่)
+// แถวแสดงการเปลี่ยนแปลงหนึ่งจุด พร้อมค่าเดิม (แดง) และค่าใหม่ (เขียว)
 function ChangeRow({ change }: { change: Change }) {
   const label = { add: "เพิ่ม", remove: "ลบ", change: "แก้ไข" }[change.kind];
   return (
@@ -136,13 +139,14 @@ function ChangeRow({ change }: { change: Change }) {
   );
 }
 
-/* ดูเนื้อหาทั้งชุดของครั้งนั้น (ข้อมูลเดิมย้อนหลัง) — โหลดเมื่อกดเปิด */
+// ปุ่มพับ/กางดูเนื้อหาทั้งหมด (คำถาม เกณฑ์ คำแนะนำ) ของเวอร์ชันที่เผยแพร่ครั้งนั้น
+// โหลด snapshot แบบ lazy จาก /api/staff/assessments?version= เฉพาะครั้งแรกที่กดเปิด
 function SnapshotViewer({ versionId }: { versionId: number }) {
   const [open, setOpen] = useState(false);
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const [error, setError] = useState("");
 
-  // เปิด/ปิดส่วนเนื้อหา และโหลด snapshot เมื่อเปิดครั้งแรก
+  // สลับเปิด/ปิด และโหลด snapshot ของเวอร์ชันจาก API ในครั้งแรกที่เปิด
   const toggle = () => {
     const next = !open;
     setOpen(next);
@@ -165,6 +169,7 @@ function SnapshotViewer({ versionId }: { versionId: number }) {
         {open ? "ซ่อนเนื้อหาทั้งหมด" : "ดูเนื้อหาทั้งหมดของครั้งนี้"}
         <ChevronDown size={14} className={`transition ${open ? "rotate-180" : ""}`} />
       </button>
+      {/* เนื้อหา snapshot: คำถามและเกณฑ์ผล */}
       {open && (
         <div className="mt-2 rounded-xl border border-staff-line p-3 text-sm">
           {error ? (

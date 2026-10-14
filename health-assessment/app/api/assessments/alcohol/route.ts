@@ -15,28 +15,24 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ตัวเลือกคำตอบหนึ่งข้อ: ค่า ข้อความ และคะแนน
 type AlcoholOption = {
   value: number;
   text: string;
   score: number;
 };
 
+// คำถามหนึ่งข้อพร้อมตัวเลือก
 type AlcoholQuestion = {
   id: number;
   text: string;
   options: AlcoholOption[];
 };
 
+// รหัสแบบประเมินแอลกอฮอล์ในตาราง assessment_types
 const ASSESSMENT_TYPE_ID = 7;
 
-/* =========================================================
-   DEFAULT QUESTIONS & OPTIONS
-========================================================= */
-
+// ชุดคำถามคัดกรองการดื่มแอลกอฮอล์ 7 ข้อ พร้อมคะแนนของแต่ละตัวเลือก
 const QUESTIONS: AlcoholQuestion[] = [
   {
     id: 1,
@@ -111,20 +107,12 @@ const QUESTIONS: AlcoholQuestion[] = [
   },
 ];
 
-/* =========================================================
-   GET
-   GET /api/assessments/alcohol
-   GET /api/assessments/alcohol?assessmentId=123
-========================================================= */
-
-// GET: ไม่ส่ง assessmentId = คืนชุดคำถาม, ส่ง assessmentId = คืนผลประเมินของผู้ใช้
+// API: ไม่มี assessmentId คืนชุดคำถาม AUDIT ดื่มแอลกอฮอล์ ถ้ามีคืนผลประเมินที่บันทึกไว้ของผู้ใช้
 export async function GET(request: NextRequest) {
   try {
     const assessmentIdParam = request.nextUrl.searchParams.get("assessmentId");
 
-    /* =====================================================
-       CASE 1: ดึงรายการคำถามสำหรับทำแบบประเมิน
-    ====================================================== */
+    // ไม่มี assessmentId → คืนชุดคำถาม
     if (!assessmentIdParam) {
       return NextResponse.json({
         success: true,
@@ -134,6 +122,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // ตรวจสิทธิ์ผู้ใช้และตรวจ assessmentId
     const auth = requireUser(request);
     if (!auth.ok) return auth.response;
 
@@ -149,7 +138,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    /* ดูได้เฉพาะผลแอลกอฮอล์ของตัวเอง (ตรวจก่อนอ่านจาก view) */
+    // ตรวจว่าผลประเมินนี้เป็นของผู้ใช้คนนี้
     const ownerResult = await pool.query(
       `
       SELECT 1
@@ -172,9 +161,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    /* =====================================================
-       CASE 2: ดึงผลการประเมินจาก View v_assessment_alcohol
-    ====================================================== */
+    // ลองดึงผลจาก view v_assessment_alcohol ก่อน
     try {
       const viewResult = await pool.query(
         `
@@ -228,9 +215,7 @@ export async function GET(request: NextRequest) {
       console.warn("QUERY v_assessment_alcohol VIEW FAILED, FALLING BACK TO TABLES:", viewError);
     }
 
-    /* =====================================================
-       FALLBACK: ดึงจากตาราง assessment และ assessment_answers
-    ====================================================== */
+    // view ใช้ไม่ได้ → ดึงผลประเมินและคำแนะนำจากตารางโดยตรง
     const assessmentResult = await pool.query(
       `
       SELECT
@@ -265,6 +250,7 @@ export async function GET(request: NextRequest) {
 
     const assessmentRow = assessmentResult.rows[0];
 
+    // ดึงคำตอบรายข้อ แล้วคืนผลทั้งหมด
     const answersResult = await pool.query(
       `
       SELECT
@@ -309,6 +295,7 @@ export async function GET(request: NextRequest) {
       questions: QUESTIONS,
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/alcohol", error);
     console.error("GET ALCOHOL ERROR:", error);
     return NextResponse.json(
@@ -321,35 +308,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* =========================================================
-   POST
-   POST /api/assessments/alcohol
-========================================================= */
-
-// POST: ตรวจคำตอบ คิดคะแนนฝั่ง server แล้วบันทึกผลประเมินการดื่มแอลกอฮอล์
+// API: ตรวจคำตอบแบบประเมินแอลกอฮอล์ คำนวณคะแนน/ระดับความเสี่ยง แล้วบันทึกผลลงฐานข้อมูล
 export async function POST(request: NextRequest) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน และความยินยอม
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  /* =====================================================
-     VALIDATE USER
-     ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
-  ====================================================== */
   const auth = requireUser(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(7);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(auth.userId);
   if (noConsent) return noConsent;
   const userId = auth.userId;
 
-  /*
-    รูปแบบคำตอบ: { [ลำดับข้อ 1-7]: value ของตัวเลือกใน QUESTIONS }
-    คะแนนคิดจาก QUESTIONS ฝั่ง server เท่านั้น
-  */
+  // ตรวจคำตอบที่ส่งมา: ต้องเป็นคำถามของชุดนี้และตัวเลือกถูกต้อง
   const rawAnswers = body.answers;
 
   if (!rawAnswers || typeof rawAnswers !== "object" || Array.isArray(rawAnswers)) {
@@ -376,18 +350,13 @@ export async function POST(request: NextRequest) {
     answers.set(question.id, option);
   }
 
-  /* =====================================================
-     VALIDATE Q1
-  ====================================================== */
+  // ข้อ 1 บังคับตอบ ถ้าเคยดื่มใน 3 เดือน (ตัวเลือก 3) ต้องตอบข้อ 2–7 ครบ
   const q1 = answers.get(1)?.value;
 
   if (q1 === undefined) {
     return badRequest("กรุณาตอบคำถามข้อที่ 1");
   }
 
-  /* =====================================================
-     CURRENT DRINKER VALIDATION (Q2 - Q7)
-  ====================================================== */
   if (q1 === 3) {
     for (let i = 2; i <= 7; i++) {
       if (!answers.has(i)) {
@@ -403,9 +372,7 @@ export async function POST(request: NextRequest) {
       return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
-    /* =====================================================
-       CALCULATE SCORE & RISK LEVEL
-    ====================================================== */
+    // คำนวณคะแนน/ระดับความเสี่ยงและคำแนะนำเริ่มต้น (ไม่เคยดื่ม / หยุดแล้ว / รวมคะแนนข้อ 2–7)
     let totalScore = 0;
     let riskLevel = "";
     let defaultRecText = "";
@@ -447,9 +414,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    /* =====================================================
-       LOOKUP RECOMMENDATION FROM DB
-    ====================================================== */
+    // หาคำแนะนำจากตาราง recommendation ตามระดับความเสี่ยง (ถ้าไม่มีใช้ข้อความเริ่มต้น)
     let recommendationId: number | null = null;
     let finalRecText = defaultRecText;
 
@@ -471,9 +436,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    /* =====================================================
-       LOOKUP QUESTIONS & CHOICES IN DB
-    ====================================================== */
+    // ดึงคำถามและตัวเลือกใน DB เพื่อจับคู่ question_id/choice_id
     const dbQuestionsResult = await client.query(
       `
       SELECT
@@ -499,12 +462,9 @@ export async function POST(request: NextRequest) {
       score: number | null;
     }>;
 
-    /* =====================================================
-       START TRANSACTION
-    ====================================================== */
+    // บันทึกผลประเมินลงตาราง assessment (ใน transaction)
     await client.query("BEGIN");
 
-    // 1) INSERT INTO assessment
     const insertAssessmentResult = await client.query(
       `
       INSERT INTO assessment (
@@ -523,7 +483,7 @@ export async function POST(request: NextRequest) {
 
     const newAssessmentId = insertAssessmentResult.rows[0].assessment_id;
 
-    // 2) PREPARE & INSERT ANSWERS
+    // บันทึกคำตอบรายข้อลง assessment_answers (ไม่เคยดื่ม/หยุดแล้ว บันทึกแค่ข้อ 1)
     const questionsToSave = QUESTIONS.filter((question) => {
       if (q1 === 1 || q1 === 2) {
         return question.id === 1;
@@ -532,13 +492,11 @@ export async function POST(request: NextRequest) {
     });
 
     for (const q of questionsToSave) {
-      // ตรวจแล้วข้างบนว่าตอบครบ และเป็นตัวเลือกที่มีจริง
       const matchedOption = answers.get(q.id)!;
 
       const optionText = matchedOption.text;
       const score = matchedOption.score;
 
-      // คำถามในฐานข้อมูลจับคู่ด้วย display_order เท่านั้น
       const matchingDbQuestionRows = dbQuestions.filter(
         (dq) => dq.display_order === q.id
       );
@@ -549,7 +507,6 @@ export async function POST(request: NextRequest) {
 
       const dbQuestionId = matchingDbQuestionRows[0].question_id;
 
-      // จับคู่ตัวเลือกด้วยข้อความเท่านั้น (ไม่จับด้วยคะแนน เพราะหลายตัวเลือกคะแนนเท่ากันได้)
       const matchedChoiceRow = matchingDbQuestionRows.find(
         (dq) => dq.choice_text?.trim() === optionText.trim()
       );
@@ -572,9 +529,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // commit ผูกเวอร์ชันแบบประเมิน แล้วคืนผลลัพธ์
     await client.query("COMMIT");
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId, typeId: ASSESSMENT_TYPE_ID, assessmentId: newAssessmentId });
 
     return NextResponse.json({
@@ -585,6 +542,7 @@ export async function POST(request: NextRequest) {
       recommendation_text: finalRecText,
     });
   } catch (error) {
+    // จัดการ error → rollback บันทึก log และคืน 500
     void logSystemError("POST /api/assessments/alcohol", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST ALCOHOL ERROR:", error);

@@ -11,8 +11,10 @@ import RecommendationLayout, {
   ScoreCircle,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้า ใช้กับคอมโพเนนต์แสดงผลประเมิน
 const TONE = "rose";
 
+// รูปแบบผลประเมิน Thai CVD ที่ได้จาก API (% ความเสี่ยง ระดับ คำแนะนำ)
 type AssessmentResult = {
   assessmentId: number;
   riskPercent: number;
@@ -22,13 +24,14 @@ type AssessmentResult = {
   assessmentName: string;
 };
 
+// รูปแบบ response ของ API ผลประเมิน
 type ResultResponse = {
   success: boolean;
   result?: AssessmentResult;
   message?: string;
 };
 
-// หน้าผลและคำแนะนำ CVD: ครอบเนื้อหาด้วย Suspense (เพราะใช้ useSearchParams)
+// หน้า: ผลและคำแนะนำความเสี่ยงโรคหัวใจและหลอดเลือด (Thai CVD) ครอบด้วย Suspense
 export default function RecommendationHealthPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -37,20 +40,24 @@ export default function RecommendationHealthPage() {
   );
 }
 
-// เนื้อหาหน้าผล CVD: อ่าน assessmentId จาก URL แล้วโหลดผลมาแสดง
+// เนื้อหาหน้า: อ่าน assessmentId จาก URL แล้วแสดงผลประเมิน Thai CVD พร้อมคำแนะนำ
+// แสดง % ความเสี่ยง 10 ปี (สีเขียว <10%, เหลือง 10–29%, แดง ≥30%) และการ์ดแนวทางดูแลหัวใจ 3 ด้าน
 function RecommendationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
   const assessmentId = searchParams.get("assessmentId");
 
+  // state ของหน้า: ผลประเมิน สถานะโหลด และ error
   const [result, setResult] =
     useState<AssessmentResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
-    // โหลดผลประเมิน Thai CVD ตาม assessmentId (session หมดอายุให้กลับหน้า login)
+    // ดึงผลประเมินจาก /api/assessments/thai-cvd (401 → ลบ userId แล้วไปหน้า login)
+    // ขั้นตอน: ไม่มี assessmentId → error → fetch → ตรวจ success → เก็บผลลง state
     const loadResult = async () => {
       if (!assessmentId) {
         setError("ไม่พบ assessmentId");
@@ -70,7 +77,6 @@ function RecommendationContent() {
           },
         );
 
-        // session หมดอายุ → กลับไปหน้า login
         if (response.status === 401) {
           localStorage.removeItem("userId");
           router.replace("/login");
@@ -100,6 +106,7 @@ function RecommendationContent() {
     void loadResult();
   }, [assessmentId, router]);
 
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -108,6 +115,7 @@ function RecommendationContent() {
     return <RecommendationError tone={TONE} message={error} editHref="/assessment_CVD" />;
   }
 
+  // ส่วนแสดงผล: วง % ความเสี่ยง สรุปผล และคำแนะนำ
   return (
     <RecommendationLayout
       tone={TONE}
@@ -127,7 +135,6 @@ function RecommendationContent() {
         />
       }
       riskLevel={result.riskLevel}
-      // สีตามตารางที่ 2 ของเอกสารอ้างอิง: <10% เขียว, 10-<30% เหลือง, ≥30% แดง
       riskColor={result.riskPercent >= 30 ? "red" : result.riskPercent >= 10 ? "yellow" : "green"}
       summary={
         <>
@@ -141,6 +148,7 @@ function RecommendationContent() {
       assessmentId={assessmentId}
       editHref="/assessment_CVD"
     >
+      {/* แนวทางดูแลสุขภาพหัวใจ 3 ด้าน */}
       <RecommendationSection icon={<ShieldCheck size={27} />} title="แนวทางดูแลสุขภาพหัวใจ">
         <div className="grid gap-5 md:grid-cols-3">
           <AdviceCard tone={TONE} icon={<Apple size={31} />} title="โภชนาการ">

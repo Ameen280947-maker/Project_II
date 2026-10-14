@@ -10,16 +10,12 @@ import NotificationBell from "@/app/components/NotificationBell";
 import AssessmentMenuCard from "@/app/components/AssessmentMenuCard";
 import { THEME_INFO, cardToneFor, type AssessmentCategory } from "@/lib/assessmentCategories";
 
-/* =========================================================
-   หน้าเมนูของหมวดหมู่ที่เจ้าหน้าที่สร้างเพิ่ม  /assessment-category/<id>
-   - หน้าตาเหมือนหน้าเมนูหมวดเดิม (assessment-menu) สีตามธีมของหมวด
-   - หมวดเดิมที่มีหน้าเมนูของตัวเอง → พาไปหน้านั้นแทน
-========================================================= */
-
+// ข้อความเมื่อไม่พบหมวดหมู่หรือไม่มีแบบประเมินที่เปิดใช้
 const NOT_FOUND_TEXT = "ไม่พบหมวดหมู่นี้ หรือยังไม่มีแบบประเมินที่เปิดใช้งาน";
 
-// หน้าหมวดหมู่แบบประเมินตาม id: โหลดหมวดจาก API แล้วแสดงรายการแบบประเมินในหมวด
+// หน้า: แสดงแบบประเมินในหมวดหมู่ตาม id (ดึงจาก /api/assessments/categories หรือ redirect ถ้ามี routePath)
 export default function AssessmentCategoryPage() {
+  // state ของหน้า: id หมวดหมู่ ข้อมูลหมวด และข้อความ error
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const id = Number(params.id);
@@ -27,6 +23,7 @@ export default function AssessmentCategoryPage() {
   const [category, setCategory] = useState<AssessmentCategory | null>(null);
   const [error, setError] = useState(validId ? "" : NOT_FOUND_TEXT);
 
+  // โหลดข้อมูลหมวดหมู่จาก API ตอนเปิดหน้า (มี routePath → redirect ไปหน้าเฉพาะ)
   useEffect(() => {
     if (!validId) return;
     fetch(`/api/assessments/categories?id=${id}`, { cache: "no-store" })
@@ -46,19 +43,11 @@ export default function AssessmentCategoryPage() {
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
 
-        {/* =====================================================
-            SIDEBAR กลาง
-        ====================================================== */}
-
         <Sidebar />
-
-        {/* =====================================================
-            MAIN CONTENT
-        ====================================================== */}
 
         <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
-          {/* Header */}
+          {/* ส่วนหัว: ชื่อหมวดหมู่และกระดิ่งแจ้งเตือน */}
           <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <p className={`text-sm font-bold uppercase tracking-[0.18em] ${theme.eyebrow}`}>
@@ -83,10 +72,7 @@ export default function AssessmentCategoryPage() {
             </div>
           </header>
 
-          {/* =================================================
-              ASSESSMENT CARDS
-          ================================================== */}
-
+          {/* เนื้อหา: error / กำลังโหลด / การ์ดแบบประเมินในหมวด */}
           {error ? (
             <div className="mt-8 grid min-h-[40vh] place-items-center rounded-[28px] border border-[#eee8e9] bg-white px-6 text-center">
               <div>
@@ -111,10 +97,7 @@ export default function AssessmentCategoryPage() {
             </div>
           )}
 
-          {/* =================================================
-              BACK BUTTON
-          ================================================== */}
-
+          {/* ปุ่มย้อนกลับไปหน้าเลือกประเภทแบบประเมิน */}
           <div className="mt-8 flex justify-end">
 
             <Link

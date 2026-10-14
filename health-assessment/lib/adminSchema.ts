@@ -1,14 +1,6 @@
 import pool from "@/lib/db";
 
-/* =========================================================
-   ตารางสำหรับฝั่ง System Admin
-   - system_error_logs : เก็บข้อผิดพลาดของระบบ (หน้า "แก้ไขข้อผิดพลาด")
-   - backup_history    : เก็บประวัติการสำรองข้อมูล (หน้า "สำรองข้อมูล")
-
-   ใช้ CREATE TABLE IF NOT EXISTS จึงเรียกซ้ำได้ปลอดภัย
-   และ cache promise ไว้ จะสร้างจริงแค่ครั้งแรกที่ server เริ่มทำงาน
-========================================================= */
-
+// SQL สร้างตาราง system_error_logs (บันทึก error) และ backup_history (ประวัติสำรองข้อมูล)
 const CREATE_SQL = `
 CREATE TABLE IF NOT EXISTS system_error_logs (
   log_id          SERIAL PRIMARY KEY,
@@ -39,18 +31,18 @@ CREATE TABLE IF NOT EXISTS backup_history (
 );
 `;
 
+// เก็บ Promise การสร้างตารางไว้ใน global เพื่อรันครั้งเดียว
 declare global {
   var adminTablesReady: Promise<void> | undefined;
 }
 
-// สร้างตารางของฝั่งแอดมิน (ถ้ายังไม่มี) แค่ครั้งเดียว โดย cache promise ไว้ใน global
+// สร้างตาราง system_error_logs และ backup_history ถ้ายังไม่มี (รันครั้งเดียวต่อ process)
 export function ensureAdminTables(): Promise<void> {
   if (!global.adminTablesReady) {
     global.adminTablesReady = pool
       .query(CREATE_SQL)
       .then(() => undefined)
       .catch((error) => {
-        // ถ้าสร้างไม่สำเร็จ ให้ลองใหม่ในครั้งถัดไป
         global.adminTablesReady = undefined;
         throw error;
       });

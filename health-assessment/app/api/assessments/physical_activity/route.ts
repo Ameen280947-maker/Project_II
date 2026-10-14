@@ -17,29 +17,20 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   CONSTANT
-========================================================= */
-
+// รหัสแบบประเมินกิจกรรมทางกายในตาราง assessment_types
 const ASSESSMENT_TYPE_ID = 8;
 
-/* =========================================================
-   พฤติกรรมเนือยนิ่ง (ข้อ 2)
-   เอกสารอ้างอิงแปลผลแยกจากกิจกรรมทางกาย (ตารางที่ 20)
-   1 = ปกติ, 2 = เสี่ยงปานกลาง, 3 = เสี่ยงสูง
-========================================================= */
-
+// แปลงคะแนนพฤติกรรมเนือยนิ่งเป็นชื่อระดับ
 const SEDENTARY_LEVEL: Record<number, string> = {
   1: "ปกติ",
   2: "เสี่ยงปานกลาง",
   3: "เสี่ยงสูง",
 };
 
-// แปลงคะแนนพฤติกรรมเนือยนิ่งเป็นระดับ พร้อมดึงข้อความคำแนะนำ
+// แปลคะแนนพฤติกรรมเนือยนิ่งเป็นระดับ และดึงคำแนะนำที่ตรงกันจากฐานข้อมูล
 async function getSedentaryResult(
   client: { query: Pool["query"] },
   score: number | null,
-  // ดูผลย้อนหลัง: ใช้คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมินครั้งนั้น
   assessmentId: number | null = null
 ) {
   if (score === null || !SEDENTARY_LEVEL[score]) {
@@ -71,21 +62,14 @@ async function getSedentaryResult(
   };
 }
 
-/* =========================================================
-   GET
-========================================================= */
-
-// GET: ไม่ส่ง assessmentId = คืนคำถาม, ส่ง assessmentId = คืนผลประเมินกิจกรรมทางกาย
+// API: คืนคำถามและตัวเลือกแบบประเมินกิจกรรมทางกาย หรือผลประเมินที่บันทึกไว้ตาม assessmentId
 export async function GET(request: NextRequest) {
+  // อ่าน assessmentId ถ้ามีต้องตรวจสิทธิ์ผู้ใช้
   const { searchParams } = new URL(request.url);
 
   const assessmentIdParam =
     searchParams.get("assessmentId");
 
-  /*
-    ดูผลได้เฉพาะของตัวเอง
-    ?userId= ถ้าส่งมาต้องตรงกับ session (ไม่งั้น 403)
-  */
   let sessionUserId = 0;
 
   if (assessmentIdParam) {
@@ -103,11 +87,7 @@ export async function GET(request: NextRequest) {
 
   try {
 
-    /* =====================================================
-       GET QUESTIONS
-       /api/assessments/physical_activity
-    ===================================================== */
-
+    // ไม่มี assessmentId → คืนคำถามพร้อมตัวเลือกจาก DB
     if (!assessmentIdParam) {
       const questionsResult = await client.query(
         `
@@ -194,11 +174,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    /* =====================================================
-       GET RESULT
-       /api/assessments/physical_activity?assessmentId=xx
-    ===================================================== */
-
     const assessmentId =
       Number(assessmentIdParam);
 
@@ -213,10 +188,6 @@ export async function GET(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    /* =====================================================
-       GET ASSESSMENT RESULT
-    ===================================================== */
 
     const resultQuery = `
       SELECT
@@ -237,10 +208,7 @@ export async function GET(request: NextRequest) {
 
     const resultParams = [assessmentId];
 
-    /* =====================================================
-       CHECK USER OWNERSHIP (ทุกครั้ง)
-    ===================================================== */
-
+    // ตรวจว่าผลประเมินเป็นของผู้ใช้คนนี้ แล้วดึงผลและคำตอบ
     const ownershipResult =
       await client.query(
         `
@@ -284,10 +252,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    /* =====================================================
-       BUILD RESULT
-    ===================================================== */
-
     const firstRow = result.rows[0];
 
     const answers = result.rows
@@ -311,6 +275,7 @@ export async function GET(request: NextRequest) {
         ),
       }));
 
+    // ดึงคะแนนพฤติกรรมเนือยนิ่งและคำแนะนำ แล้วคืนผลทั้งหมด
     const sedentaryAnswer = await client.query(
       `
       SELECT aa.score
@@ -362,6 +327,7 @@ export async function GET(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/physical_activity", error);
     console.error(
       "GET Physical Activity Error:",
@@ -380,24 +346,16 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* =========================================================
-   POST
-========================================================= */
-
-// POST: ตรวจคำตอบ หาระดับความเสี่ยง แล้วบันทึกผลประเมินกิจกรรมทางกาย
+// API: คำนวณผลกิจกรรมทางกายและพฤติกรรมเนือยนิ่งจากคำตอบ แล้วบันทึกผลประเมินลงฐานข้อมูล
 export async function POST(
   request: NextRequest
 ) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน ความยินยอม และคำตอบ
   const body = await readJsonObject(request);
 
   if (!body) {
     return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
   }
-
-  /* =====================================================
-     VALIDATE USER
-     ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
-  ===================================================== */
 
   const auth = requireUser(
     request,
@@ -406,10 +364,8 @@ export async function POST(
 
   if (!auth.ok) return auth.response;
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(8);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(auth.userId);
   if (noConsent) return noConsent;
 
@@ -433,10 +389,7 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       GET PHYSICAL ACTIVITY QUESTIONS
-    ===================================================== */
-
+    // ดึงคำถามกิจกรรมทางกายจาก DB
     const questionsResult =
       await client.query(
         `
@@ -459,10 +412,6 @@ export async function POST(
     const physicalQuestions =
       questionsResult.rows;
 
-    /* =====================================================
-       CHECK QUESTIONS
-    ===================================================== */
-
     if (
       physicalQuestions.length === 0
     ) {
@@ -475,12 +424,7 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       VALIDATE ANSWERS
-       ตอบครบทุกข้อ ข้อละ 1 คำตอบ
-       ตัวเลือกต้องเป็นของคำถามนั้น คะแนนดึงจากฐานข้อมูล
-    ===================================================== */
-
+    // ตรวจคำตอบกับตัวเลือกใน DB
     const resolved = resolveChoiceAnswers(
       await loadActiveChoices(
         client,
@@ -504,11 +448,7 @@ export async function POST(
         score: choice.score,
       }));
 
-    /* =====================================================
-       FIND FIRST QUESTION
-       เป็นคำถามหลักเรื่อง "กิจกรรมทางกาย"
-    ===================================================== */
-
+    // แยกคะแนนกิจกรรมทางกาย (ข้อแรก) และพฤติกรรมเนือยนิ่ง (ข้อสอง)
     const activityQuestionId =
       Number(
         physicalQuestions[0]
@@ -532,11 +472,6 @@ export async function POST(
       );
     }
 
-    /*
-      เอกสารอ้างอิงไม่มีคะแนนรวม 2 ข้อ
-      คะแนนที่บันทึกคือคะแนนกิจกรรมทางกาย (ข้อ 1, ตารางที่ 18)
-      ส่วนข้อ 2 แปลผลแยกเป็นพฤติกรรมเนือยนิ่ง (ตารางที่ 20)
-    */
     const totalScore = activityAnswer.score;
 
     const sedentaryQuestionId = physicalQuestions[1]
@@ -550,14 +485,7 @@ export async function POST(
           sedentaryQuestionId
       )?.score ?? null;
 
-    /* =====================================================
-       DETERMINE RISK LEVEL
-
-       3 = เพียงพอ
-       2 = ไม่เพียงพอ
-       1 = ไม่มีกิจกรรมทางกาย
-    ===================================================== */
-
+    // แปลคะแนนกิจกรรมทางกายเป็นระดับและรหัสคำแนะนำ
     let riskLevel = "";
 
     let recommendationId =
@@ -603,10 +531,7 @@ export async function POST(
         );
     }
 
-    /* =====================================================
-       VERIFY RECOMMENDATION
-    ===================================================== */
-
+    // ดึงข้อความคำแนะนำจาก DB
     const recommendationResult =
       await client.query(
         `
@@ -639,20 +564,10 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       START TRANSACTION
-    ===================================================== */
-
+    // บันทึกผลลง assessment และคำตอบลง assessment_answers ใน transaction
     await client.query(
       "BEGIN"
     );
-
-    /* =====================================================
-       INSERT ASSESSMENT
-
-       สำคัญ:
-       recommendation_id ถูกบันทึกตรงนี้
-    ===================================================== */
 
     const assessmentResult =
       await client.query(
@@ -697,10 +612,6 @@ export async function POST(
         assessment.assessment_id
       );
 
-    /* =====================================================
-       INSERT ANSWERS
-    ===================================================== */
-
     for (
       const answer of validatedAnswers
     ) {
@@ -735,20 +646,12 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       COMMIT
-    ===================================================== */
-
+    // commit ผูกเวอร์ชันแบบประเมิน แล้วคืนผลพร้อมผลพฤติกรรมเนือยนิ่ง
     await client.query(
       "COMMIT"
     );
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId: userId, typeId: ASSESSMENT_TYPE_ID, assessmentId: assessmentId });
-
-    /* =====================================================
-       RESPONSE
-    ===================================================== */
 
     return NextResponse.json(
       {
@@ -783,10 +686,8 @@ export async function POST(
       { status: 201 }
     );
   } catch (error) {
-    /* =====================================================
-       ROLLBACK
-    ===================================================== */
 
+    // จัดการ error → rollback บันทึก log และคืน 500
     try {
       await client.query(
         "ROLLBACK"

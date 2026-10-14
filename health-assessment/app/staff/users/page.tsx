@@ -1,13 +1,8 @@
 import UsersClient, { type Filter } from "./UsersClient";
 
-/* =========================================================
-   หน้า "จัดการผู้ใช้งาน" (Staff)
-   รองรับ ?status=active|inactive|suspended ให้เลือกแท็บไว้ล่วงหน้า (ลิงก์จากหน้าภาพรวม)
-========================================================= */
-
 const STATUSES: Filter[] = ["all", "active", "inactive", "suspended"];
 
-// อ่าน ?status จาก URL แล้วส่งเป็นแท็บเริ่มต้นให้ UsersClient
+// หน้า: จัดการบัญชีผู้ใช้ อ่านตัวกรองสถานะจาก query ?status= แล้วส่งให้ UsersClient
 export default async function StaffUsersPage({
   searchParams,
 }: {
@@ -16,6 +11,5 @@ export default async function StaffUsersPage({
   const raw = (await searchParams).status;
   const value = Array.isArray(raw) ? raw[0] : raw;
   const status = STATUSES.find((s) => s === value) ?? "all";
-  // key ทำให้สถานะในหน้ารีเซ็ตเมื่อเปิดลิงก์ที่มี ?status ต่างกัน
   return <UsersClient key={status} initialStatus={status} />;
 }

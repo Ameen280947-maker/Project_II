@@ -1,24 +1,18 @@
 import type { CardTone } from "@/app/components/AssessmentMenuCard";
 
-/* =========================================================
-   หมวดหมู่แบบประเมิน (ตาราง assessment_categories) — ใช้ได้ทั้งฝั่งเบราว์เซอร์และเซิร์ฟเวอร์
-   - หมวดเดิม 3 หมวด (is_builtin) มีหน้าเมนูของตัวเอง (route_path)
-   - หมวดที่ staff สร้างเพิ่ม route_path = NULL → หน้าเมนูกลาง /assessment-category/<id>
-   - ตัวช่วยอ่านจากฐานข้อมูลอยู่ใน lib/assessmentCategoriesDb.ts
-========================================================= */
-
+// ชื่อธีมสีที่หมวดหมู่เลือกใช้ได้
 export const CATEGORY_THEMES = ["red", "green", "blue", "amber", "violet", "teal", "pink"] as const;
 export type CategoryTheme = (typeof CATEGORY_THEMES)[number];
 
-// เช็คว่าค่าที่ได้เป็นชื่อสีของหมวดที่รองรับหรือไม่
+// ตรวจว่าค่าที่รับมาเป็นชื่อธีมสีหมวดที่รองรับหรือไม่
 export const isCategoryTheme = (v: unknown): v is CategoryTheme =>
   typeof v === "string" && (CATEGORY_THEMES as readonly string[]).includes(v);
 
+// ความยาวสูงสุดของชื่อและคำอธิบายสั้นของหมวด
 export const CATEGORY_NAME_MAX = 60;
 export const CATEGORY_SUBTITLE_MAX = 80;
 
-/* ===== สีของหมวด: ชื่อสีภาษาไทย (ตัวเลือกสีฝั่ง staff) + คลาสของหน้าเมนูหมวด ===== */
-// เขียนคลาสเต็มทุกตัว ให้ Tailwind สร้าง CSS ได้
+// ข้อมูลแต่ละธีม: ชื่อไทย สีตัวอย่าง และคลาส Tailwind ที่ใช้บนหน้าหมวด
 export const THEME_INFO: Record<
   CategoryTheme,
   { label: string; swatch: string; eyebrow: string; accent: string; back: string }
@@ -74,10 +68,10 @@ export const THEME_INFO: Record<
   },
 };
 
-/* ===== ชนิดข้อมูล (ตรงกับ GET /api/assessments/categories) ===== */
-
+// แบบประเมินหนึ่งรายการภายในหมวด (สำหรับหน้าผู้ใช้)
 export type CategoryAssessment = { id: number; name: string; description: string | null; questions: number };
 
+// หมวดหมู่พร้อมลิงก์และรายการแบบประเมินในหมวด
 export type AssessmentCategory = {
   id: number;
   name: string;
@@ -85,19 +79,18 @@ export type AssessmentCategory = {
   theme: CategoryTheme;
   routePath: string | null;
   builtIn: boolean;
-  // หน้าเมนูของหมวด
   href: string;
-  // แบบประเมินที่ staff สร้างเพิ่มและเปิดใช้งานอยู่ในหมวดนี้
   assessments: CategoryAssessment[];
 };
 
-// ลิงก์หน้าเมนูของหมวด: ใช้ route_path ถ้ามี ไม่งั้นใช้หน้ากลาง /assessment-category/<id>
+// คืนลิงก์ของหมวด: ใช้ routePath ถ้ามี ไม่งั้นใช้ /assessment-category/{id}
 export const categoryHref = (c: { id: number; routePath: string | null }) => c.routePath ?? `/assessment-category/${c.id}`;
 
-/* ===== โทนการ์ดของแบบประเมินที่สร้างเพิ่ม (เลือกตาม id ให้สีคงที่ทุกครั้ง) ===== */
+// ลำดับโทนสีการ์ดที่ใช้วนให้แบบประเมิน
 const CARD_TONES: CardTone[] = ["rose", "green", "blue", "mint", "amber", "teal", "violet", "pink"];
+// เลือกโทนสีการ์ดแบบประเมินจาก id (วนตามรายการสี)
 export const cardToneFor = (id: number): CardTone => CARD_TONES[Math.abs(id) % CARD_TONES.length];
 
-// สีแรกที่ยังไม่มีหมวดไหนใช้ (ใช้ทุกสีแล้ว = ม่วง)
+// หาธีมสีแรกที่ยังไม่มีหมวดใช้ (ถ้าใช้หมดแล้วคืน violet)
 export const firstUnusedTheme = (used: string[]): CategoryTheme =>
   CATEGORY_THEMES.find((t) => !used.includes(t)) ?? "violet";

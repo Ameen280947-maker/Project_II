@@ -11,6 +11,7 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
+// ตัวเลือกคำตอบหนึ่งรายการ พร้อมคะแนน
 type Choice = {
   choice_id: number;
   choice_text: string;
@@ -18,6 +19,7 @@ type Choice = {
   display_order?: number;
 };
 
+// คำถามหนึ่งข้อพร้อมรายการตัวเลือก
 type Question = {
   question_id: number;
   question_text: string;
@@ -27,10 +29,11 @@ type Question = {
   choices: Choice[];
 };
 
-// หน้าแบบประเมินกิจกรรมทางกาย: แสดงคำถามทั้งหมด แล้วส่งคำตอบไปประเมินผล
+// หน้า: แบบประเมินกิจกรรมทางกาย แสดงคำถามทั้งหมดในหน้าเดียว
 export default function PhysicalActivityAssessmentPage() {
   const router = useRouter();
 
+  // state คำถาม คำตอบที่เลือก (questionId → choiceId) และสถานะโหลด/ส่ง/error
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<
     Record<number, number>
@@ -40,12 +43,9 @@ export default function PhysicalActivityAssessmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  /* =========================================================
-     LOAD QUESTIONS
-  ========================================================= */
-
+  // โหลดคำถามตอนเปิดหน้า
   useEffect(() => {
-    // โหลดคำถามแบบประเมินกิจกรรมทางกายจาก API
+    // โหลดคำถามจาก GET /api/assessments/physical_activity
     const loadQuestions = async () => {
       try {
         setLoading(true);
@@ -84,11 +84,7 @@ export default function PhysicalActivityAssessmentPage() {
     loadQuestions();
   }, []);
 
-  /* =========================================================
-     SELECT ANSWER
-  ========================================================= */
-
-  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
+  // บันทึกตัวเลือกที่ผู้ใช้เลือกของแต่ละข้อลง state
   const handleSelect = (
     questionId: number,
     choiceId: number
@@ -99,15 +95,12 @@ export default function PhysicalActivityAssessmentPage() {
     }));
   };
 
-  /* =========================================================
-     SUBMIT
-  ========================================================= */
-
-  // ตรวจ userId และการตอบครบทุกข้อ แล้ว POST ผลและพาไปหน้าคำแนะนำ
+  // ตรวจ userId และว่าตอบครบ แล้วส่ง POST /api/assessments/physical_activity และไปหน้าผลลัพธ์
   const handleSubmit = async () => {
     try {
       setError("");
 
+      // ตรวจ userId จาก localStorage
       const userIdString =
         localStorage.getItem("userId");
 
@@ -123,8 +116,7 @@ export default function PhysicalActivityAssessmentPage() {
         return;
       }
 
-      /* ตรวจว่าตอบครบทุกข้อ */
-
+      // ตรวจว่าตอบครบทุกข้อ
       const unansweredQuestions = questions.filter(
         (question) =>
           answers[question.question_id] === undefined
@@ -139,6 +131,7 @@ export default function PhysicalActivityAssessmentPage() {
 
       setSubmitting(true);
 
+      // แปลงคำตอบเป็น payload (question_id, choice_id, ข้อความตัวเลือก)
       const payload = {
         userId,
 
@@ -161,6 +154,7 @@ export default function PhysicalActivityAssessmentPage() {
         }),
       };
 
+      // ส่งคำตอบไปบันทึกที่ API
       const response = await fetch(
         "/api/assessments/physical_activity",
         {
@@ -187,8 +181,6 @@ export default function PhysicalActivityAssessmentPage() {
         );
       }
 
-      /* ไปหน้าผลการประเมิน */
-
       router.push(
         `/recommendation_physical_activity?assessmentId=${data.assessment_id}`
       );
@@ -205,10 +197,7 @@ export default function PhysicalActivityAssessmentPage() {
     }
   };
 
-  /* =========================================================
-     LOADING
-  ========================================================= */
-
+  // หน้าระหว่างโหลดคำถาม
   if (loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fbf9f9]">
@@ -223,10 +212,7 @@ export default function PhysicalActivityAssessmentPage() {
     );
   }
 
-  /* =========================================================
-     ERROR (โหลดคำถามไม่ได้)
-  ========================================================= */
-
+  // โหลดคำถามไม่สำเร็จ → แสดงหน้า error พร้อมปุ่มลองใหม่
   if (error && questions.length === 0) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fbf9f9] px-5">
@@ -250,16 +236,11 @@ export default function PhysicalActivityAssessmentPage() {
     );
   }
 
-  /* =========================================================
-     MAIN UI (รูปแบบเดียวกับแบบประเมินการสูบบุหรี่)
-  ========================================================= */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 lg:py-12">
 
-        {/* HEADER */}
-
+        {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ความยินยอม และปุ่มย้อนกลับ */}
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#1f7a69]">
@@ -274,15 +255,12 @@ export default function PhysicalActivityAssessmentPage() {
             </h1>
           </div>
 
-          {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
           <HealthConsentNotice />
           <AssessmentBackLink href="/assessment-menu-behavior" />
         </header>
-        {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
         <AssessmentSourceNote typeId={8} className="mt-3" />
 
-        {/* ICON */}
-
+        {/* การ์ดหัวข้อหมวดกิจกรรมทางกาย */}
         <section className="mt-8 rounded-[28px] border border-[#d6ebe6] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.04)]">
           <div className="flex items-center gap-4">
             <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#e2f3ef] text-[#1f7a69]">
@@ -300,8 +278,7 @@ export default function PhysicalActivityAssessmentPage() {
           </div>
         </section>
 
-        {/* QUESTIONS */}
-
+        {/* รายการคำถามทั้งหมด แต่ละข้อมีปุ่มตัวเลือกให้กด */}
         <section className="mt-6 space-y-5">
           {questions.map((question, index) => (
             <article
@@ -365,16 +342,13 @@ export default function PhysicalActivityAssessmentPage() {
           ))}
         </section>
 
-        {/* ERROR (ตอนบันทึก) */}
-
         {error && (
           <div className="mt-6 rounded-2xl border border-[#f2d3d7] bg-[#fff0f2] p-4 text-sm font-medium text-[#b91c2b]">
             {error}
           </div>
         )}
 
-        {/* BUTTONS */}
-
+        {/* ปุ่มส่งคำตอบเพื่อดูผลการประเมิน */}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"

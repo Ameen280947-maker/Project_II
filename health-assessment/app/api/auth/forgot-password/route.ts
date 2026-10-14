@@ -12,33 +12,18 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// รูปแบบ body ที่รับจากหน้าลืมรหัสผ่าน
 type ForgotPasswordBody = {
   email?: string;
 };
 
-/* =========================================================
-   HELPER
-========================================================= */
-
-// สุ่มรหัส OTP ตัวเลข 6 หลัก
+// สุ่มรหัส OTP 6 หลักด้วย crypto
 function generateOtp() {
   return crypto.randomInt(100000, 1000000).toString();
 }
 
-/* =========================================================
-   POST /api/auth/forgot-password
-========================================================= */
-
-// POST: สร้าง OTP รีเซ็ตรหัสผ่าน บันทึกลงฐานข้อมูล แล้วส่งไปที่อีเมลผู้ใช้
+// API: สร้าง OTP รีเซ็ตรหัสผ่าน เก็บ hash ใน password_reset_tokens แล้วส่งทางอีเมล
 export async function POST(request: NextRequest) {
-  /*
-    ต้องตั้งค่า Gmail ก่อนเสมอ (OTP ส่งทางอีเมลเท่านั้น ไม่แสดงใน Terminal)
-    ตรวจก่อนค้นหา user เพื่อให้ตอบเหมือนกันทุกอีเมล
-  */
   if (!isMailerConfigured()) {
     console.error("FORGOT PASSWORD: ยังไม่ได้ตั้งค่า GMAIL_USER / GMAIL_APP_PASSWORD");
 
@@ -56,10 +41,8 @@ export async function POST(request: NextRequest) {
   const client = await pool.connect();
 
   try {
-    /* =====================================================
-       1. รับ Email
-    ===================================================== */
 
+    // ตรวจข้อมูลที่ส่งมา: อีเมลต้องมีและรูปแบบถูกต้อง
     const body = (await request.json()) as ForgotPasswordBody;
 
     const email = body.email?.trim().toLowerCase();
@@ -76,10 +59,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* =====================================================
-       2. ตรวจรูปแบบ Email
-    ===================================================== */
-
     const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
     if (!emailPattern.test(email)) {
@@ -94,13 +73,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* =====================================================
-       2.1 จำกัดจำนวนครั้ง: 3 ครั้ง / อีเมล / 15 นาที
-
-       นับทุกคำขอ รวมถึงอีเมลที่ไม่มีในระบบ
-       เพื่อไม่ให้ใช้ความต่างของคำตอบเดาว่าใครมีบัญชี
-    ===================================================== */
-
+    // จำกัดความถี่การขอ OTP ต่ออีเมล
     if (otpRateLimits.forgotPassword.isLimited(email)) {
       return NextResponse.json(
         {
@@ -116,10 +89,7 @@ export async function POST(request: NextRequest) {
 
     otpRateLimits.forgotPassword.hit(email);
 
-    /* =====================================================
-       3. ค้นหา User จาก Database
-    ===================================================== */
-
+    // ค้นหาผู้ใช้จากอีเมล (ไม่พบก็ตอบสำเร็จเพื่อไม่เปิดเผยว่ามีบัญชีหรือไม่)
     const userResult = await client.query(
       `
         SELECT
@@ -131,16 +101,6 @@ export async function POST(request: NextRequest) {
       `,
       [email],
     );
-
-    /*
-      เพื่อความปลอดภัย
-
-      ไม่ควรบอกผู้ใช้ว่า
-      "ไม่มีอีเมลนี้ในระบบ"
-
-      เพราะคนอื่นสามารถใช้ endpoint นี้
-      เช็กได้ว่าใครมีบัญชีอยู่ในระบบ
-    */
 
     if (userResult.rowCount === 0) {
       return NextResponse.json(
@@ -159,40 +119,17 @@ export async function POST(request: NextRequest) {
 
     const userId = Number(user.user_id);
 
-    /* =====================================================
-       4. สร้าง OTP 6 หลัก
-    ===================================================== */
-
+    // สร้าง OTP และ hash แล้วแทนที่ token เดิมใน password_reset_tokens
     const otp = generateOtp();
 
-    /*
-      OTP ใช้ได้ 10 นาที
-    */
-
     const expiresAt = new Date(Date.now() + OTP_VALID_MINUTES * 60 * 1000);
-
-    /* =====================================================
-       5. Hash OTP ก่อนเก็บ Database
-
-       ไม่เก็บ OTP จริงลง Database
-    ===================================================== */
 
     const otpHash = crypto
       .createHash("sha256")
       .update(otp)
       .digest("hex");
 
-    /* =====================================================
-       6. Transaction
-    ===================================================== */
-
     await client.query("BEGIN");
-
-    /*
-      ลบรหัส Reset เก่าที่ยังมีอยู่ของ User นี้
-
-      เพื่อให้มี OTP ล่าสุดเพียงตัวเดียว
-    */
 
     await client.query(
       `
@@ -201,10 +138,6 @@ export async function POST(request: NextRequest) {
       `,
       [userId],
     );
-
-    /*
-      บันทึก OTP ใหม่
-    */
 
     await client.query(
       `
@@ -230,14 +163,9 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT");
 
-    // OTP ใหม่ → เริ่มนับการกรอกผิดใหม่
     otpRateLimits.verifyOtpFailures.reset(email);
 
-    /* =====================================================
-       7. ส่ง Email (Gmail SMTP)
-       ส่งอีเมลจริงเท่านั้น ไม่ส่ง OTP กลับ Frontend และไม่แสดงใน Terminal
-    ===================================================== */
-
+    // ส่ง OTP ทางอีเมล
     try {
       await sendOtpEmail(email, otp);
     } catch (mailError) {
@@ -256,10 +184,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    /* =====================================================
-       8. Response
-    ===================================================== */
-
     return NextResponse.json(
       {
         success: true,
@@ -272,14 +196,10 @@ export async function POST(request: NextRequest) {
       },
     );
   } catch (error) {
-    /* =====================================================
-       Rollback
-    ===================================================== */
 
     try {
       await client.query("ROLLBACK");
     } catch {
-      // ไม่มี transaction ที่ต้อง rollback
     }
 
     console.error("FORGOT PASSWORD API ERROR:", error);

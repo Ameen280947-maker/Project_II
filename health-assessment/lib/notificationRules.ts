@@ -1,8 +1,10 @@
 import { Pool } from "pg";
 
+// ระดับความเร่งด่วน และสถานะของแจ้งเตือน
 export type NotificationUrgency = "critical" | "high" | "medium" | "low";
 export type NotificationStatus = "overdue" | "due_today" | "upcoming" | "scheduled";
 
+// กฎแจ้งเตือนของแบบประเมิน: รอบติดตาม ความเร่งด่วน ลิงก์ และข้อความ
 export interface AssessmentNotificationRule {
   intervalDays: number;
   intervalLabel: string;
@@ -14,6 +16,7 @@ export interface AssessmentNotificationRule {
   message: string;
 }
 
+// แจ้งเตือนที่คำนวณแล้วสำหรับส่งให้หน้าเว็บ (วันครบกำหนด สถานะ อ่านแล้วหรือยัง)
 export interface CalculatedNotification {
   notificationId?: number;
   userId: number;
@@ -29,7 +32,7 @@ export interface CalculatedNotification {
   intervalLabel: string;
   status: NotificationStatus;
   statusText: string;
-  daysDiff: number; // positive = days overdue, negative = days until due
+  daysDiff: number;
   urgency: NotificationUrgency;
   title: string;
   message: string;
@@ -38,10 +41,7 @@ export interface CalculatedNotification {
   readAt?: string | null;
 }
 
-/**
- * กำหนดเกณฑ์มาตรฐานทางการแพทย์สำหรับระยะเวลาการแจ้งเตือนและติดตามประเมินซ้ำ
- * อิงตามประเภทโรค/แบบประเมินและระดับความเสี่ยง
- */
+// เลือกกฎแจ้งเตือนประเมินซ้ำ (รอบวัน ความเร่งด่วน ข้อความ ลิงก์) ตามชนิดแบบประเมินและระดับความเสี่ยง
 export function getNotificationRule(
   assessmentTypeId: number,
   riskLevelRaw?: string | null
@@ -49,9 +49,7 @@ export function getNotificationRule(
   const risk = String(riskLevelRaw || "").toLowerCase().trim();
 
   switch (assessmentTypeId) {
-    // ---------------------------------------------------------
-    // 1. BMI (ดัชนีมวลกาย)
-    // ---------------------------------------------------------
+    // BMI: อ้วน/เสี่ยงสูงติดตามทุกเดือน น้ำหนักผิดเกณฑ์ทุก 2 เดือน
     case 1: {
       const assessmentName = "ดัชนีมวลกาย (BMI)";
       const actionUrl = "/assessment_BMI";
@@ -100,9 +98,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 2. Blood Pressure (ความดันโลหิต)
-    // ---------------------------------------------------------
+    // ความดันโลหิต: รอบติดตามตามระดับความดัน
     case 2: {
       const assessmentName = "แบบประเมินความดันโลหิต";
       const actionUrl = "/assessment_DB";
@@ -175,9 +171,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 3. Thai CVD (โรคหัวใจและหลอดเลือด)
-    // ---------------------------------------------------------
+    // Thai CVD: รอบติดตามตามระดับความเสี่ยงโรคหัวใจและหลอดเลือด
     case 3: {
       const assessmentName = "ความเสี่ยงโรคหัวใจและหลอดเลือด (Thai CVD)";
       const actionUrl = "/assessment_CVD";
@@ -224,9 +218,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 4. Diabetes TDS (Thai Diabetes Score)
-    // ---------------------------------------------------------
+    // เบาหวาน TDS: รอบติดตามตามระดับความเสี่ยง
     case 4: {
       const assessmentName = "ความเสี่ยงโรคเบาหวาน (TDS)";
       const actionUrl = "/assessment_diabetes";
@@ -287,9 +279,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 5. Diabetes Risk (ปัจจัยเสี่ยงเบาหวาน)
-    // ---------------------------------------------------------
+    // ปัจจัยเสี่ยงเบาหวาน
     case 5: {
       const assessmentName = "ปัจจัยเสี่ยงโรคเบาหวาน (Diabetes Risk)";
       const actionUrl = "/assessment_diabetes";
@@ -321,9 +311,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 6. Smoking (การสูบบุหรี่)
-    // ---------------------------------------------------------
+    // การสูบบุหรี่
     case 6: {
       const assessmentName = "แบบประเมินการสูบบุหรี่";
       const actionUrl = "/assessment_smoking";
@@ -369,9 +357,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 7. Alcohol (การดื่มแอลกอฮอล์)
-    // ---------------------------------------------------------
+    // การดื่มแอลกอฮอล์
     case 7: {
       const assessmentName = "แบบประเมินการดื่มแอลกอฮอล์";
       const actionUrl = "/assessment_alcohol";
@@ -417,9 +403,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 8. Physical Activity (กิจกรรมทางกาย)
-    // ---------------------------------------------------------
+    // กิจกรรมทางกาย
     case 8: {
       const assessmentName = "แบบประเมินกิจกรรมทางกาย";
       const actionUrl = "/assessment_physical_activity";
@@ -465,9 +449,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 9. Sleep (การนอนหลับ)
-    // ---------------------------------------------------------
+    // การนอนหลับ
     case 9: {
       const assessmentName = "แบบประเมินการนอนหลับ";
       const actionUrl = "/sleep-assessment";
@@ -512,9 +494,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 10. Diet (การรับประทานอาหาร)
-    // ---------------------------------------------------------
+    // พฤติกรรมการรับประทานอาหาร
     case 10: {
       const assessmentName = "แบบประเมินพฤติกรรมการรับประทานอาหาร";
       const actionUrl = "/assessment_diet";
@@ -564,9 +544,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 11. Oral Health (สุขภาพช่องปาก)
-    // ---------------------------------------------------------
+    // สุขภาพช่องปาก
     case 11: {
       const assessmentName = "แบบประเมินสุขภาพช่องปาก";
       const actionUrl = "/assessment-menu-behavior";
@@ -610,9 +588,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 12. Stress (ความเครียด ST-5)
-    // ---------------------------------------------------------
+    // ความเครียด ST-5
     case 12: {
       const assessmentName = "แบบประเมินความเครียด (ST-5)";
       const actionUrl = "/assessment_stress";
@@ -671,9 +647,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 13. PHQ-2 (คัดกรองซึมเศร้า 2Q)
-    // ---------------------------------------------------------
+    // คัดกรองซึมเศร้า 2Q
     case 13: {
       const assessmentName = "แบบคัดกรองภาวะซึมเศร้า (2Q)";
       const actionUrl = "/assessment_depression_2q";
@@ -705,9 +679,7 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // 14. 9Q (แบบประเมินโรคซึมเศร้า 9Q)
-    // ---------------------------------------------------------
+    // โรคซึมเศร้า 9Q
     case 14: {
       const assessmentName = "แบบประเมินโรคซึมเศร้า (9Q)";
       const actionUrl = "/assessment_depression_9q";
@@ -767,15 +739,12 @@ export function getNotificationRule(
       };
     }
 
-    // ---------------------------------------------------------
-    // Default Fallback
-    // ---------------------------------------------------------
+    // แบบประเมินอื่น ๆ: ใช้กฎติดตามทั่วไป
     default: {
       return {
         intervalDays: 90,
         intervalLabel: "ทุก 3 เดือน",
         urgency: "medium",
-        // แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม → หน้ากลางของแบบนั้น
         actionUrl: `/assessment/${assessmentTypeId}`,
         assessmentName: "แบบประเมินสุขภาพ",
         category: "ncd",
@@ -786,9 +755,7 @@ export function getNotificationRule(
   }
 }
 
-/**
- * คำนวณสถานะความเร่งด่วนและวันที่ครบกำหนด
- */
+// คำนวณวันครบกำหนดและสถานะ (เลยกำหนด/วันนี้/ใกล้ถึงใน 7 วัน/ตามกำหนด) จากวันที่ประเมินล่าสุด
 export function calculateNotificationStatus(
   assessedAt: Date | string,
   intervalDays: number
@@ -798,16 +765,17 @@ export function calculateNotificationStatus(
   status: NotificationStatus;
   statusText: string;
 } {
+  // คำนวณวันครบกำหนดและส่วนต่างวันเทียบกับวันนี้
   const assessedDate = new Date(assessedAt);
   const dueDate = new Date(assessedDate.getTime() + intervalDays * 24 * 60 * 60 * 1000);
   const now = new Date();
 
-  // คำนวณความต่างของวัน (ไม่นับเศษมิลลิวินาทีของเวลา)
   const msPerDay = 24 * 60 * 60 * 1000;
   const startOfDue = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate()).getTime();
   const startOfNow = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const diffDays = Math.round((startOfNow - startOfDue) / msPerDay);
 
+  // แปลงส่วนต่างวันเป็นสถานะและข้อความ
   let status: NotificationStatus;
   let statusText: string;
 
@@ -833,15 +801,12 @@ export function calculateNotificationStatus(
   };
 }
 
-/**
- * ซิงค์การแจ้งเตือนของผู้ใช้จากประวัติการประเมินล่าสุดในฐานข้อมูล
- * ระบบจะตรวจหาการประเมินล่าสุดของแต่ละประเภท และลงทะเบียนใน user_notifications
- */
+// สร้าง/อัปเดตแจ้งเตือนใน user_notifications จากผลล่าสุดของแต่ละแบบประเมิน แล้วคืนรายการเรียงตามความเร่งด่วน
 export async function syncUserNotifications(
   pool: Pool,
   userId: number
 ): Promise<CalculatedNotification[]> {
-  // ดึงผลการประเมินล่าสุด 1 รายการของแต่ละประเภท
+  // ดึงผลประเมินล่าสุดของแต่ละแบบประเมินของผู้ใช้จาก DB
   const latestAssessmentsRes = await pool.query(
     `
     WITH RankedAssessments AS (
@@ -883,6 +848,7 @@ export async function syncUserNotifications(
 
   const results: CalculatedNotification[] = [];
 
+  // คำนวณกฎ/สถานะ แล้ว upsert ลง user_notifications (คงสถานะการอ่านเดิม)
   for (const item of latestAssessments) {
     const rule = getNotificationRule(item.assessment_type_id, item.risk_level);
     const { dueDate, daysDiff, status, statusText } = calculateNotificationStatus(
@@ -890,7 +856,6 @@ export async function syncUserNotifications(
       rule.intervalDays
     );
 
-    // Upsert: INSERT ถ้ายังไม่มี, UPDATE ถ้ามีแล้ว (atomic - ป้องกัน race condition)
     const upsertRes = await pool.query(
       `
       INSERT INTO user_notifications (
@@ -963,15 +928,13 @@ export async function syncUserNotifications(
     });
   }
 
-  // เรียงลำดับ: รายการที่เลยกำหนด/ถึงกำหนดก่อน -> วันที่ถึงกำหนดเร็วสุด -> ระดับความเร่งด่วน
+  // เรียงให้รายการที่ถึง/เลยกำหนดขึ้นก่อน แล้วตามวันครบกำหนด
   results.sort((a, b) => {
-    // 1. Overdue & Due today ขึ้นก่อน
     const isDueA = a.status === "overdue" || a.status === "due_today";
     const isDueB = b.status === "overdue" || b.status === "due_today";
     if (isDueA && !isDueB) return -1;
     if (!isDueA && isDueB) return 1;
 
-    // 2. เรียงตาม due_date ใกล้ที่สุด
     return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
   });
 

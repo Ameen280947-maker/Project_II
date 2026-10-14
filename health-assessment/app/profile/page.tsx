@@ -28,15 +28,13 @@ import {
   useState,
 } from "react";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ค่าเพศที่เลือกได้ (null = ยังไม่เลือก)
 type Gender =
   | "male"
   | "female"
   | null;
 
+// ข้อมูลโปรไฟล์สุขภาพตามที่เก็บในตารางโปรไฟล์
 type ProfileData = {
   profile_id: number;
   user_id: number;
@@ -80,6 +78,7 @@ type ProfileData = {
   updated_at?: string;
 };
 
+// response ของ GET /api/profile
 type ProfileResponse = {
   success: boolean;
   message?: string;
@@ -96,6 +95,7 @@ type ProfileResponse = {
     | null;
 };
 
+// response ของ PUT /api/profile
 type SaveProfileResponse = {
   success: boolean;
   message?: string;
@@ -106,6 +106,7 @@ type SaveProfileResponse = {
     | null;
 };
 
+// สำเนาค่าฟอร์มก่อนแก้ไข ใช้คืนค่าตอนกดยกเลิก
 type ProfileSnapshot = {
   gender: Gender;
 
@@ -138,19 +139,12 @@ type ProfileSnapshot = {
     | null;
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าโปรไฟล์สุขภาพ: ดู/กรอก/แก้ไขข้อมูลร่างกายและประวัติสุขภาพของผู้ใช้
+// หน้า: ดูและแก้ไขข้อมูลสุขภาพพื้นฐานของผู้ใช้ (เพศ อายุ น้ำหนัก ส่วนสูง รอบเอว ประวัติโรค)
 export default function ProfilePage() {
   const router =
     useRouter();
 
-  /* =========================================================
-     PROFILE DATA
-  ========================================================= */
-
+  // state ค่าข้อมูลสุขภาพในฟอร์ม
   const [
     gender,
     setGender,
@@ -207,10 +201,7 @@ export default function ProfilePage() {
     boolean | null
   >(null);
 
-  /* =========================================================
-     STATE
-  ========================================================= */
-
+  // state สถานะหน้า: โหลด บันทึก ผิดพลาด โหมดแก้ไข ข้อความแจ้ง และค่าเดิมก่อนแก้
   const [
     loading,
     setLoading,
@@ -241,7 +232,6 @@ export default function ProfilePage() {
     setNotice,
   ] = useState("");
 
-  // เวลาของข้อมูลเวอร์ชันล่าสุด (แสดง "อัปเดตล่าสุด")
   const [
     updatedAt,
     setUpdatedAt,
@@ -255,11 +245,7 @@ export default function ProfilePage() {
       null,
     );
 
-  /* =========================================================
-     CHECK COMPLETE
-  ========================================================= */
-
-  // เช็กว่ากรอกข้อมูลสุขภาพครบทุกช่องแล้วหรือยัง
+  // ตรวจว่ากรอกครบทุกช่องหรือยัง
   const isComplete =
     useMemo(() => {
       return (
@@ -284,11 +270,7 @@ export default function ProfilePage() {
       familyDiabetes,
     ]);
 
-  /* =========================================================
-     CHECK VALID
-  ========================================================= */
-
-  // เช็กว่าข้อมูลครบและค่าอายุ/น้ำหนัก/ส่วนสูง/รอบเอวอยู่ในช่วงที่กำหนด
+  // ตรวจช่วงค่าที่ยอมรับ (อายุ 18–100, น้ำหนัก 30–250, ส่วนสูง 120–230, รอบเอว 40–200)
   const isValid =
     useMemo(() => {
       if (!isComplete) {
@@ -353,18 +335,16 @@ export default function ProfilePage() {
       waist,
     ]);
 
-  /* =========================================================
-     LOAD PROFILE
-  ========================================================= */
-
+  // โหลดโปรไฟล์ตอนเปิดหน้า
   useEffect(() => {
-    // โหลดข้อมูลสุขภาพจาก API มาใส่ฟอร์ม (ผู้ใช้ใหม่เปิดให้กรอกทันที) ไม่พบ userId พาไป login
+    // ดึงข้อมูลโปรไฟล์สุขภาพจาก API /api/profile ตาม userId มาเติมในฟอร์ม (ไม่มี userId ให้ไปหน้า login)
     const loadProfile =
       async () => {
         try {
           setLoading(true);
           setError("");
 
+          // ตรวจ userId ใน localStorage (ไม่มี/ไม่ถูกต้อง → ล้างข้อมูลแล้วไปหน้า login)
           const storedUserId =
             localStorage.getItem(
               "userId",
@@ -426,10 +406,6 @@ export default function ProfilePage() {
             return;
           }
 
-          /* =========================
-             GET PROFILE
-          ========================= */
-
           const response =
             await fetch(
               `/api/profile?userId=${userId}`,
@@ -442,6 +418,7 @@ export default function ProfilePage() {
               },
             );
 
+          // อ่านผลจาก API (ดึงข้อมูลอยู่ด้านบน)
           const data =
             (await response.json()) as ProfileResponse;
 
@@ -455,23 +432,13 @@ export default function ProfilePage() {
             );
           }
 
-          /* =================================================
-             USER ใหม่
-
-             ยังไม่มี health_profile
-          ================================================= */
-
+          // ยังไม่มีโปรไฟล์ → ล้างฟอร์มและเปิดโหมดกรอกใหม่
           if (
             !data.profile
           ) {
             setHasProfile(
               false,
             );
-
-            /*
-              ผู้ใช้ใหม่:
-              เปิดให้กรอกข้อมูลได้ทันที
-            */
 
             setIsEditing(
               true,
@@ -496,21 +463,9 @@ export default function ProfilePage() {
             return;
           }
 
-          /* =================================================
-             USER เก่า
-
-             มี health_profile แล้ว
-          ================================================= */
-
           setHasProfile(
             true,
           );
-
-          /*
-            ผู้ใช้เก่า:
-            ล็อกข้อมูลก่อน
-            ต้องกด "แก้ไขข้อมูล"
-          */
 
           setIsEditing(
             false,
@@ -525,10 +480,7 @@ export default function ProfilePage() {
               null,
           );
 
-          /* =========================
-             GENDER
-          ========================= */
-
+          // แปลงค่าจาก DB เป็นชนิดที่ฟอร์มใช้ แล้วเติมลง state และเก็บสำเนาค่าเดิม
           let loadedGender: Gender =
             null;
 
@@ -542,10 +494,6 @@ export default function ProfilePage() {
               profile.gender;
           }
 
-          /* =========================
-             AGE
-          ========================= */
-
           const loadedAge =
             profile.age !==
             null
@@ -553,10 +501,6 @@ export default function ProfilePage() {
                   profile.age,
                 )
               : null;
-
-          /* =========================
-             WEIGHT
-          ========================= */
 
           const loadedWeight =
             profile.weight_kg !==
@@ -566,10 +510,6 @@ export default function ProfilePage() {
                 )
               : null;
 
-          /* =========================
-             HEIGHT
-          ========================= */
-
           const loadedHeight =
             profile.height_cm !==
             null
@@ -577,10 +517,6 @@ export default function ProfilePage() {
                   profile.height_cm,
                 )
               : null;
-
-          /* =========================
-             WAIST
-          ========================= */
 
           const loadedWaist =
             profile.waist_cm !==
@@ -590,10 +526,6 @@ export default function ProfilePage() {
                 )
               : null;
 
-          /* =========================
-             BOOLEAN VALUES
-          ========================= */
-
           const loadedSmoking =
             profile.smoking;
 
@@ -602,10 +534,6 @@ export default function ProfilePage() {
 
           const loadedFamily =
             profile.family_diabetes;
-
-          /* =========================
-             SET FORM
-          ========================= */
 
           setGender(
             loadedGender,
@@ -638,10 +566,6 @@ export default function ProfilePage() {
           setFamilyDiabetes(
             loadedFamily,
           );
-
-          /* =========================
-             SAVE ORIGINAL
-          ========================= */
 
           setOriginalData({
             gender:
@@ -690,20 +614,11 @@ export default function ProfilePage() {
     void loadProfile();
   }, [router]);
 
-  /* =========================================================
-     START EDITING
-  ========================================================= */
-
-  // เข้าโหมดแก้ไข โดยเก็บค่าเดิมไว้เผื่อกดยกเลิก
+  // เข้าสู่โหมดแก้ไข โดยเก็บค่าปัจจุบันไว้สำหรับยกเลิก
   const startEditing =
     () => {
       setError("");
       setNotice("");
-
-      /*
-        เก็บข้อมูลก่อนแก้ไข
-        เผื่อกด Cancel
-      */
 
       setOriginalData({
         gender,
@@ -721,11 +636,7 @@ export default function ProfilePage() {
       );
     };
 
-  /* =========================================================
-     CANCEL EDITING
-  ========================================================= */
-
-  // ยกเลิกการแก้ไข คืนค่าทุกช่องเป็นค่าเดิมแล้วออกจากโหมดแก้ไข
+  // ยกเลิกการแก้ไขและคืนค่าฟอร์มกลับเป็นข้อมูลเดิม
   const cancelEditing =
     () => {
       if (
@@ -773,11 +684,7 @@ export default function ProfilePage() {
       );
     };
 
-  /* =========================================================
-     SAVE PROFILE
-  ========================================================= */
-
-  // ตรวจข้อมูลแล้วบันทึกโปรไฟล์ ผู้ใช้เดิมอยู่หน้าเดิม ผู้ใช้ใหม่ไปหน้าเลือกแบบประเมิน
+  // ตรวจข้อมูลแล้ว PUT /api/profile บันทึกโปรไฟล์ ถ้าเป็นครั้งแรกจะพาไปหน้าเลือกแบบประเมิน
   const handleSubmit =
     async (
       event: FormEvent<HTMLFormElement>,
@@ -787,20 +694,13 @@ export default function ProfilePage() {
       try {
         setError("");
 
-        /* =========================
-           ต้องอยู่ใน Edit Mode
-        ========================= */
-
         if (
           !isEditing
         ) {
           return;
         }
 
-        /* =========================
-           CHECK COMPLETE
-        ========================= */
-
+        // ตรวจข้อมูลที่กรอก: ครบทุกช่องและอยู่ในช่วงที่ยอมรับ
         if (
           !isComplete
         ) {
@@ -810,10 +710,6 @@ export default function ProfilePage() {
 
           return;
         }
-
-        /* =========================
-           NULL GUARD
-        ========================= */
 
         if (
           age === null ||
@@ -833,10 +729,6 @@ export default function ProfilePage() {
           return;
         }
 
-        /* =========================
-           AGE
-        ========================= */
-
         if (
           !Number.isInteger(
             age,
@@ -850,10 +742,6 @@ export default function ProfilePage() {
 
           return;
         }
-
-        /* =========================
-           WEIGHT
-        ========================= */
 
         if (
           !Number.isFinite(
@@ -869,10 +757,6 @@ export default function ProfilePage() {
           return;
         }
 
-        /* =========================
-           HEIGHT
-        ========================= */
-
         if (
           !Number.isFinite(
             height,
@@ -886,10 +770,6 @@ export default function ProfilePage() {
 
           return;
         }
-
-        /* =========================
-           WAIST
-        ========================= */
 
         if (
           !Number.isFinite(
@@ -905,10 +785,7 @@ export default function ProfilePage() {
           return;
         }
 
-        /* =========================
-           USER ID
-        ========================= */
-
+        // ตรวจ userId ของผู้ใช้จาก localStorage
         const storedUserId =
           localStorage.getItem(
             "userId",
@@ -944,10 +821,7 @@ export default function ProfilePage() {
           true,
         );
 
-        /* =========================
-           REQUEST BODY
-        ========================= */
-
+        // ส่งข้อมูลไปบันทึกที่ PUT /api/profile
         const requestBody = {
           user_id:
             userId,
@@ -978,10 +852,6 @@ export default function ProfilePage() {
           "PROFILE REQUEST:",
           requestBody,
         );
-
-        /* =========================
-           PUT PROFILE
-        ========================= */
 
         const response =
           await fetch(
@@ -1020,10 +890,7 @@ export default function ProfilePage() {
           );
         }
 
-        /* =========================
-           SUCCESS
-        ========================= */
-
+        // บันทึกสำเร็จ: อัปเดตสถานะ ปิดโหมดแก้ไข ถ้าเป็นครั้งแรกพาไปหน้าเลือกแบบประเมิน
         const wasExisting =
           hasProfile;
 
@@ -1055,10 +922,6 @@ export default function ProfilePage() {
           familyDiabetes,
         });
 
-        /*
-          ผู้ใช้เก่าแก้ไขผ่านหน้าต่าง: อยู่หน้าเดิม เห็นประวัติที่เพิ่งบันทึก
-        */
-
         if (
           wasExisting
         ) {
@@ -1073,16 +936,6 @@ export default function ProfilePage() {
           "บันทึกข้อมูลสุขภาพเรียบร้อย",
         );
 
-        /*
-          สำคัญ
-
-          ผู้ใช้ใหม่:
-          Profile → บันทึก → Assessment Type
-
-          ผู้ใช้เก่าแก้ไข Profile:
-          อยู่หน้าเดิม (จัดการด้านบน)
-        */
-
         router.push(
           "/assessment-type",
         );
@@ -1094,6 +947,7 @@ export default function ProfilePage() {
           saveError,
         );
 
+        // จัดการ error → แสดงข้อความ
         const message =
           saveError instanceof
             Error
@@ -1110,16 +964,10 @@ export default function ProfilePage() {
       }
     };
 
-  /* =========================================================
-     FIELDS
-     ใช้ทั้งในหน้า (ผู้ใช้ใหม่กรอกครั้งแรก / ผู้ใช้เก่าดูแบบล็อก)
-     และในหน้าต่างแก้ไข (ผู้ใช้เก่า)
-  ========================================================= */
-
-  // สร้างช่องกรอกข้อมูลร่างกายและประวัติสุขภาพ (ล็อกไม่ให้แก้ได้ตาม disabled)
+  // สร้างชุดช่องกรอกข้อมูลร่างกายและประวัติสุขภาพ (ปิดการแก้ไขได้ด้วย disabled)
   const renderFields = (disabled: boolean) => (
     <div className="space-y-7">
-      {/* ข้อมูลร่างกาย */}
+      {/* กลุ่มข้อมูลร่างกาย: เพศ อายุ น้ำหนัก ส่วนสูง รอบเอว */}
       <section>
         <h3 className="text-base font-bold text-[#16181d]">
           ข้อมูลร่างกาย
@@ -1174,7 +1022,7 @@ export default function ProfilePage() {
         </div>
       </section>
 
-      {/* ประวัติสุขภาพ */}
+      {/* กลุ่มประวัติสุขภาพ: สูบบุหรี่ เบาหวาน ประวัติครอบครัว */}
       <section>
         <h3 className="text-base font-bold text-[#16181d]">
           ประวัติสุขภาพ
@@ -1213,30 +1061,15 @@ export default function ProfilePage() {
     </div>
   );
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
 
-        {/* =================================================
-            SIDEBAR
-        ================================================== */}
-
         <Sidebar />
-
-        {/* =================================================
-            MAIN CONTENT
-        ================================================== */}
 
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-12">
 
-          {/* =================================================
-              HEADER
-          ================================================== */}
-
+          {/* ส่วนหัว: ชื่อหน้า วันที่อัปเดต และปุ่มแก้ไข/บันทึก */}
           <header className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-[#b91c2b]">
@@ -1256,7 +1089,6 @@ export default function ProfilePage() {
               </p>
             </div>
 
-            {/* ปุ่มหลัก: ผู้ใช้เก่า = แก้ไข (เปิดหน้าต่าง) / ผู้ใช้ใหม่ = บันทึกครั้งแรก */}
             {!loading &&
               (hasProfile ? (
                 <button
@@ -1308,10 +1140,7 @@ export default function ProfilePage() {
               ))}
           </header>
 
-          {/* =================================================
-              LOADING / NOTICE / ERROR
-          ================================================== */}
-
+          {/* ข้อความสถานะ: กำลังโหลด / บันทึกสำเร็จ / ผิดพลาด */}
           {loading && (
             <div className="mt-8 rounded-2xl border border-[#eee5e6] bg-white p-4 text-sm text-[#777780]">
               กำลังโหลดข้อมูลสุขภาพ...
@@ -1330,10 +1159,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {/* =================================================
-              ผู้ใช้เก่า: แสดงข้อมูล (แก้ผ่านหน้าต่าง)
-          ================================================== */}
-
+          {/* มีโปรไฟล์แล้ว → แสดงข้อมูลร่างกายและประวัติสุขภาพแบบอ่านอย่างเดียว */}
           {!loading &&
             hasProfile && (
               <>
@@ -1381,6 +1207,7 @@ export default function ProfilePage() {
                   </div>
                 </section>
 
+                {/* การ์ดประวัติสุขภาพ */}
                 <section className="mt-6 rounded-[28px] border border-[#ece6e3] bg-white p-6 sm:p-8">
                   <h2 className="text-xl font-bold text-[#16181d]">
                     ประวัติสุขภาพ
@@ -1413,10 +1240,7 @@ export default function ProfilePage() {
               </>
             )}
 
-          {/* =================================================
-              ผู้ใช้ใหม่: กรอกข้อมูลครั้งแรก
-          ================================================== */}
-
+          {/* ยังไม่มีโปรไฟล์ → ฟอร์มกรอกข้อมูลครั้งแรก */}
           {!loading &&
             !hasProfile && (
               <form
@@ -1442,10 +1266,6 @@ export default function ProfilePage() {
               </form>
             )}
 
-          {/* =================================================
-              TIP
-          ================================================== */}
-
           {!loading && (
             <p className="mt-6 flex items-center gap-3 px-1 text-sm text-[#6b6d75]">
               <Lightbulb
@@ -1456,10 +1276,7 @@ export default function ProfilePage() {
             </p>
           )}
 
-          {/* =================================================
-              EDIT MODAL (ผู้ใช้เก่า)
-          ================================================== */}
-
+          {/* modal แก้ไขข้อมูลสุขภาพ: ฟอร์ม ข้อความเตือน และปุ่มยกเลิก/บันทึก */}
           {hasProfile &&
             isEditing && (
               <div
@@ -1514,6 +1331,7 @@ export default function ProfilePage() {
                     )}
                   </div>
 
+                  {/* ส่วนท้าย modal: ข้อความผิดพลาด/เตือน และปุ่มยกเลิก/บันทึก */}
                   <div className="space-y-3 border-t border-[#f0eaeb] px-6 py-4">
                     {error && (
                       <p className="rounded-xl bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b91c2b]">
@@ -1575,11 +1393,7 @@ export default function ProfilePage() {
   );
 }
 
-/* =========================================================
-   STAT TILE (ข้อมูลร่างกาย)
-========================================================= */
-
-// กล่องแสดงค่าข้อมูลร่างกายหนึ่งรายการ พร้อมไอคอนและหน่วย
+// ช่องแสดงค่าข้อมูลร่างกายหนึ่งค่า พร้อมไอคอนและหน่วย (โหมดดู)
 function StatTile({
   icon,
   label,
@@ -1605,11 +1419,7 @@ function StatTile({
   );
 }
 
-/* =========================================================
-   HISTORY ROW (ประวัติสุขภาพ)
-========================================================= */
-
-// แถวแสดงประวัติสุขภาพแบบ ใช่/ไม่ใช่ (ไม่มีข้อมูลแสดง "-")
+// แถวแสดงประวัติสุขภาพแบบ ใช่/ไม่ใช่ (โหมดดู)
 function HistoryRow({
   icon,
   label,
@@ -1640,11 +1450,7 @@ function HistoryRow({
   );
 }
 
-/* =========================================================
-   EDIT TILE (กรอกตัวเลข ในหน้าต่างแก้ไข / ฟอร์มครั้งแรก)
-========================================================= */
-
-// ช่องกรอกตัวเลข พร้อมแจ้งเตือนเมื่อค่าอยู่นอกช่วง min–max
+// ช่องกรอกตัวเลขข้อมูลร่างกาย พร้อมเตือนเมื่อค่าอยู่นอกช่วง min–max
 function EditTile({
   icon,
   label,
@@ -1700,11 +1506,7 @@ function EditTile({
   );
 }
 
-/* =========================================================
-   GENDER TILE
-========================================================= */
-
-// ปุ่มเลือกเพศ ชาย/หญิง
+// ตัวเลือกเพศ ชาย/หญิง
 function GenderTile({
   value,
   disabled,
@@ -1746,11 +1548,7 @@ function GenderTile({
   );
 }
 
-/* =========================================================
-   CHOICE ROW (ใช่ / ไม่ใช่ ในหน้าต่างแก้ไข / ฟอร์มครั้งแรก)
-========================================================= */
-
-// แถวคำถามให้เลือก ใช่/ไม่ใช่
+// แถวเลือกคำตอบ ใช่/ไม่ใช่ สำหรับประวัติสุขภาพ (โหมดแก้ไข)
 function ChoiceRow({
   icon,
   label,

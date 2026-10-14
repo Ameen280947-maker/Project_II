@@ -11,14 +11,11 @@ import RecommendationLayout, {
   type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้าและลิงก์กลับไปเริ่มคัดกรอง 2Q ใหม่
 const TONE = "violet";
-// แบบประเมินเริ่มที่ 2Q เสมอ
 const EDIT_HREF = "/assessment_depression_2q";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// คำตอบรายข้อของ 9Q (ใช้ตรวจข้อสุดท้ายเรื่องความคิดทำร้ายตนเอง)
 type AnswerItem = {
   answer_id: number;
   question_id: number;
@@ -30,6 +27,7 @@ type AnswerItem = {
   answer_value?: string | number | null;
 };
 
+// รูปแบบผลประเมิน 9Q จาก API (คะแนน ระดับ คำแนะนำ ธงต้องดูแลด่วน คำตอบ)
 type Result = {
   assessment_id: number;
   total_score: number;
@@ -40,20 +38,19 @@ type Result = {
   answers?: AnswerItem[];
 };
 
-/* =========================================================
-   COMPONENT CONTENT
-========================================================= */
-
-// เนื้อหาหน้าผล 9Q: โหลดผลตาม assessmentId แล้วแสดงระดับภาวะซึมเศร้าและคำแนะนำ
+// เนื้อหาหน้า: แสดงคะแนนซึมเศร้า 9Q ระดับความรุนแรง และคำแนะนำ
+// ระดับ: ≥19 รุนแรง, ≥13 ปานกลาง, ≥7 น้อย; ถ้าคะแนน ≥13 หรือข้อ 9 (ทำร้ายตนเอง) > 0 แสดงกล่องสายด่วน
 function Depression9QRecommendationContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const assessmentId = searchParams.get("assessmentId");
 
+  // state ของหน้า: ผลประเมิน สถานะโหลด และ error
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
     if (!assessmentId) {
       setError("ไม่พบรหัสผลการประเมิน (Assessment ID)");
@@ -61,7 +58,7 @@ function Depression9QRecommendationContent() {
       return;
     }
 
-    // โหลดผลประเมิน 9Q ของผู้ใช้ตาม assessmentId จาก API
+    // ดึงผล 9Q จาก /api/assessments/depression?stage=9q (401 → ไปหน้า login)
     async function loadResult() {
       try {
         setLoading(true);
@@ -79,7 +76,6 @@ function Depression9QRecommendationContent() {
           }
         );
 
-        // session หมดอายุ → กลับไปหน้า login
         if (res.status === 401) {
           localStorage.removeItem("userId");
           router.replace("/login");
@@ -105,6 +101,7 @@ function Depression9QRecommendationContent() {
     loadResult();
   }, [assessmentId, router]);
 
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -113,9 +110,9 @@ function Depression9QRecommendationContent() {
     return <RecommendationError tone={TONE} message={error} editHref={EDIT_HREF} />;
   }
 
-  /* ===== ระดับความรุนแรงตามคะแนน 9Q ===== */
   const score = Number(result.total_score ?? 0);
 
+  // แปลคะแนนเป็นสีและคำอธิบายระดับอาการ
   let riskColor: RiskColor = "green";
   let levelDesc = "ไม่มีอาการของโรคซึมเศร้า หรือมีน้อยมาก";
 
@@ -130,8 +127,7 @@ function Depression9QRecommendationContent() {
     levelDesc = "มีอาการของโรคซึมเศร้าระดับน้อย ควรเฝ้าระวังและดูแลตนเอง";
   }
 
-  /* ข้อ 9 (ข้อสุดท้าย) = คิดทำร้ายตนเอง ตอบมากกว่า 0 คะแนน
-     ถ้าไม่มีรายการคำตอบ ใช้ค่าที่ API ตรวจมาให้แทน */
+  // ตรวจความคิดทำร้ายตนเองจากข้อสุดท้าย (ไม่มีคำตอบใช้ธง needs_urgent_attention) และตัดสินว่าต้องแสดงกล่องช่วยเหลือ
   const lastAnswer = result.answers?.length
     ? result.answers.reduce((max, a) =>
         Number(a.display_order) > Number(max.display_order) ? a : max
@@ -141,9 +137,9 @@ function Depression9QRecommendationContent() {
     ? Number(lastAnswer.score) > 0
     : !!result.needs_urgent_attention;
 
-  // ระดับปานกลางขึ้นไป (≥13) หรือคิดทำร้ายตนเอง → แสดงช่องทางช่วยเหลือ
   const showHelpBox = selfHarm || score >= 13;
 
+  // ส่วนแสดงผล: วงคะแนน (เต็ม 27) ระดับ สรุปผล และคำแนะนำ
   return (
     <RecommendationLayout
       tone={TONE}
@@ -172,10 +168,7 @@ function Depression9QRecommendationContent() {
       editHref={EDIT_HREF}
       menuHref="/assessment-menu-mental-health"
     >
-      {/* =====================================================
-         ระดับปานกลางขึ้นไป / คิดทำร้ายตนเอง → ช่องทางช่วยเหลือเร่งด่วน
-         (คงสีแดงไว้ เพราะเป็นสีแจ้งเตือนความเสี่ยง)
-      ===================================================== */}
+      {/* กล่องเตือนพร้อมเบอร์สายด่วนสุขภาพจิต (อาการปานกลางขึ้นไปหรือมีความคิดทำร้ายตนเอง) */}
       {showHelpBox && (
         <section className="mt-8 rounded-[28px] border-2 border-red-200 bg-red-50/90 p-6 sm:p-8">
           <div className="flex items-start gap-4">
@@ -198,7 +191,6 @@ function Depression9QRecommendationContent() {
                   : "คะแนนของท่านอยู่ในระดับที่ควรได้รับการดูแลและวางแผนการรักษาจากแพทย์หรือบุคลากรสาธารณสุขโดยเร็ว"}
               </p>
 
-              {/* คิดทำร้ายตนเอง → ส่งต่อประเมินความเสี่ยงการฆ่าตัวตาย 8Q */}
               {selfHarm && (
                 <div className="mt-4 rounded-2xl border border-red-200 bg-white/80 px-4 py-3 text-sm leading-relaxed text-red-800">
                   <span className="font-bold">ขั้นตอนถัดไป: </span>
@@ -207,7 +199,6 @@ function Depression9QRecommendationContent() {
                 </div>
               )}
 
-              {/* สายด่วน */}
               <div className="mt-5 flex flex-wrap items-center gap-3">
                 <a
                   href="tel:1323"
@@ -233,7 +224,7 @@ function Depression9QRecommendationContent() {
   );
 }
 
-// หน้าผลและคำแนะนำ 9Q: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลประเมินซึมเศร้า 9Q ครอบด้วย Suspense
 export default function Depression9QRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>

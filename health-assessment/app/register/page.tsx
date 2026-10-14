@@ -17,27 +17,30 @@ import {
 import { FormEvent, ReactNode, useState } from "react";
 import { CONSENT_TEXT } from "@/lib/consents";
 
-// ช่องความยินยอม เรียงและใช้ข้อความเดียวกับหน้าการตั้งค่า
+// รายการ checkbox ความยินยอมที่ต้องติ๊กตอนสมัคร (ตอนนี้มีเฉพาะข้อมูลสุขภาพ)
 const CONSENTS = [
   { name: "consentHealth", required: true, ...CONSENT_TEXT.health },
 ];
 
-// หน้าสมัครสมาชิก: กรอกชื่อผู้ใช้ อีเมล รหัสผ่าน และยินยอมให้เก็บข้อมูลสุขภาพ
+// หน้า: สมัครสมาชิกผู้ใช้ใหม่ (ชื่อผู้ใช้ อีเมล รหัสผ่าน และยินยอมข้อมูลสุขภาพ)
 export default function RegisterPage() {
   const router = useRouter();
 
+  // state ของหน้า: สลับแสดงรหัสผ่าน และข้อความ error
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] =
     useState(false);
   const [error, setError] = useState("");
 
-  // ตรวจข้อมูลในฟอร์มแล้วส่งไปสมัครสมาชิก สำเร็จพาไปหน้า login
+  // ตรวจข้อมูลฟอร์มแล้วส่งไป /api/auth/register สำเร็จจะไปหน้า login
+  // ตรวจ: กรอกครบ, ชื่อผู้ใช้ 3–30 ตัวไม่มีช่องว่าง, อีเมลถูกรูปแบบ, รหัส ≥8 และตรงกัน, ติ๊กยินยอม
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>
   ) => {
     event.preventDefault();
     setError("");
 
+    // อ่านค่าจากฟอร์ม
     const formData = new FormData(event.currentTarget);
 
     const username = String(
@@ -52,19 +55,17 @@ export default function RegisterPage() {
       formData.get("password") || ""
     );
 
-    // ความยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ (จำเป็น) ตรงกับหน้าการตั้งค่า > ความเป็นส่วนตัวและข้อมูลของฉัน
     const consentHealth = formData.get("consentHealth") === "on";
     const confirmPassword = String(
       formData.get("confirmPassword") || ""
     );
 
-    // ตรวจสอบข้อมูล
+    // ตรวจความถูกต้องของข้อมูลที่กรอก
     if (!username || !email || !password || !confirmPassword) {
       setError("กรุณากรอกข้อมูลให้ครบทุกช่อง");
       return;
     }
 
-    // ชื่อผู้ใช้ 3-30 ตัวอักษร ไม่มีช่องว่าง (กติกาเดียวกับ API)
     if (username.length < 3 || username.length > 30) {
       setError("ชื่อผู้ใช้ต้องมี 3-30 ตัวอักษร");
       return;
@@ -75,7 +76,6 @@ export default function RegisterPage() {
       return;
     }
 
-    // ต้องมีโดเมนท้าย เช่น .com .ac.th
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
       setError("กรุณากรอกอีเมลให้ถูกต้อง");
       return;
@@ -101,7 +101,7 @@ export default function RegisterPage() {
       return;
     }
 
-    // ตรงนี้ค่อยส่งไป API
+    // ส่งข้อมูลสมัครสมาชิกไป API แล้วพาไปหน้า login
     try {
       const response = await fetch("/api/auth/register", {
         method: "POST",
@@ -136,7 +136,7 @@ export default function RegisterPage() {
   return (
     <main className="min-h-screen bg-white">
       <section className="grid min-h-screen overflow-hidden bg-white lg:grid-cols-[42%_58%]">
-        {/* ฝั่งซ้าย */}
+        {/* แผงซ้าย: ข้อความต้อนรับ (แสดงเฉพาะจอใหญ่) */}
         <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#fff5f6] via-[#f3dadd] to-[#b91c2b] p-14 lg:flex lg:flex-col">
         
           <div className="relative z-10 mt-20 max-w-[420px]">
@@ -163,7 +163,7 @@ export default function RegisterPage() {
           <div className="absolute -bottom-40 -right-28 h-[430px] w-[430px] rounded-full bg-white/15" />
         </aside>
 
-        {/* ฟอร์ม */}
+        {/* แผงขวา: ฟอร์มสมัครสมาชิก */}
         <section className="flex items-center justify-center px-5 py-12 sm:px-10 lg:px-16">
           <div className="w-full max-w-[510px]">
             <Link
@@ -174,6 +174,7 @@ export default function RegisterPage() {
               กลับหน้าหลัก
             </Link>
 
+            {/* หัวข้อฟอร์ม */}
             <header className="text-center">
               <div className="relative mx-auto grid h-24 w-24 place-items-center rounded-full bg-[#f8e8ea] text-[#b91c2b] shadow-[0_15px_40px_rgba(138,20,32,0.1)]">
                 <UserPlus size={43} strokeWidth={1.7} />
@@ -190,6 +191,7 @@ export default function RegisterPage() {
               </p>
             </header>
 
+            {/* ฟอร์ม: ชื่อผู้ใช้ อีเมล รหัสผ่าน ความยินยอม และปุ่มสมัคร */}
             <form className="mt-9 space-y-4" onSubmit={handleSubmit}>
               <InputField
                 name="username"
@@ -225,8 +227,7 @@ export default function RegisterPage() {
                 }
               />
 
-              {/* ความยินยอม (PDPA) ไม่ติ๊กไว้ก่อน ผู้ใช้ต้องเลือกเอง
-                  ข้อความตรงกับหน้าการตั้งค่า เปลี่ยนได้ภายหลังที่นั่น */}
+              {/* checkbox ความยินยอมด้านข้อมูลสุขภาพ */}
               <fieldset className="space-y-3 px-1">
                 <legend className="mb-2 text-sm font-semibold text-[#2f3037]">
                   ความเป็นส่วนตัวและข้อมูลของฉัน
@@ -280,6 +281,7 @@ export default function RegisterPage() {
   );
 }
 
+// props ของช่องกรอกข้อความทั่วไป
 type InputFieldProps = {
   name: string;
   type: string;
@@ -288,7 +290,7 @@ type InputFieldProps = {
   icon: ReactNode;
 };
 
-// ช่องกรอกข้อความพร้อมไอคอนด้านหน้า
+// ช่องกรอกข้อความพร้อมไอคอนนำหน้า
 function InputField({
   name,
   type,
@@ -311,6 +313,7 @@ function InputField({
   );
 }
 
+// props ของช่องกรอกรหัสผ่าน
 type PasswordFieldProps = {
   name: string;
   placeholder: string;
@@ -318,7 +321,7 @@ type PasswordFieldProps = {
   onToggle: () => void;
 };
 
-// ช่องกรอกรหัสผ่าน พร้อมปุ่มแสดง/ซ่อนรหัสผ่าน
+// ช่องกรอกรหัสผ่านพร้อมปุ่มสลับแสดง/ซ่อนรหัส
 function PasswordField({
   name,
   placeholder,

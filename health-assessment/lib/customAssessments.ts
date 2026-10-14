@@ -1,14 +1,7 @@
 import pool from "@/lib/db";
 import { setCustomSeverities, severityForRank, type Severity } from "@/lib/staff/riskLevels";
 
-/* =========================================================
-   แบบประเมินทั่วไป (เจ้าหน้าที่สร้างเพิ่มเอง)
-   - แปลผลจาก "คะแนนรวม" ตามช่วง recommendation.min_score–max_score
-   - แบบประเมินจะนับเป็นแบบทั่วไปเมื่อ "ทุกระดับ" มีช่วงคะแนนครบ
-   - คะแนนมาก = ความเสี่ยงสูง (ระดับเรียงตาม min_score)
-   แบบประเมินเดิม 12 แบบไม่มีช่วงคะแนน จึงไม่ถูกนับเป็นแบบทั่วไป
-========================================================= */
-
+// ระดับผลของแบบประเมินแบบทั่วไป: ช่วงคะแนน ความรุนแรง คำแนะนำ รอบประเมินซ้ำ สายด่วน
 export type GenericLevel = {
   recId: number;
   riskLevel: string;
@@ -21,9 +14,10 @@ export type GenericLevel = {
   source: string | null;
 };
 
+// อะไรก็ได้ที่มีเมธอด query (pool หรือ client ใน transaction)
 type Queryable = Pick<typeof pool, "query">;
 
-// ระดับผลของแบบประเมินทั่วไป (null = ไม่ใช่แบบทั่วไป)
+// ดึงเกณฑ์ช่วงคะแนนและคำแนะนำของแบบประเมินจากตาราง recommendation (null ถ้าเกณฑ์ไม่ครบ)
 export async function getGenericLevels(typeId: number, db: Queryable = pool): Promise<GenericLevel[] | null> {
   const { rows } = await db.query(
     `SELECT rec_id, risk_level, min_score, max_score, recommendation_text, reassess_days, hotline, source
@@ -45,11 +39,11 @@ export async function getGenericLevels(typeId: number, db: Queryable = pool): Pr
   }));
 }
 
-// หาระดับผลที่ช่วงคะแนนครอบคะแนนนี้ (ไม่พบ = null)
+// หาระดับผลที่ช่วงคะแนนครอบคลุมคะแนนที่ได้ (null ถ้าไม่อยู่ในช่วงใด)
 export const levelForScore = (levels: GenericLevel[], score: number) =>
   levels.find((l) => score >= l.min && score <= l.max) ?? null;
 
-// รายการแบบประเมินทั่วไปที่เปิดใช้งาน (สำหรับเมนูผู้ใช้)
+// ดึงแบบประเมินแบบทั่วไป (เกณฑ์คะแนนครบและมีคำถาม) พร้อมจำนวนคำถามและหมวด
 export async function listGenericTypes(onlyActive = true) {
   const { rows } = await pool.query(
     `SELECT t.assessment_type_id, t.assessment_name, t.description, t.is_active, t.category_id,
@@ -74,7 +68,7 @@ export async function listGenericTypes(onlyActive = true) {
     }));
 }
 
-// ให้ severityOf รู้จักระดับของแบบประเมินทั่วไป (เรียกก่อนคำนวณในฝั่งเซิร์ฟเวอร์)
+// โหลดระดับความรุนแรงของแบบประเมินที่สร้างเอง (คิดจากลำดับช่วงคะแนน) เข้า cache ของ riskLevels
 export async function loadCustomSeverities() {
   const { rows } = await pool.query(
     `SELECT t.assessment_name, r.risk_level, r.assessment_type_id,
@@ -83,6 +77,7 @@ export async function loadCustomSeverities() {
             BOOL_AND(r.min_score IS NOT NULL AND r.max_score IS NOT NULL) OVER (PARTITION BY r.assessment_type_id) AS ok
        FROM recommendation r JOIN assessment_types t USING (assessment_type_id)`
   );
+  // สร้างแผนที่ ชื่อแบบประเมิน → ระดับผล → ความรุนแรง แล้วเก็บเข้า cache
   const map: Record<string, Record<string, Severity>> = {};
   for (const r of rows) {
     if (!r.ok) continue;

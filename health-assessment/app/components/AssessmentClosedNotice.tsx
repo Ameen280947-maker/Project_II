@@ -4,15 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarClock } from "lucide-react";
 
-/* =========================================================
-   แจ้งเตือนเมื่อแบบประเมินถูกปิดใช้งาน (staff ปิดไว้)
-   แสดงทับหน้าทำแบบประเมิน ผู้ใช้ทำต่อไม่ได้ ให้เลือกไปหน้าอื่นแทน
-========================================================= */
-
-// ตรวจว่าแบบประเมินถูกปิดใช้งานหรือไม่ ถ้าปิดจะแสดงหน้าต่างแจ้งเตือนทับหน้าทำแบบประเมิน
+// คอมโพเนนต์: เช็กสถานะแบบประเมินจาก /api/assessments/status แล้วแสดง popup ทับหน้าเมื่อถูกปิดใช้งาน
 export default function AssessmentClosedNotice({ typeId }: { typeId: number }) {
   const [closed, setClosed] = useState(false);
 
+  // เช็กสถานะเปิด/ปิดของแบบประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
     let cancelled = false;
 

@@ -18,23 +18,16 @@ import {
 } from "./components/overview/OverviewParts";
 import type { Overview } from "./components/overview/types";
 
-/* =========================================================
-   หน้า "ภาพรวมระบบ" ของ Staff
-   - ระบบประเมินสุขภาพเบื้องต้นด้วยตนเอง: ไม่มีการติดตามรายบุคคล
-     และเจ้าหน้าที่ไม่เห็นผลประเมินของใครรายคน (มีแต่ตัวเลขรวม)
-   - ไม่มีตัวเลือกช่วงเวลา: ตัวเลขรายช่วงใช้ "30 วันล่าสุดรวมวันนี้" ตามเวลาไทยเสมอ
-     ยอดสะสมแสดงเป็น "ณ วันนี้" (ต้องการเลือกช่วงเอง → หน้ารายงานและสถิติ)
-========================================================= */
-
+// ช่วงวันที่ใช้สรุปภาพรวม และข้อความกำกับที่ใช้ซ้ำในหน้า
 const RANGE_DAYS = 30;
 const AS_OF = "ณ วันนี้";
 const IN_RANGE = "30 วันล่าสุด";
 const CONSENT_NOTE = "นับเฉพาะผู้ใช้ที่ยินยอมให้ประมวลผลข้อมูลสุขภาพ";
 
-// จัดรูปแบบตัวเลขแบบไทย ถ้าไม่มีค่าแสดง –
+// จัดรูปแบบตัวเลขแบบไทย หรือแสดง "–" เมื่อไม่มีค่า
 const fmt = (n: number | null | undefined) => (n === null || n === undefined ? "–" : n.toLocaleString("th-TH"));
 
-// แสดง % เปลี่ยนแปลงของจำนวนการประเมินเทียบกับ 30 วันก่อนหน้า
+// แสดง % การเปลี่ยนแปลงของจำนวนการประเมินเทียบกับ 30 วันก่อนหน้า (ลูกศรขึ้น/ลง)
 function Delta({ cur, prev }: { cur: number; prev: number }) {
   if (prev === 0) return <>{cur > 0 ? "ช่วงก่อนไม่มีการประเมิน" : "ไม่มีการประเมินทั้งสองช่วง"}</>;
   const pct = Math.round(((cur - prev) / prev) * 100);
@@ -46,17 +39,18 @@ function Delta({ cur, prev }: { cur: number; prev: number }) {
   );
 }
 
-// หน้าภาพรวมระบบ: โหลดข้อมูล 30 วันล่าสุด แสดง KPI กราฟ งานค้าง และกิจกรรมล่าสุด
+// หน้า: ภาพรวมระบบเจ้าหน้าที่ 30 วันล่าสุด ดึงข้อมูลจาก /api/staff/overview มาแสดง KPI กราฟ และงานค้าง
+// ส่วนประกอบ: KPI → กราฟการใช้งาน/สัดส่วนผล → การ์ดแต่ละระบบ → งานค้างและกิจกรรมล่าสุด
 export default function StaffOverviewPage() {
-  // ช่วงตายตัว 30 วันล่าสุดรวมวันนี้ (วันที่ตามเวลาไทย ไม่ใช้ toISOString กับเวลาปัจจุบัน)
+  // ช่วงวันที่ 30 วันล่าสุด และ state ผลการโหลด
   const today = todayInBangkok();
   const from = shiftDate(today, -(RANGE_DAYS - 1));
   const to = today;
   const reqKey = `${from}|${to}`;
-  // ผลของคำขอล่าสุด (key บอกว่าเป็นของช่วงไหน → ถ้าไม่ตรงกับช่วงที่เลือกอยู่ = กำลังโหลด)
   const [result, setResult] = useState<{ key: string; error?: string } | null>(null);
   const [data, setData] = useState<Overview | null>(null);
 
+  // โหลดข้อมูลภาพรวมจาก /api/staff/overview ตอนเปิดหน้า
   useEffect(() => {
     let cancelled = false;
     staffFetch<Overview>(`/api/staff/overview?from=${from}&to=${to}`)
@@ -71,6 +65,7 @@ export default function StaffOverviewPage() {
     };
   }, [from, to]);
 
+  // ค่าที่คำนวณสำหรับแสดงผล
   const loading = result?.key !== reqKey;
   const period = rangeText(from, to);
   const error = result?.key === reqKey ? result.error ?? "" : "";
@@ -84,6 +79,7 @@ export default function StaffOverviewPage() {
 
   return (
     <div className={`flex flex-col gap-6 transition-opacity ${loading && data ? "opacity-60" : ""}`}>
+      {/* หัวหน้าเพจ */}
       <PageHeader
         eyebrow="Staff Dashboard"
         title="ภาพรวม"
@@ -99,7 +95,7 @@ export default function StaffOverviewPage() {
 
       <ErrorBox message={error} />
 
-      {/* ---------- KPI ---------- */}
+      {/* การ์ด KPI 4 ใบ */}
       <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           label={`ผู้ใช้งานทั้งหมด · ${AS_OF}`}
@@ -123,8 +119,8 @@ export default function StaffOverviewPage() {
         />
       </section>
 
-      {/* ---------- การใช้งาน + ผลโดยรวม ---------- */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        {/* กราฟการใช้งานระบบ */}
         <Card className="lg:col-span-3">
           <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -136,6 +132,7 @@ export default function StaffOverviewPage() {
           {data ? <UsageChart chart={data.chart} /> : <div className="h-60 animate-pulse rounded-2xl bg-staff-soft" />}
         </Card>
 
+        {/* สัดส่วนผลการประเมินโดยรวม */}
         <Card className="flex flex-col lg:col-span-2">
           <h2 className="text-lg font-bold">ผลการประเมินโดยรวม</h2>
           <p className="mb-5 text-sm text-staff-muted">
@@ -152,7 +149,7 @@ export default function StaffOverviewPage() {
         </Card>
       </section>
 
-      {/* ---------- ส่วนต่าง ๆ ของระบบ ---------- */}
+      {/* การ์ดสรุปแต่ละส่วนของระบบ (ผู้ใช้ แบบประเมิน รายงาน) */}
       <section className="flex flex-col gap-3">
         <h2 className="text-lg font-bold">ส่วนต่าง ๆ ของระบบ</h2>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -245,8 +242,8 @@ export default function StaffOverviewPage() {
         </div>
       </section>
 
-      {/* ---------- งานค้าง + กิจกรรมล่าสุด ---------- */}
       <section className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+        {/* รายการงานค้าง */}
         <Card className="lg:col-span-3">
           <h2 className="text-lg font-bold">สิ่งที่ต้องดูแลในระบบ</h2>
           <p className="mb-4 text-sm text-staff-muted">งานด้านเนื้อหาและบัญชีที่ยังค้างอยู่ · {AS_OF}</p>
@@ -281,6 +278,7 @@ export default function StaffOverviewPage() {
           </div>
         </Card>
 
+        {/* กิจกรรมล่าสุดในระบบ */}
         <Card className="lg:col-span-2">
           <h2 className="text-lg font-bold">กิจกรรมล่าสุดในระบบ</h2>
           <p className="mb-3 text-sm text-staff-muted">{IN_RANGE} ({period})</p>

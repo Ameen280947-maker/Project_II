@@ -1,15 +1,10 @@
 import Link from "next/link";
 import { ArrowRight, type LucideIcon } from "lucide-react";
 
-/* =========================================================
-   การ์ดเลือกแบบประเมิน (ใช้ในหน้าเมนูแบบประเมินทุกหมวด)
-   - พื้นสีพาสเทลตามโทน + ไอคอนตกแต่งจาง ๆ มุมขวาล่าง
-   - ทั้งการ์ดกดได้ เมื่อชี้เมาส์: การ์ดลอยขึ้น ไอคอนตกแต่งขยาย/เอียง ลูกศรเลื่อนไปขวา
-========================================================= */
-
+// ชื่อโทนสีที่การ์ดเมนูรองรับ
 export type CardTone = "rose" | "green" | "blue" | "mint" | "amber" | "teal" | "violet" | "pink";
 
-// เขียนคลาสเต็มทุกตัว ให้ Tailwind สร้าง CSS ได้
+// ตาราง class สีของแต่ละโทน (พื้นการ์ด ไอคอน และไอคอนตกแต่ง)
 const TONES: Record<CardTone, { card: string; icon: string; deco: string }> = {
   rose: { card: "bg-[#fce8ea] hover:bg-[#fadde2]", icon: "text-[#a3112a]", deco: "text-[#ebbcc5]" },
   green: { card: "bg-[#ebf3e2] hover:bg-[#e2edd5]", icon: "text-[#3f7a2e]", deco: "text-[#cde0c0]" },
@@ -21,7 +16,7 @@ const TONES: Record<CardTone, { card: string; icon: string; deco: string }> = {
   pink: { card: "bg-[#fce9f0] hover:bg-[#f9dfe9]", icon: "text-[#b4235a]", deco: "text-[#efc1d3]" },
 };
 
-// การ์ดลิงก์ไปยังแบบประเมิน แสดงชื่อและไอคอน สีตามโทนที่กำหนด
+// คอมโพเนนต์: การ์ดเมนูแบบประเมินพร้อมไอคอนและโทนสี ลิงก์ไปยังหน้าประเมินนั้น
 export default function AssessmentMenuCard({
   title,
   href,
@@ -40,7 +35,6 @@ export default function AssessmentMenuCard({
       href={href}
       className={`group relative isolate flex min-h-[240px] flex-col overflow-hidden rounded-[28px] p-7 transition duration-300 ease-out hover:-translate-y-1 hover:shadow-[0_22px_45px_rgba(22,24,29,0.10)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1b1f2a] focus-visible:ring-offset-2 motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-8 ${t.card}`}
     >
-      {/* ไอคอนตกแต่ง */}
       <Icon
         aria-hidden
         size={224}

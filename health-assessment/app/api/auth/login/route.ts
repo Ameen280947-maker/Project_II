@@ -10,11 +10,12 @@ import { logSystemError } from "@/lib/errorLogger";
 
 export const runtime = "nodejs";
 
-// POST: ตรวจชื่อผู้ใช้และรหัสผ่าน แล้วตั้ง session cookie เมื่อเข้าสู่ระบบสำเร็จ
+// API: ตรวจ username/รหัสผ่านด้วย bcrypt บันทึกเวลาเข้าสู่ระบบ แล้วตั้ง session cookie ตามบทบาท
 export async function POST(
   request: NextRequest,
 ) {
   try {
+    // ตรวจข้อมูลที่ส่งมา: ต้องมี username และรหัสผ่าน
     const body =
       await request.json();
 
@@ -25,10 +26,6 @@ export async function POST(
     const password = String(
       body.password || "",
     );
-
-    /* =========================
-       Validation
-    ========================= */
 
     if (
       !username ||
@@ -46,15 +43,7 @@ export async function POST(
       );
     }
 
-    /* =========================
-       หา User
-
-       1) ตรงตัวพิมพ์ก่อน
-       2) ไม่เจอ → เทียบแบบไม่สนตัวพิมพ์
-          ใช้ได้เฉพาะเมื่อเจอบัญชีเดียว
-          (กันกรณีบัญชีเก่ามีชื่อซ้ำกันต่างแค่ตัวพิมพ์)
-    ========================= */
-
+    // ค้นหาผู้ใช้จาก username (ตรงตัวก่อน แล้วค่อยลองแบบไม่สนตัวพิมพ์)
     const userSelect = `
         SELECT
           u.user_id,
@@ -111,12 +100,9 @@ export async function POST(
       );
     }
 
+    // ตรวจรหัสผ่านด้วย bcrypt และสถานะบัญชีที่ถูกระงับ
     const user =
       result.rows[0];
-
-    /* =========================
-       ตรวจ Password
-    ========================= */
 
     const passwordMatch =
       await bcrypt.compare(
@@ -137,10 +123,6 @@ export async function POST(
       );
     }
 
-    /* =========================
-       บัญชีถูกระงับโดยเจ้าหน้าที่
-    ========================= */
-
     if (user.is_active === false) {
       return NextResponse.json(
         {
@@ -154,12 +136,7 @@ export async function POST(
       );
     }
 
-    /* =========================
-       ตรวจ Health Profile
-
-       จุดสำคัญของระบบ
-    ========================= */
-
+    // เช็กว่ามีโปรไฟล์สุขภาพแล้วหรือยัง และบันทึกเวลาเข้าสู่ระบบล่าสุด
     const profileResult =
       await pool.query(
         `
@@ -175,12 +152,6 @@ export async function POST(
       (profileResult.rowCount ??
         0) > 0;
 
-    /* =========================
-       บันทึกเวลาเข้าสู่ระบบล่าสุด
-       (ใช้นับ "ใช้งานล่าสุด" ในหน้าผู้ใช้งานของ staff)
-       ไม่ให้การบันทึกล้มเหลวทำให้ล็อกอินไม่ได้
-    ========================= */
-
     await pool
       .query(
         `UPDATE users SET last_login_at = NOW() WHERE user_id = $1`,
@@ -190,10 +161,7 @@ export async function POST(
         console.error("UPDATE last_login_at ERROR:", error);
       });
 
-    /* =========================
-       Login สำเร็จ
-    ========================= */
-
+    // ตอบข้อมูลผู้ใช้กลับและตั้ง session cookie
     const response = NextResponse.json({
       success: true,
 
@@ -216,18 +184,8 @@ export async function POST(
         role_name:
           user.role_name,
 
-        /*
-          สำคัญ
-
-          true  = เคยกรอกข้อมูลทั่วไปแล้ว
-          false = ยังไม่เคยกรอก
-        */
         hasProfile,
 
-        /*
-          หน้าแรกหลังเข้าสู่ระบบตามบทบาท
-          3 = staff → /staff
-        */
         homePath:
           user.role_id === 3
             ? "/staff"
@@ -235,7 +193,6 @@ export async function POST(
       },
     });
 
-    // ตั้ง session cookie (HttpOnly) ให้ API ใช้ระบุตัวผู้ใช้
     setSessionCookie(response, {
       userId: Number(user.user_id),
       roleId:

@@ -11,21 +11,20 @@ import { otpRateLimits } from "@/lib/rateLimit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// รูปแบบ body: อีเมลและรหัส OTP
 type VerifyOtpBody = {
   email?: string;
   otp?: string;
 };
 
+// ข้อความแจ้งเมื่อ OTP ผิด/หมดอายุ และเมื่อกรอกผิดเกินกำหนด
 const INVALID_OTP_MESSAGE =
   "OTP ไม่ถูกต้องหรือหมดอายุแล้ว";
 
 const TOO_MANY_ATTEMPTS_MESSAGE =
   "กรอก OTP ผิดเกินจำนวนครั้งที่กำหนด รหัสนี้ถูกยกเลิกแล้ว กรุณาขอรหัส OTP ใหม่";
 
-/*
-  ยกเลิก OTP ที่ยังไม่ถูกใช้ของอีเมลนี้
-  (forgot-password เก็บไว้แค่ตัวล่าสุดตัวเดียวอยู่แล้ว)
-*/
+// ปิดใช้ OTP ที่ยังไม่ถูกใช้ทั้งหมดของอีเมลนี้ (used = TRUE)
 async function invalidateLatestOtp(
   email: string,
 ) {
@@ -42,7 +41,7 @@ async function invalidateLatestOtp(
   );
 }
 
-// สร้าง response 429 แจ้งว่ากรอก OTP ผิดเกินจำนวนครั้งที่กำหนด
+// สร้าง response 429 เมื่อกรอก OTP ผิดเกินจำนวนครั้งที่กำหนด
 function tooManyAttemptsResponse() {
   return NextResponse.json(
     {
@@ -56,10 +55,7 @@ function tooManyAttemptsResponse() {
   );
 }
 
-/*
-  นับการกรอกผิด (5 ครั้ง / อีเมล / 10 นาที)
-  ครบแล้ว → ยกเลิก OTP และตอบ 429
-*/
+// นับครั้งที่ OTP ผิด ถ้าครบ 5 ครั้งยกเลิก OTP และตอบ 429 ไม่งั้นแจ้งว่า OTP ไม่ถูกต้อง
 async function failedAttemptResponse(
   email: string,
 ) {
@@ -86,11 +82,7 @@ async function failedAttemptResponse(
   );
 }
 
-/* =========================================================
-   POST /api/auth/verify-otp
-========================================================= */
-
-// POST: ตรวจรหัส OTP ของอีเมล ถ้าถูกต้องออก reset token สำหรับตั้งรหัสผ่านใหม่
+// API: ตรวจรหัส OTP กับ password_reset_tokens (หมดอายุ/ถูกใช้แล้ว) และจำกัดจำนวนครั้งที่ลองผิด
 export async function POST(
   request: NextRequest,
 ) {
@@ -101,12 +93,9 @@ export async function POST(
     false;
 
   try {
+    // ตรวจข้อมูลที่ส่งมา: ต้องมีอีเมล และ OTP เป็นตัวเลข 6 หลัก
     const body =
       (await request.json()) as VerifyOtpBody;
-
-    /* =====================================================
-       NORMALIZE
-    ===================================================== */
 
     const email =
       String(
@@ -119,10 +108,6 @@ export async function POST(
       String(
         body.otp ?? "",
       ).trim();
-
-    /* =====================================================
-       VALIDATION
-    ===================================================== */
 
     if (
       !email ||
@@ -157,13 +142,7 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       RATE LIMIT
-
-       กรอกผิดครบ 5 ครั้งแล้ว → ต้องขอ OTP ใหม่
-       (ตัวนับอยู่ใน memory ดู lib/rateLimit.ts)
-    ===================================================== */
-
+    // ถ้าลองผิดเกินกำหนดแล้ว ยกเลิก OTP และตอบ 429
     if (
       otpRateLimits.verifyOtpFailures.isLimited(
         email,
@@ -174,20 +153,13 @@ export async function POST(
       return tooManyAttemptsResponse();
     }
 
-    /* =====================================================
-       START TRANSACTION
-    ===================================================== */
-
+    // เริ่ม transaction และค้นหาผู้ใช้จากอีเมล
     await client.query(
       "BEGIN",
     );
 
     transactionStarted =
       true;
-
-    /* =====================================================
-       FIND USER
-    ===================================================== */
 
     const userResult =
       await client.query<{
@@ -216,10 +188,6 @@ export async function POST(
       transactionStarted =
         false;
 
-      /*
-        ไม่บอกว่าไม่มีอีเมลนี้ในระบบ
-        ตอบเหมือน OTP ผิด กันการเดาว่าใครมีบัญชี
-      */
       return failedAttemptResponse(
         email,
       );
@@ -231,12 +199,7 @@ export async function POST(
           .user_id,
       );
 
-    /* =====================================================
-       HASH OTP
-
-       ต้องใช้วิธีเดียวกับ forgot-password
-    ===================================================== */
-
+    // hash OTP แล้วหา token ที่ตรงกัน ยังไม่ใช้ และยังไม่หมดอายุ
     const otpHash =
       crypto
         .createHash(
@@ -248,10 +211,6 @@ export async function POST(
         .digest(
           "hex",
         );
-
-    /* =====================================================
-       FIND VALID OTP
-    ===================================================== */
 
     const tokenResult =
       await client.query<{
@@ -305,13 +264,7 @@ export async function POST(
           .reset_id,
       );
 
-    /* =====================================================
-       CREATE RESET TOKEN
-
-       สร้าง Token ใหม่สำหรับขั้นตอนเปลี่ยน Password
-       ไม่ส่ง OTP ต่อไปโดยตรง
-    ===================================================== */
-
+    // OTP ถูกต้อง: สร้าง resetToken ใหม่ (อายุ 10 นาที) แทน hash เดิม แล้ว commit
     const resetToken =
       crypto
         .randomBytes(
@@ -320,12 +273,6 @@ export async function POST(
         .toString(
           "hex",
         );
-
-    /* =====================================================
-       HASH RESET TOKEN
-
-       เก็บ hash เท่านั้นใน Database
-    ===================================================== */
 
     const resetTokenHash =
       crypto
@@ -338,15 +285,6 @@ export async function POST(
         .digest(
           "hex",
         );
-
-    /* =====================================================
-       UPDATE TOKEN RECORD
-
-       เปลี่ยน token_hash จาก OTP hash
-       เป็น resetToken hash
-
-       และต่ออายุให้ reset password ได้อีก 10 นาที
-    ===================================================== */
 
     await client.query(
       `
@@ -363,10 +301,6 @@ export async function POST(
       ],
     );
 
-    /* =====================================================
-       COMMIT
-    ===================================================== */
-
     await client.query(
       "COMMIT",
     );
@@ -374,17 +308,9 @@ export async function POST(
     transactionStarted =
       false;
 
-    // ยืนยันสำเร็จ → ล้างตัวนับการกรอกผิด
     otpRateLimits.verifyOtpFailures.reset(
       email,
     );
-
-    /* =====================================================
-       RETURN RESET TOKEN
-
-       ส่ง token จริงกลับ Frontend
-       Database เก็บแค่ hash
-    ===================================================== */
 
     return NextResponse.json({
       success: true,
@@ -395,10 +321,8 @@ export async function POST(
       resetToken,
     });
   } catch (error) {
-    /* =====================================================
-       ROLLBACK
-    ===================================================== */
 
+    // จัดการ error: rollback ถ้า transaction ค้างอยู่ แล้วคืน 500
     if (
       transactionStarted
     ) {

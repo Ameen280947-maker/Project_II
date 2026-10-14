@@ -12,11 +12,13 @@ import RecommendationLayout, {
     type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้า ใช้กับคอมโพเนนต์แสดงผลประเมิน
 const TONE = "violet";
 
-// คะแนนเต็มของแบบประเมินการนอน (≥3 = เพียงพอ)
+// คะแนนเต็มของแบบประเมินการนอน
 const MAX_SCORE = 3;
 
+// คำแนะนำตามคะแนน (การแปลผล หัวข้อ คำอธิบาย รายการคำแนะนำ)
 type Recommendation = {
     id: number;
     score: number;
@@ -27,6 +29,7 @@ type Recommendation = {
     color: string;
 };
 
+// ผลประเมินการนอนหนึ่งรายการพร้อมคำแนะนำ
 type ResultData = {
     id: string;
     score: number;
@@ -36,21 +39,19 @@ type ResultData = {
     recommendation: Recommendation;
 };
 
-/* =====================================================
-   สีป้ายระดับตามคะแนน: 3 เพียงพอ, 2 ไม่เพียงพอ, ต่ำกว่านั้นเสี่ยงสูง
-===================================================== */
-
+// แปลงคะแนนการนอนเป็นสีความเสี่ยง (≥3 เขียว, 2 เหลือง, ต่ำกว่านั้นแดง)
 function getRiskColor(score: number): RiskColor {
     if (score >= 3) return "green";
     if (score === 2) return "yellow";
     return "red";
 }
 
-// หน้าผลและคำแนะนำการนอนหลับ: อ่าน recordId จาก URL แล้วโหลดผลมาแสดง
+// หน้า: ผลและคำแนะนำการประเมินการนอนหลับ (อ่าน recordId จาก URL)
+// แสดงวงคะแนน (เต็ม 3) การแปลผล คำอธิบาย และรายการคำแนะนำแบบมีลำดับ
 export default function RecommendationSleepPage() {
     const router = useRouter();
 
-    // undefined = ยังไม่ได้อ่าน URL, null = ไม่มี recordId
+    // state ของหน้า: recordId (undefined = ยังไม่อ่าน URL) ผลประเมิน สถานะโหลด error
     const [recordId, setRecordId] =
         useState<string | null | undefined>(undefined);
 
@@ -63,31 +64,24 @@ export default function RecommendationSleepPage() {
     const [error, setError] =
         useState("");
 
-    // =====================================================
-    // อ่าน recordId จาก URL
-    // =====================================================
-
+    // อ่าน recordId (หรือ assessmentId) จาก URL ตอนเปิดหน้า
     useEffect(() => {
         const params = new URLSearchParams(
             window.location.search
         );
 
-        // หน้าประวัติส่ง assessmentId หน้าทำแบบประเมินส่ง recordId (ค่าเดียวกัน)
         const id = params.get("recordId") || params.get("assessmentId");
 
         setRecordId(id);
     }, []);
 
-    // =====================================================
-    // ดึงผลการประเมิน
-    // =====================================================
-
+    // โหลดผลประเมินจาก API เมื่อได้ recordId แล้ว
     useEffect(() => {
         if (!recordId) {
             return;
         }
 
-        // โหลดผลประเมินการนอนตาม recordId จาก API
+        // ดึงผลประเมินจาก /api/assessments/sleep (401 → ลบ userId แล้วไปหน้า login)
         async function loadResult() {
             try {
                 setLoading(true);
@@ -100,7 +94,6 @@ export default function RecommendationSleepPage() {
                     }
                 );
 
-                // session หมดอายุ → กลับไปหน้า login
                 if (response.status === 401) {
                     localStorage.removeItem("userId");
                     router.replace("/login");
@@ -138,18 +131,10 @@ export default function RecommendationSleepPage() {
         loadResult();
     }, [recordId, router]);
 
-    // =====================================================
-    // Loading
-    // =====================================================
-
-    // ไม่มี recordId → ข้ามไปแสดงหน้าไม่พบผลแทนการโหลดค้าง
+    // สถานะกำลังโหลด / ไม่พบผล
     if (recordId === undefined || (recordId && loading)) {
         return <RecommendationLoading tone={TONE} />;
     }
-
-    // =====================================================
-    // ไม่พบข้อมูล
-    // =====================================================
 
     if (!result || !result.recommendation) {
         return (
@@ -161,6 +146,7 @@ export default function RecommendationSleepPage() {
         );
     }
 
+    // ค่าที่คำนวณสำหรับแสดงผล (คะแนน ชุดสี รายการคำแนะนำ)
     const recommendation = result.recommendation;
     const score = Number(result.score);
     const t = RECOMMENDATION_TONES[TONE];
@@ -168,6 +154,7 @@ export default function RecommendationSleepPage() {
         ? recommendation.recommendations
         : [];
 
+    // ส่วนแสดงผล: วงคะแนน การแปลผล และคำอธิบาย
     return (
         <RecommendationLayout
             tone={TONE}
@@ -201,10 +188,8 @@ export default function RecommendationSleepPage() {
             menuHref="/assessment-menu-behavior"
             disclaimer="ผลการประเมินนี้เป็นข้อมูลเบื้องต้น สำหรับใช้ประกอบการดูแลสุขภาพ ไม่สามารถใช้แทนการวินิจฉัยจากแพทย์ได้"
         >
-            {/* =================================================
-                รายการคำแนะนำการนอน
-            ================================================= */}
 
+            {/* รายการคำแนะนำสำหรับผู้ใช้ (มีลำดับเลข) */}
             {adviceList.length > 0 && (
                 <RecommendationSection
                     icon={

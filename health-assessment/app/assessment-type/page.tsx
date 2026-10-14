@@ -19,13 +19,10 @@ import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
 import type { AssessmentCategory, CategoryAssessment, CategoryTheme } from "@/lib/assessmentCategories";
 
-/* =========================================================
-   เนื้อหาของหมวดเดิม 3 หมวด (หัวข้อย่อย + ภาพ) — ผูกกับ route_path ในตาราง assessment_categories
-   แบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดเหล่านี้จะต่อท้ายรายการหัวข้อย่อย
-========================================================= */
-
+// ชนิดภาพประกอบของการ์ดหมวดหมู่
 type Illustration = "ncd" | "behavior" | "mental" | "generic";
 
+// รายการคำอธิบายและภาพประกอบของหมวดหลักในระบบ (key = routePath)
 const BUILTIN_CONTENT: Record<string, { descriptionItems: string[]; illustration: Illustration }> = {
   "/assessment-menu": {
     descriptionItems: [
@@ -55,20 +52,19 @@ const BUILTIN_CONTENT: Record<string, { descriptionItems: string[]; illustration
   },
 };
 
-// แสดงระหว่างรอโหลดหมวดจากฐานข้อมูล (และกรณีโหลดไม่สำเร็จ) = หมวดเดิม 3 หมวด
+// หมวดหมู่เริ่มต้นที่แสดงก่อนโหลดจาก API เสร็จ (หรือเมื่อโหลดไม่สำเร็จ)
 const FALLBACK_CATEGORIES: AssessmentCategory[] = [
   { id: 1, name: "โรคไม่ติดต่อเรื้อรัง", subtitle: "(NCDs)", theme: "red", routePath: "/assessment-menu", builtIn: true, href: "/assessment-menu", assessments: [] },
   { id: 2, name: "ความเสี่ยงด้านพฤติกรรม", subtitle: null, theme: "green", routePath: "/assessment-menu-behavior", builtIn: true, href: "/assessment-menu-behavior", assessments: [] },
   { id: 3, name: "ความเสี่ยงด้านสุขภาพจิต", subtitle: null, theme: "blue", routePath: "/assessment-menu-mental-health", builtIn: true, href: "/assessment-menu-mental-health", assessments: [] },
 ];
 
-// หน้าเลือกประเภทแบบประเมิน: โหลดหมวดหมู่และแบบประเมินเพิ่มเติมจาก API มาแสดงเป็นการ์ด
+// หน้า: แสดงหมวดหมู่แบบประเมินทั้งหมดเป็นการ์ด (ดึงจาก /api/assessments/categories)
 export default function AssessmentTypePage() {
-  // หมวดหมู่จากฐานข้อมูล + แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
-  // (หมวดที่ staff สร้างแต่ยังไม่มีแบบประเมินที่เปิดใช้งาน API จะไม่ส่งมา)
+  // state: หมวดหมู่ทั้งหมด และแบบประเมินที่ไม่มีหมวด
   const [categories, setCategories] = useState<AssessmentCategory[]>(FALLBACK_CATEGORIES);
-  // แบบประเมินที่ยังไม่มีหมวด (ไม่มีจะไม่แสดงหัวข้อ "แบบประเมินเพิ่มเติม")
   const [extra, setExtra] = useState<CategoryAssessment[]>([]);
+  // โหลดหมวดหมู่จาก API ตอนเปิดหน้า
   useEffect(() => {
     fetch("/api/assessments/categories", { cache: "no-store" })
       .then((r) => r.json())
@@ -84,19 +80,11 @@ export default function AssessmentTypePage() {
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
 
-        {/* =====================================================
-            SIDEBAR กลาง
-        ====================================================== */}
-
         <Sidebar />
-
-        {/* =====================================================
-            MAIN CONTENT
-        ====================================================== */}
 
         <section className="min-w-0 flex-1 px-5 py-5 sm:px-6 lg:px-8">
 
-          {/* Header */}
+          {/* ส่วนหัวหน้าและกระดิ่งแจ้งเตือน */}
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <h1 className="mt-2 text-3xl font-black tracking-tight sm:text-4xl">
@@ -117,10 +105,7 @@ export default function AssessmentTypePage() {
             </div>
           </header>
 
-          {/* =================================================
-              ASSESSMENT CARDS
-          ================================================== */}
-
+          {/* การ์ดหมวดหมู่แบบประเมิน */}
           <div className="mt-6 grid gap-5 xl:grid-cols-3">
 
             {categories.map((category) => {
@@ -143,6 +128,7 @@ export default function AssessmentTypePage() {
 
           </div>
 
+          {/* แบบประเมินเพิ่มเติมที่ไม่อยู่ในหมวดใด */}
           {extra.length > 0 && (
             <div className="mt-10">
               <h2 className="text-xl font-bold">แบบประเมินเพิ่มเติม</h2>
@@ -176,10 +162,7 @@ export default function AssessmentTypePage() {
   );
 }
 
-/* =========================================================
-   ASSESSMENT TYPE CARD
-========================================================= */
-
+// props ของการ์ดหมวดหมู่
 type AssessmentTypeCardProps = {
   title: string;
   subtitle?: string;
@@ -193,7 +176,7 @@ type AssessmentTypeCardProps = {
   illustration: Illustration;
 };
 
-// การ์ดหมวดหมู่แบบประเมิน แสดงภาพ หัวข้อ รายละเอียด และปุ่มเข้าตามธีมสี
+// คอมโพเนนต์: การ์ดหมวดหมู่แบบประเมิน พร้อมภาพประกอบ รายการคำอธิบาย และลิงก์ตามธีมสี
 function AssessmentTypeCard({
   title,
   subtitle,
@@ -202,6 +185,7 @@ function AssessmentTypeCard({
   theme,
   illustration,
 }: AssessmentTypeCardProps) {
+  // คลาสสีของการ์ดตามธีมหมวดหมู่
   const themeStyles = {
     red: {
       imageArea:
@@ -253,8 +237,6 @@ function AssessmentTypeCard({
       accent:
         "text-[#6594c8]",
     },
-
-    /* ===== สีของหมวดที่เจ้าหน้าที่สร้างเพิ่ม ===== */
 
     amber: {
       imageArea:
@@ -328,8 +310,7 @@ function AssessmentTypeCard({
   return (
     <article className="flex min-h-[535px] flex-col overflow-hidden rounded-[26px] border border-[#eee8e9] bg-white p-5 shadow-[0_14px_36px_rgba(35,25,30,0.045)]">
 
-      {/* Illustration */}
-
+      {/* พื้นที่ภาพประกอบด้านบนการ์ด */}
       <div
         className={`relative flex h-[170px] items-center justify-center overflow-hidden rounded-[22px] ${themeStyles.imageArea}`}
       >
@@ -340,8 +321,7 @@ function AssessmentTypeCard({
         />
       </div>
 
-      {/* Content */}
-
+      {/* ชื่อหมวด คำอธิบาย และรายการแบบประเมินในหมวด */}
       <div className="mt-5">
 
         <h3 className="text-[25px] font-bold leading-tight">
@@ -381,8 +361,6 @@ function AssessmentTypeCard({
 
       </div>
 
-      {/* Start button */}
-
       <Link
         href={href}
         className={`mt-auto flex h-13 min-h-13 items-center justify-center gap-3 rounded-2xl px-5 text-base font-bold transition hover:-translate-y-0.5 ${themeStyles.button}`}
@@ -398,23 +376,18 @@ function AssessmentTypeCard({
   );
 }
 
-/* =========================================================
-   ASSESSMENT ILLUSTRATION
-========================================================= */
-
-// ภาพประกอบของแต่ละหมวดแบบประเมิน เลือกไอคอนตามชนิด (kind)
+// คอมโพเนนต์: วาดภาพประกอบไอคอนของการ์ดตามชนิด (kind)
 function AssessmentIllustration({
   kind,
   iconClass,
   softBg,
 }: {
   kind: Illustration;
-  // สีไอคอน/พื้นของหมวด (ใช้กับภาพของหมวดที่เจ้าหน้าที่สร้างเพิ่ม)
   iconClass: string;
   softBg: string;
 }) {
-  /* ================= หมวดที่เจ้าหน้าที่สร้างเพิ่ม ================= */
 
+  // เลือกภาพตามชนิด: generic / ncd / behavior / (ที่เหลือ = สุขภาพจิต)
   if (kind === "generic") {
     return (
       <div className={`relative grid h-36 w-36 place-items-center rounded-full bg-white/75 shadow-[0_14px_34px_rgba(35,25,30,0.08)] ${iconClass}`}>
@@ -436,8 +409,6 @@ function AssessmentIllustration({
     );
   }
 
-  /* ================= NCD ================= */
-
   if (kind === "ncd") {
     return (
       <div className="relative grid h-32 w-32 place-items-center rounded-full bg-white/75 text-[#ef4962] shadow-[0_14px_34px_rgba(239,73,98,0.1)]">
@@ -457,8 +428,6 @@ function AssessmentIllustration({
       </div>
     );
   }
-
-  /* ================= Behavior ================= */
 
   if (kind === "behavior") {
     return (
@@ -484,8 +453,6 @@ function AssessmentIllustration({
     );
   }
 
-  /* ================= Mental Health ================= */
-
   return (
     <div className="relative grid h-36 w-36 place-items-center rounded-full bg-white/75 text-[#6594c8] shadow-[0_14px_34px_rgba(101,148,200,0.12)]">
 
@@ -506,11 +473,7 @@ function AssessmentIllustration({
   );
 }
 
-/* =========================================================
-   ICON CIRCLE
-========================================================= */
-
-// กรอบวงกลมสำหรับวางไอคอนในภาพประกอบ
+// คอมโพเนนต์: กรอบวงกลมสำหรับครอบไอคอน
 function IconCircle({
   children,
 }: {

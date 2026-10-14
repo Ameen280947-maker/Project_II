@@ -3,12 +3,7 @@
 import { useState } from "react";
 import type { SnapLevel, SnapQuestion } from "./shared";
 
-/* =========================================================
-   แท็บ "ตัวอย่าง" — คำถามตามที่ผู้ใช้เห็น (โทนแดงแบบหน้าผู้ใช้จริง)
-   ใช้ซ้ำในหน้าดูเวอร์ชันเก่า (readOnly)
-========================================================= */
-
-// แท็บตัวอย่าง: แสดงคำถามแบบที่ผู้ใช้เห็น ลองเลือกคำตอบเพื่อดูคะแนนรวมและผล
+// แท็บทดลองทำแบบประเมิน: ให้เจ้าหน้าที่กดเลือกคำตอบแล้วดูคะแนนรวมและผลที่ได้
 export default function PreviewTab({
   label,
   description,
@@ -22,7 +17,7 @@ export default function PreviewTab({
   levels: SnapLevel[];
   generic: boolean;
 }) {
-  // ลำดับคำถาม → ลำดับตัวเลือกที่เลือก
+  // คำตอบที่เลือก (index คำถาม → index ตัวเลือก) และคะแนนรวม/ผลที่คำนวณได้
   const [picked, setPicked] = useState<Record<number, number>>({});
   const answered = questions.filter((q, i) => q.type === "choice" && picked[i] !== undefined).length;
   const total = questions.reduce((s, q, i) => s + (picked[i] !== undefined ? q.choices[picked[i]]?.score ?? 0 : 0), 0);
@@ -33,6 +28,7 @@ export default function PreviewTab({
       <p className="text-sm font-semibold text-[#b91c2b]">แบบประเมิน</p>
       <h3 className="break-words text-xl font-bold text-[#2f3037]">{label}</h3>
       {description && <p className="mt-1 text-sm text-[#777780]">{description}</p>}
+      {/* รายการคำถามพร้อมปุ่มตัวเลือกให้ลองกด */}
       <div className="mt-4 flex flex-col gap-3">
         {questions.length === 0 && <p className="text-sm text-[#777780]">ยังไม่มีคำถาม</p>}
         {questions.map((q, i) => (
@@ -64,6 +60,7 @@ export default function PreviewTab({
           </div>
         ))}
       </div>
+      {/* สรุปคะแนนรวมและระดับผลที่ได้ */}
       <p className="mt-4 text-sm text-[#777780]">
         คะแนนรวมจากตัวอย่าง: <b className="text-[#2f3037]">{total}</b>
         {generic && answered > 0 && (

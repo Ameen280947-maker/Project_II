@@ -7,22 +7,14 @@ import { loadCustomSeverities } from "@/lib/customAssessments";
 import { getNotificationRule } from "@/lib/notificationRules";
 import { logSystemError } from "@/lib/errorLogger";
 
-/* =========================================================
-   GET /api/staff/reports?from=YYYY-MM-DD&to=YYYY-MM-DD&type=all|<id>&gender=all|male|female&age=all|18-24|25-39|40-59|60+
-   รายงานภาพรวมแบบไม่ระบุตัวตน
-   - นับเฉพาะผู้ใช้ที่ยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ (user_settings.consent_health)
-     ผู้ที่ยังไม่มีแถวการตั้งค่า (สมัครก่อนมีหน้าความยินยอม) ถือว่ายินยอม ตามค่าเริ่มต้นของ /api/settings
-   - กลุ่มที่มีผู้ใช้น้อยกว่า MIN_GROUP คน จะส่งค่า null (หน้าเว็บแสดง "–")
-   - "ช่วงก่อน" = ช่วงความยาวเท่ากันที่อยู่ก่อนหน้าช่วงที่เลือกทันที
-   - วันที่ทั้งหมดเป็นเวลาไทย (from / to รวมทั้งสองวัน)
-========================================================= */
-
+// ค่าคงที่ของรายงาน: กลุ่มขั้นต่ำ วันผ่อนผัน รอบประเมินสูงสุด เวลา และชุดแบบประเมินด้านสุขภาพจิต
 const MIN_GROUP = 5;
-const GRACE_DAYS = 7; // ประเมินซ้ำช้ากว่ากำหนดไม่เกิน 7 วัน ยังนับว่าตามรอบ
-const MAX_INTERVAL_DAYS = 740; // รอบประเมินซ้ำที่ยาวที่สุด (730 วัน) + เผื่อ → ใช้ดึงข้อมูลย้อนหลังสำหรับ "ประเมินซ้ำตามรอบ"
+const GRACE_DAYS = 7;
+const MAX_INTERVAL_DAYS = 740;
 const DAY_MS = 86_400_000;
-const BKK_OFFSET_MS = 7 * 3_600_000; // เวลาไทย UTC+7 (ไม่มี DST)
+const BKK_OFFSET_MS = 7 * 3_600_000;
 const MENTAL = new Set(["Stress", "9Q", "PHQ-2", "Sleep"]);
+// ช่วงกลุ่มอายุที่ใช้กรองและแบ่งกลุ่มในรายงาน
 const AGE_GROUPS: { key: string; label: string; min: number; max: number }[] = [
   { key: "18-24", label: "18–24 ปี", min: 0, max: 24 },
   { key: "25-39", label: "25–39 ปี", min: 25, max: 39 },
@@ -30,71 +22,68 @@ const AGE_GROUPS: { key: string; label: string; min: number; max: number }[] = [
   { key: "60+", label: "60+ ปี", min: 60, max: 200 },
 ];
 
+// นิพจน์ SQL แปลงเวลาประเมิน/สมัครเป็นเวลาไทย
 const LOCAL_ASSESSED = localOf("a.assessed_at");
 const LOCAL_CREATED = localOf("u.created_at");
 
-// เงื่อนไขร่วม: ผู้ใช้ทั่วไป + ยินยอมให้ประมวลผลข้อมูลสุขภาพ + ข้อมูลสุขภาพล่าสุด (เพศ/อายุ)
+// สร้าง SQL JOIN ผู้ใช้ที่ยินยอมให้ใช้ข้อมูลสุขภาพ พร้อมโปรไฟล์สุขภาพล่าสุด
 const CONSENT_JOIN = (userCol: string) => `
   JOIN users u ON u.user_id = ${userCol}
   JOIN LATERAL (SELECT COALESCE((SELECT consent_health FROM user_settings WHERE user_id::text = ${userCol}::text), TRUE) AS ok) hc ON hc.ok
   LEFT JOIN LATERAL (SELECT * FROM health_profile WHERE user_id = ${userCol} ORDER BY profile_id DESC LIMIT 1) hp ON TRUE`;
-// $1 = role, $2 = gender, $3 = age min, $4 = age max
+// เงื่อนไข SQL กรองผู้ใช้ตามบทบาท เพศ และช่วงอายุ
 const PROFILE_FILTER = `u.role_id = $1 AND ($2 = 'all' OR hp.gender = $2) AND ($3::int IS NULL OR hp.age BETWEEN $3 AND $4)`;
 
+// แถวผลประเมินพร้อมเพศ/อายุของผู้ใช้ (ts = มิลลิวินาที, day = วันที่ไทย)
 type Row = {
   user_id: number;
   type_id: number;
   name: string;
   risk_level: string;
-  ts: number; // epoch ms
-  day: string; // YYYY-MM-DD เวลาไทย
+  ts: number;
+  day: string;
   gender: string | null;
   age: number | null;
 };
 
-// คิด % (ทศนิยม 1 ตำแหน่ง) คืน null ถ้ากลุ่มเล็กกว่า MIN_GROUP
+// คำนวณร้อยละ (ทศนิยม 1 ตำแหน่ง) คืน null ถ้ากลุ่มเล็กกว่า MIN_GROUP
 const pct = (n: number, d: number) => (d >= MIN_GROUP ? Math.round((n / d) * 1000) / 10 : null);
-// % เปลี่ยนแปลงของจำนวน เทียบช่วงก่อน (ช่วงก่อนเป็น 0 → เทียบไม่ได้)
+// คำนวณอัตราการเติบโต (%) เทียบช่วงก่อนหน้า
 const growth = (cur: number, prev: number) => (prev > 0 ? Math.round(((cur - prev) / prev) * 1000) / 10 : null);
-// ผลต่างของสองค่า (หน่วย % point) คืน null ถ้าค่าใดเป็น null
+// คำนวณผลต่างเป็นจุดเปอร์เซ็นต์ระหว่างสองค่า
 const diffPts = (a: number | null, b: number | null) => (a !== null && b !== null ? Math.round((a - b) * 10) / 10 : null);
 
-// เลื่อนวันที่ YYYY-MM-DD ไป n วัน
+// บวก/ลบจำนวนวันให้วันที่รูปแบบ YYYY-MM-DD
 const addDays = (ymd: string, days: number) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 };
-/* ---------- ช่วงก่อนหน้าสำหรับ "เทียบช่วงก่อน" ---------- */
 
-// วันสุดท้ายของเดือน (m = 1-12)
+// คืนวันสุดท้ายของเดือน m ปี y
 const lastDayOf = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-// วันแรกของเดือนที่เลื่อนไป n เดือน
+// คืนวันแรกของเดือนที่เลื่อนจากเดือน m ไป n เดือน
 const monthStart = (y: number, m: number, n: number) => new Date(Date.UTC(y, m - 1 + n, 1)).toISOString().slice(0, 10);
 
-// หาวันเริ่มของช่วงก่อนหน้า (ปี/ไตรมาส/เดือนเต็ม หรือช่วงยาวเท่ากันก่อนหน้าทันที)
+// หาวันเริ่มของช่วงก่อนหน้าเพื่อเปรียบเทียบ (รองรับช่วงเดือน/ไตรมาส/ปีเต็ม)
 function previousPeriodStart(from: string, to: string, days: number) {
   const [y, m, d] = from.split("-").map(Number);
   if (d === 1) {
-    // ปีเต็ม 1 ม.ค. – 31 ธ.ค.
     if (m === 1 && to === `${y}-12-31`) return `${y - 1}-01-01`;
-    // ไตรมาสปฏิทินเต็ม (ม.ค.–มี.ค. / เม.ย.–มิ.ย. / ก.ค.–ก.ย. / ต.ค.–ธ.ค.)
     if ((m - 1) % 3 === 0 && to === lastDayOf(y, m + 2)) return monthStart(y, m, -3);
-    // เดือนเต็ม
     if (to === lastDayOf(y, m)) return monthStart(y, m, -1);
   }
-  // ช่วงอื่น: ยาวเท่ากันและอยู่ก่อนหน้าทันที
   return addDays(from, -days);
 }
 
-// เที่ยงคืนเวลาไทยของวันนั้น เป็น epoch ms
+// แปลงวันที่เป็น timestamp เที่ยงคืนตามเวลากรุงเทพฯ
 const bkkMidnight = (ymd: string) => {
   const [y, m, d] = ymd.split("-").map(Number);
   return Date.UTC(y, m - 1, d) - BKK_OFFSET_MS;
 };
-// วันที่ของวันนี้ตามเวลาไทย (YYYY-MM-DD)
+// คืนวันที่วันนี้ (YYYY-MM-DD) ตามเขตเวลากรุงเทพฯ
 const todayInBangkok = () => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Bangkok" }).format(new Date());
 
-// วันแรกของช่วงย่อยที่วันนั้นอยู่ (สัปดาห์เริ่มวันจันทร์ ตรงกับ date_trunc('week'))
+// หาวันเริ่มของช่วง (วัน/สัปดาห์เริ่มจันทร์/เดือน) ที่วันนั้นอยู่
 function bucketStart(day: string, bucket: Bucket) {
   if (bucket === "month") return `${day.slice(0, 7)}-01`;
   if (bucket === "week") {
@@ -104,7 +93,7 @@ function bucketStart(day: string, bucket: Bucket) {
   }
   return day;
 }
-// วันแรกของช่วงย่อยถัดไป (วัน/สัปดาห์/เดือน)
+// คืนวันเริ่มของช่วงถัดไปตามประเภทช่วง
 function nextBucket(start: string, bucket: Bucket) {
   if (bucket === "month") {
     const [y, m] = start.split("-").map(Number);
@@ -112,10 +101,10 @@ function nextBucket(start: string, bucket: Bucket) {
   }
   return addDays(start, bucket === "week" ? 7 : 1);
 }
-// key ของช่วงย่อย (รายเดือนใช้ YYYY-MM นอกนั้นใช้ YYYY-MM-DD)
+// สร้าง key ของช่วงสำหรับกราฟ (เดือนใช้ YYYY-MM)
 const bucketKey = (start: string, bucket: Bucket) => (bucket === "month" ? start.slice(0, 7) : start);
 
-// ผลล่าสุดของแต่ละคน/แต่ละแบบ ภายในชุดข้อมูลที่ให้มา
+// เลือกผลประเมินล่าสุดของแต่ละผู้ใช้ต่อแต่ละประเภทแบบประเมิน
 function latestPerUserType(rows: Row[]) {
   const m = new Map<string, Row>();
   for (const r of rows) {
@@ -126,10 +115,10 @@ function latestPerUserType(rows: Row[]) {
   return Array.from(m.values());
 }
 
-// ผลนี้อยู่ระดับความรุนแรงสูง (severity >= 2) หรือไม่
+// ตรวจว่าผลประเมินอยู่ในระดับความเสี่ยงสูง (severity >= 2)
 const high = (r: Row) => severityOf(r.name, r.risk_level) >= 2;
 
-// % ผู้ใช้ที่ผลล่าสุด (แบบใดแบบหนึ่ง) อยู่ระดับสูง
+// คำนวณสัดส่วนผู้ใช้ที่มีความเสี่ยงสูงจากผลล่าสุด
 function highShare(rows: Row[]) {
   const latest = latestPerUserType(rows);
   const users = new Set(latest.map((r) => r.user_id));
@@ -137,7 +126,7 @@ function highShare(rows: Row[]) {
   return { users: users.size, high: hi.size, pct: pct(hi.size, users.size) };
 }
 
-// จัดกลุ่มผลตามผู้ใช้+แบบประเมิน เรียงตามเวลา
+// จัดกลุ่มผลประเมินตามผู้ใช้+ประเภท และเรียงตามเวลา
 function seriesByUserType(rows: Row[]) {
   const m = new Map<string, Row[]>();
   for (const r of rows) {
@@ -150,9 +139,7 @@ function seriesByUserType(rows: Row[]) {
   return m;
 }
 
-/* อัตราประเมินซ้ำตามรอบ
-   ผลที่ "ครบกำหนดประเมินซ้ำ" ภายในช่วง [startMs, endMs) และพ้นช่วงผ่อนผันแล้ว
-   มีกี่ % ที่ผู้ใช้กลับมาทำแบบเดิมภายในกำหนด (+GRACE_DAYS) */
+// คำนวณอัตราการประเมินซ้ำตรงกำหนด (ตามกฎแจ้งเตือน + ช่วงผ่อนผัน) ในช่วงเวลา
 function onTimeRate(series: Map<string, Row[]>, typeId: number | null, startMs: number, endMs: number, nowMs: number) {
   let due = 0;
   let ok = 0;
@@ -171,17 +158,17 @@ function onTimeRate(series: Map<string, Row[]>, typeId: number | null, startMs: 
   return users.size >= MIN_GROUP ? pct(ok, due) : null;
 }
 
-// GET: คืนรายงานภาพรวมแบบไม่ระบุตัวตน กรองตามช่วงวันที่ แบบประเมิน เพศ และอายุ
+// API (เจ้าหน้าที่): สร้างรายงานสถิติตามช่วงวันที่/เพศ/อายุ เทียบช่วงก่อนหน้า พร้อมแนวโน้มและความเสี่ยง
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
   const p = new URL(request.url).searchParams;
 
+  // อ่านช่วงวันที่และตัวกรอง (ประเภท เพศ กลุ่มอายุ) จาก query
   const range = parseRange(p);
   if ("error" in range) return NextResponse.json({ success: false, message: range.error }, { status: 400 });
   const { from, to } = range;
   const days = spanDays(from, to);
-  // ช่วงก่อน: จบวันก่อนวันเริ่มเสมอ / เดือน·ไตรมาส·ปีเต็ม → เทียบกับเดือน·ไตรมาส·ปีก่อนหน้าแบบเต็ม
   const prevTo = addDays(from, -1);
   const prevFrom = previousPeriodStart(from, to, days);
   const lookback = addDays(prevFrom, -MAX_INTERVAL_DAYS);
@@ -193,12 +180,12 @@ export async function GET(request: NextRequest) {
 
   try {
     await loadCustomSeverities();
+    // ดึงประเภทแบบประเมิน ผลประเมิน และผู้ใช้ที่สมัคร (เฉพาะผู้ยินยอม) จาก DB
     const [typesRes, rowsRes, usersRes] = await Promise.all([
       pool.query(
         "SELECT assessment_type_id, assessment_name FROM assessment_types WHERE NOT (assessment_name = ANY($1)) ORDER BY assessment_type_id",
         [EXCLUDED_TYPES]
       ),
-      // ผลประเมินย้อนหลังพอสำหรับคำนวณ "ประเมินซ้ำตามรอบ" ของช่วงก่อนด้วย
       pool.query<Row>(
         `SELECT a.user_id, a.assessment_type_id AS type_id, t.assessment_name AS name, a.risk_level,
                 (EXTRACT(EPOCH FROM a.assessed_at AT TIME ZONE 'UTC') * 1000)::float8 AS ts,
@@ -213,7 +200,6 @@ export async function GET(request: NextRequest) {
             AND ($8 = 'all' OR t.assessment_type_id::text = $8)`,
         [...base, EXCLUDED_TYPES, lookback, to, typeParam]
       ),
-      // ผู้ใช้ที่สมัครในช่วงนี้และช่วงก่อน (ใช้กับ "ผู้ใช้ใหม่" และเส้นทางผู้ใช้)
       pool.query<{ user_id: number; day: string; has_profile: boolean }>(
         `SELECT u.user_id, to_char(${LOCAL_CREATED}, 'YYYY-MM-DD') AS day, hp.profile_id IS NOT NULL AS has_profile
            FROM users u
@@ -225,6 +211,7 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
+    // แยกผลช่วงปัจจุบัน/ก่อนหน้า แล้วคำนวณ KPI
     const rows = rowsRes.rows;
     const today = todayInBangkok();
     const nowMs = Date.now();
@@ -236,7 +223,6 @@ export async function GET(request: NextRequest) {
     const prev = rows.filter((r) => r.day >= prevFrom && r.day <= prevTo);
     const series = seriesByUserType(rows);
 
-    /* ---------- KPI ---------- */
     const curUsers = new Set(cur.map((r) => r.user_id)).size;
     const curHigh = highShare(cur);
     const onTimeCur = onTimeRate(series, null, startMs, endMs, nowMs);
@@ -248,35 +234,31 @@ export async function GET(request: NextRequest) {
       onTime: { pct: onTimeCur, change: diffPts(onTimeCur, onTimePrev) },
     };
 
-    /* ---------- แนวโน้มตามช่วงย่อย: ไม่เกิน 31 วัน → รายวัน, เกินนั้น → รายเดือน ---------- */
+    // สร้างกราฟแนวโน้มรายวัน/รายเดือน (จำนวนประเมิน + % เสี่ยงสูง)
     const bucket: Bucket = days <= 31 ? "day" : "month";
     const multiYear = from.slice(0, 4) !== to.slice(0, 4);
     const trend: { key: string; label: string; total: number; highPct: number | null; partial: boolean }[] = [];
     for (let s = bucketStart(from, bucket); s <= to; s = nextBucket(s, bucket)) {
-      const end = nextBucket(s, bucket); // วันแรกของช่วงถัดไป
+      const end = nextBucket(s, bucket);
       const inBucket = cur.filter((r) => r.day >= s && r.day < end);
       const key = bucketKey(s, bucket);
-      // วันจริงที่แท่งนี้ครอบคลุม (เดือนแรก/สุดท้ายอาจถูกตัดด้วยช่วงที่เลือก)
       const first = s < from ? from : s;
       const last = addDays(end, -1) > to ? to : addDays(end, -1);
       const clipped = first !== s || last !== addDays(end, -1);
       const baseLabel = bucketLabel(key, bucket, days, multiYear);
       trend.push({
         key,
-        // เดือนที่ไม่ครบ → บอกวันที่จริง เช่น "15–31 ส.ค."
         label: bucket === "month" && clipped ? `${Number(first.slice(8))}–${Number(last.slice(8))} ${baseLabel}` : baseLabel,
         total: inBucket.length,
         highPct: highShare(inBucket).pct,
-        // ช่วงย่อยที่ยังไม่จบ (เช่น เดือนปัจจุบัน / วันนี้) หรือถูกตัดด้วยวันเริ่ม/วันสิ้นสุดที่เลือก
         partial: clipped || (s <= today && today < end),
       });
     }
 
-    /* ---------- การใช้งานของผู้ใช้ ---------- */
+    // สถิติการใช้งาน: ผู้สมัครใหม่ ผู้ที่ผลดีขึ้น และ funnel การใช้งาน
     const signups = usersRes.rows.filter((u) => u.day >= from && u.day <= to);
     const prevSignups = usersRes.rows.filter((u) => u.day >= prevFrom && u.day <= prevTo).length;
 
-    // ผลดีขึ้นเมื่อประเมินซ้ำ: ผู้ใช้ที่ทำแบบเดิม ≥ 2 ครั้งในช่วงนี้ และผลครั้งหลังสุดดีกว่าครั้งแรกของช่วง (แบบใดแบบหนึ่ง)
     const repeaters = new Set<number>();
     const improvedUsers = new Set<number>();
     for (const list of seriesByUserType(cur).values()) {
@@ -287,7 +269,6 @@ export async function GET(request: NextRequest) {
       if (severityOf(last.name, last.risk_level) < severityOf(first.name, first.risk_level)) improvedUsers.add(first.user_id);
     }
 
-    // เส้นทางผู้ใช้: ผู้ที่สมัครในช่วงนี้ → กรอกข้อมูลสุขภาพ → ทำแบบประเมิน ≥ 1 ครั้ง → ประเมินซ้ำตามรอบอย่างน้อย 1 ครั้ง
     const signupIds = new Set(signups.map((u) => u.user_id));
     const assessedIds = new Set(rows.filter((r) => signupIds.has(r.user_id)).map((r) => r.user_id));
     const onTimeIds = new Set<number>();
@@ -312,10 +293,11 @@ export async function GET(request: NextRequest) {
       funnel: funnelCounts.map((f) => ({ ...f, pct: pct(f.n, signups.length) })),
     };
 
-    /* ---------- สัดส่วนเสี่ยงสูงตามช่วงอายุ (ใช้ผลล่าสุดของแต่ละคน) ---------- */
+    // ความเสี่ยงสูงแยกตามกลุ่มอายุ (กาย/จิต)
     const latest = latestPerUserType(cur);
     const byAge = AGE_GROUPS.map((g) => {
       const inGroup = latest.filter((r) => r.age !== null && r.age >= g.min && r.age <= g.max);
+      // คำนวณสัดส่วนความเสี่ยงสูงของกลุ่มอายุ แยกสุขภาพกาย/สุขภาพจิต
       const calc = (mental: boolean) => {
         const rs = inGroup.filter((r) => MENTAL.has(r.name) === mental);
         const users = new Set(rs.map((r) => r.user_id));
@@ -325,7 +307,7 @@ export async function GET(request: NextRequest) {
       return { label: g.label, physical: calc(false), mental: calc(true) };
     });
 
-    /* ---------- ปัญหาที่พบมาก: % ผู้ใช้ที่ผลล่าสุด "ควรระวัง" ขึ้นไป ---------- */
+    // ปัญหาสุขภาพที่พบความเสี่ยงมากที่สุด 5 อันดับ
     const issueMap = new Map<string, { users: number; risky: number }>();
     for (const r of latest) {
       const v = issueMap.get(r.name) ?? { users: 0, risky: 0 };
@@ -339,7 +321,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.pct - a.pct)
       .slice(0, 5);
 
-    /* ---------- สรุปรายแบบประเมิน ---------- */
+    // ตารางสรุปรายแบบประเมิน เทียบกับช่วงก่อนหน้า
     const summary = typesRes.rows
       .filter((t) => typeParam === "all" || String(t.assessment_type_id) === typeParam)
       .map((t) => {

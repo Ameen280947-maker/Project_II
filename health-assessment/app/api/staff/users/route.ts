@@ -4,21 +4,10 @@ import { logAccess, requireStaff, USER_ROLE_ID } from "@/lib/staff/auth";
 import { EXCLUDED_TYPES, typeLabel } from "@/lib/staff/riskLevels";
 import { logSystemError } from "@/lib/errorLogger";
 
-/* =========================================================
-   /api/staff/users
-   GET  ?status=all|active|inactive|suspended&q=&sort=recent|newest|most|name&page=1
-        → รายชื่อผู้ใช้ + จำนวนแต่ละแท็บ + KPI
-   GET  ?userId=<id>  → ข้อมูลบัญชีรายคน + จำนวนครั้งแยกตามแบบประเมิน + ประวัติการจัดการบัญชี
-                        (บันทึก access log: view_user_detail)
-   PATCH { userId, action: "suspend" | "activate", reason }
-   - เจ้าหน้าที่จัดการได้เฉพาะบัญชีผู้ใช้ทั่วไป (role_id = USER_ROLE_ID)
-   - ระบบเป็นการประเมินเบื้องต้นด้วยตนเอง: เจ้าหน้าที่เห็นเฉพาะข้อมูลบัญชีและ "จำนวนครั้ง"
-     ไม่ส่งผลประเมิน / ระดับความเสี่ยงรายบุคคลออกไปเด็ดขาด
-========================================================= */
-
+// จำนวนผู้ใช้ต่อหน้า
 const PAGE_SIZE = 8;
 
-// เงื่อนไขของแต่ละแท็บ (ค่าคงที่ ไม่ได้มาจากผู้ใช้)
+// เงื่อนไข SQL ของแต่ละตัวกรองสถานะผู้ใช้
 const STATUS_WHERE = {
   all: "TRUE",
   active: "x.is_active AND x.last_seen >= NOW() - INTERVAL '30 days'",
@@ -27,6 +16,7 @@ const STATUS_WHERE = {
 } as const;
 type StatusKey = keyof typeof STATUS_WHERE;
 
+// ORDER BY ของแต่ละรูปแบบการเรียง
 const SORTS = {
   recent: "x.last_seen DESC, x.user_id DESC",
   newest: "x.created_at DESC, x.user_id DESC",
@@ -35,8 +25,7 @@ const SORTS = {
 } as const;
 type SortKey = keyof typeof SORTS;
 
-// ผู้ใช้รายคน พร้อมจำนวนครั้งที่ประเมิน และเวลาใช้งานล่าสุด (สมัคร, ทำแบบประเมิน หรือเข้าสู่ระบบครั้งล่าสุด)
-// $1 = USER_ROLE_ID, $2 = EXCLUDED_TYPES
+// CTE พื้นฐาน: ผู้ใช้ทั่วไปพร้อมจำนวนการประเมิน และเวลาใช้งานล่าสุด (last_seen)
 const BASE = `
   WITH ac AS (
     SELECT a.user_id,
@@ -58,11 +47,12 @@ const BASE = `
      WHERE u.role_id = $1
   )`;
 
-// ตรวจว่าเป็นค่าแท็บสถานะที่รองรับหรือไม่
+// ตรวจว่าค่าที่ส่งมาเป็นตัวกรองสถานะที่รองรับ
 const isStatus = (v: string | null): v is StatusKey => !!v && Object.hasOwn(STATUS_WHERE, v);
-// ตรวจว่าเป็นค่าการเรียงลำดับที่รองรับหรือไม่
+// ตรวจว่าค่าที่ส่งมาเป็นรูปแบบการเรียงที่รองรับ
 const isSort = (v: string | null): v is SortKey => !!v && Object.hasOwn(SORTS, v);
 
+// แถวผู้ใช้ที่ได้จาก CTE BASE
 type Row = {
   user_id: number;
   username: string;
@@ -76,11 +66,11 @@ type Row = {
   last_seen: Date;
 };
 
-// หาสถานะบัญชี: ถูกระงับ / ไม่ได้ใช้งานเกิน 30 วัน / ใช้งานอยู่
+// ระบุสถานะผู้ใช้: ถูกระงับ / ไม่เคลื่อนไหวเกิน 30 วัน / ใช้งานอยู่
 const statusOf = (r: Row) =>
   !r.is_active ? "suspended" : new Date(r.last_seen).getTime() < Date.now() - 30 * 86_400_000 ? "inactive" : "active";
 
-// แปลงแถวจากฐานข้อมูลเป็นข้อมูลผู้ใช้ที่ส่งให้หน้าเว็บ
+// แปลงแถวจากฐานข้อมูลเป็นอ็อบเจกต์ผู้ใช้สำหรับส่งให้หน้าเว็บ
 const toUser = (r: Row) => ({
   userId: r.user_id,
   username: r.username,
@@ -91,7 +81,7 @@ const toUser = (r: Row) => ({
   status: statusOf(r),
 });
 
-// GET: คืนรายชื่อผู้ใช้ตามแท็บ/คำค้น/การเรียง พร้อม KPI หรือรายละเอียดรายคน (?userId)
+// API (เจ้าหน้าที่): คืนรายชื่อผู้ใช้แบบค้นหา/กรองสถานะ/เรียง/แบ่งหน้า หรือรายละเอียดถ้ามี userId
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -101,6 +91,7 @@ export async function GET(request: NextRequest) {
     const detailId = Number(p.get("userId") ?? p.get("user"));
     if (Number.isInteger(detailId) && detailId > 0) return userDetail(detailId, auth.staff.userId);
 
+    // อ่านตัวกรอง การเรียง คำค้น และหน้าจาก query
     const statusParam = p.get("status") ?? p.get("filter");
     const status: StatusKey = isStatus(statusParam) ? statusParam : "all";
     const sortParam = p.get("sort");
@@ -108,11 +99,11 @@ export async function GET(request: NextRequest) {
     const q = (p.get("q") ?? "").trim().slice(0, 100);
     const requestedPage = Math.max(1, Math.floor(Number(p.get("page"))) || 1);
 
-    // ค้นหาด้วย ILIKE แบบพารามิเตอร์ (escape อักขระพิเศษของ LIKE)
     const like = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
     const search = `($3 = '' OR x.username ILIKE $4 OR x.email ILIKE $4)`;
     const params = [USER_ROLE_ID, EXCLUDED_TYPES, q, like];
 
+    // นับ KPI รวม และจำนวนต่อแท็บสถานะตามคำค้น
     const [kpiRes, tabRes] = await Promise.all([
       pool.query(
         `${BASE}
@@ -137,6 +128,7 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
+    // คำนวณหน้าแล้วดึงรายชื่อผู้ใช้ของหน้านั้น
     const counts = tabRes.rows[0] as Record<StatusKey, number>;
     const total = counts[status];
     const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -168,7 +160,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ข้อมูลบัญชีรายคน จำนวนครั้งแยกตามแบบประเมิน และประวัติการจัดการบัญชี
+// ดึงรายละเอียดผู้ใช้ แบบประเมินที่ทำ ประวัติการจัดการบัญชี และบันทึกการเข้าดู
 async function userDetail(userId: number, staffId: number) {
   const { rows } = await pool.query<Row>(`${BASE} SELECT * FROM x WHERE x.user_id = $3`, [
     USER_ROLE_ID,
@@ -178,8 +170,8 @@ async function userDetail(userId: number, staffId: number) {
   const u = rows[0];
   if (!u) return NextResponse.json({ success: false, message: "ไม่พบผู้ใช้" }, { status: 404 });
 
+  // ดึงจำนวนการประเมินแยกประเภท และประวัติระงับ/เปิดบัญชี แล้วบันทึก log การเข้าดู
   const [typesRes, historyRes] = await Promise.all([
-    // จำนวนครั้งแยกตามแบบประเมิน (ไม่ดึงผลหรือระดับความเสี่ยง)
     pool.query(
       `SELECT t.assessment_name, COUNT(*)::int AS n
          FROM assessment a JOIN assessment_types t USING (assessment_type_id)
@@ -188,7 +180,6 @@ async function userDetail(userId: number, staffId: number) {
         ORDER BY n DESC, t.assessment_name`,
       [userId, EXCLUDED_TYPES]
     ),
-    // ประวัติการจัดการบัญชี (ระงับ / เปิดใช้งาน)
     pool.query(
       `SELECT l.action, l.detail, l.created_at, s.username AS staff_name
          FROM access_logs l LEFT JOIN users s ON s.user_id = l.staff_id
@@ -219,11 +210,12 @@ async function userDetail(userId: number, staffId: number) {
   });
 }
 
-// PATCH: ระงับ (ต้องระบุเหตุผล) หรือเปิดใช้งานบัญชีผู้ใช้ทั่วไป
+// API (เจ้าหน้าที่): ระงับหรือเปิดใช้งานบัญชีผู้ใช้ พร้อมเหตุผลและบันทึก access log
 export async function PATCH(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
 
+  // ตรวจข้อมูลที่ส่งมา: userId, action และเหตุผล (จำเป็นเมื่อระงับ)
   const body = await request.json().catch(() => ({}));
   const userId = Number(body.userId);
   const action = body.action;
@@ -237,6 +229,7 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
+    // อัปเดตสถานะบัญชีใน users แล้วบันทึก access log
     const { rowCount } = await pool.query(
       action === "suspend"
         ? "UPDATE users SET is_active = FALSE, suspended_reason = $3, suspended_at = NOW() WHERE user_id = $1 AND role_id = $2"

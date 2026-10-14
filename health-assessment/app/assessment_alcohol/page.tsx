@@ -15,22 +15,21 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ตัวเลือกคำตอบ (value ที่ส่งไป API และคะแนนของตัวเลือก)
 type Option = {
   value: number;
   text: string;
   score: number;
 };
 
+// คำถามหนึ่งข้อพร้อมรายการตัวเลือก
 type Question = {
   id: number;
   text: string;
   options: Option[];
 };
 
+// รูปแบบ response จาก POST /api/assessments/alcohol
 type SubmitResponse = {
   success: boolean;
   assessment_id?: number;
@@ -40,10 +39,7 @@ type SubmitResponse = {
   message?: string;
 };
 
-/* =========================================================
-   QUESTIONS
-========================================================= */
-
+// ชุดคำถามแบบคัดกรองการดื่มแอลกอฮอล์ 7 ข้อ พร้อมคะแนนของแต่ละตัวเลือก
 const QUESTIONS: Question[] = [
   {
     id: 1,
@@ -247,14 +243,11 @@ const QUESTIONS: Question[] = [
   },
 ];
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าแบบประเมินการดื่มแอลกอฮอล์: แสดงคำถามทีละข้อ แล้วส่งคำตอบไปคำนวณผล
+// หน้า: แบบประเมินการดื่มแอลกอฮอล์ ทีละข้อ
 export default function AlcoholAssessmentPage() {
   const router = useRouter();
 
+  // state ของหน้า: ข้อปัจจุบัน คำตอบ สถานะกำลังส่ง และ error
   const [currentQuestion, setCurrentQuestion] =
     useState(0);
 
@@ -267,6 +260,7 @@ export default function AlcoholAssessmentPage() {
   const [error, setError] =
     useState("");
 
+  // ค่าที่คำนวณจากข้อปัจจุบันและคำตอบข้อ 1 (ไม่เคยดื่ม/หยุดแล้ว/ยังดื่ม)
   const question =
     QUESTIONS[currentQuestion];
 
@@ -279,10 +273,6 @@ export default function AlcoholAssessmentPage() {
   const selectedValue =
     answers[question.id];
 
-  /* =====================================================
-     IF Q1 = NEVER / STOPPED
-  ====================================================== */
-
   const q1Answer = answers[1];
 
   const isNeverDrink =
@@ -294,16 +284,11 @@ export default function AlcoholAssessmentPage() {
   const isCurrentDrink =
     q1Answer === 3;
 
-  /* =====================================================
-     AUTO MOVE AFTER Q1
-  ====================================================== */
-
   useEffect(() => {
     if (
       currentQuestion === 0 &&
       (isNeverDrink || isStoppedDrink)
     ) {
-      // ไม่ต้องทำข้อ 2-7
       return;
     }
   }, [
@@ -312,10 +297,7 @@ export default function AlcoholAssessmentPage() {
     isStoppedDrink,
   ]);
 
-  /* =====================================================
-     PROGRESS
-  ====================================================== */
-
+  // เปอร์เซ็นต์ความคืบหน้า (100% ทันทีถ้าข้อ 1 ตอบไม่เคยดื่ม/หยุดแล้ว)
   const progress =
     useMemo(() => {
       if (
@@ -336,11 +318,7 @@ export default function AlcoholAssessmentPage() {
       isStoppedDrink,
     ]);
 
-  /* =====================================================
-     SELECT ANSWER
-  ====================================================== */
-
-  // บันทึกคำตอบของข้อที่เลือก และล้างข้อความแจ้งเตือน
+  // บันทึกคำตอบที่เลือกของข้อนั้นลง state และล้างข้อความ error
   const selectAnswer = (
     questionId: number,
     value: number,
@@ -353,11 +331,7 @@ export default function AlcoholAssessmentPage() {
     setError("");
   };
 
-  /* =====================================================
-     NEXT
-  ====================================================== */
-
-  // ไปข้อถัดไป หรือส่งผลทันทีถ้าข้อ 1 ตอบว่าไม่เคยดื่ม/เลิกดื่มแล้ว หรือเป็นข้อสุดท้าย
+  // ไปข้อถัดไป หรือส่งผลทันทีถ้าข้อแรกตอบว่าไม่ดื่ม/ถึงข้อสุดท้ายแล้ว
   const nextQuestion = () => {
     if (
       selectedValue === undefined
@@ -369,8 +343,6 @@ export default function AlcoholAssessmentPage() {
     }
 
     setError("");
-
-    /* Q1 never / stopped */
 
     if (
       question.id === 1 &&
@@ -394,11 +366,7 @@ export default function AlcoholAssessmentPage() {
     }
   };
 
-  /* =====================================================
-     BACK
-  ====================================================== */
-
-  // ย้อนกลับเฉพาะข้อคำถาม (ข้อ 1 ไม่มีปุ่มนี้)
+  // ย้อนกลับไปข้อก่อนหน้า
   const previousQuestion = () => {
     if (currentQuestion === 0) {
       return;
@@ -409,11 +377,7 @@ export default function AlcoholAssessmentPage() {
     );
   };
 
-  /* =====================================================
-     SUBMIT
-  ====================================================== */
-
-  // POST คำตอบไปบันทึกผลแอลกอฮอล์ แล้วพาไปหน้าคำแนะนำ
+  // ส่งคำตอบไป POST /api/assessments/alcohol แล้วพาไปหน้าผลลัพธ์
   const submitAssessment = async (
     finalAnswers: Record<
       number,
@@ -424,6 +388,7 @@ export default function AlcoholAssessmentPage() {
       setSubmitting(true);
       setError("");
 
+      // ตรวจ userId ใน localStorage ถ้าไม่ถูกต้องให้ไปหน้า login
       const storedUserId =
         localStorage.getItem("userId");
 
@@ -447,6 +412,7 @@ export default function AlcoholAssessmentPage() {
         return;
       }
 
+      // ส่งคำตอบไปบันทึกที่ API
       const username =
         localStorage.getItem(
           "username",
@@ -469,6 +435,7 @@ export default function AlcoholAssessmentPage() {
           },
         );
 
+      // ตรวจผลลัพธ์แล้วไปหน้าคำแนะนำ
       const data =
         (await response.json()) as SubmitResponse;
 
@@ -502,10 +469,6 @@ export default function AlcoholAssessmentPage() {
     }
   };
 
-  /* =====================================================
-     RENDER
-  ====================================================== */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
@@ -514,8 +477,7 @@ export default function AlcoholAssessmentPage() {
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-12">
           <div className="mx-auto max-w-4xl">
 
-            {/* HEADER */}
-
+            {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ความยินยอม และปุ่มย้อนกลับ */}
             <header className="mb-8 flex items-start justify-between gap-4">
               <div className="min-w-0">
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#8a5a00]">
@@ -530,15 +492,12 @@ export default function AlcoholAssessmentPage() {
               </h1>
               </div>
 
-              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
               <HealthConsentNotice />
               <AssessmentBackLink href="/assessment-menu-behavior" />
             </header>
-            {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
             <AssessmentSourceNote typeId={7} className="mt-3" />
 
-            {/* PROGRESS */}
-
+            {/* การ์ดแถบความคืบหน้า */}
             <section className="rounded-[28px] border border-[#eee5e6] bg-white p-5 shadow-[0_12px_35px_rgba(35,25,30,0.04)]">
 
               <div className="flex items-center justify-between">
@@ -568,8 +527,7 @@ export default function AlcoholAssessmentPage() {
               </div>
             </section>
 
-            {/* QUESTION */}
-
+            {/* การ์ดคำถามข้อปัจจุบัน */}
             <section className="mt-6 rounded-[30px] border border-[#eee5e6] bg-white p-6 shadow-[0_15px_45px_rgba(35,25,30,0.05)] sm:p-9">
 
               <div className="flex items-start gap-4">
@@ -590,8 +548,7 @@ export default function AlcoholAssessmentPage() {
 
               </div>
 
-              {/* OPTIONS */}
-
+              {/* รายการตัวเลือกคำตอบ */}
               <div className="mt-8 space-y-3">
 
                 {question.options.map(
@@ -645,8 +602,7 @@ export default function AlcoholAssessmentPage() {
 
               </div>
 
-              {/* SPECIAL MESSAGE */}
-
+              {/* ข้อความแจ้งข้ามข้อ 2–7 เมื่อข้อ 1 ตอบไม่เคยดื่ม/หยุดแล้ว */}
               {question.id === 1 &&
                 selectedValue === 1 && (
                   <div className="mt-6 rounded-2xl bg-[#eef8e9] p-5 text-sm leading-7 text-[#57965c]">
@@ -666,16 +622,13 @@ export default function AlcoholAssessmentPage() {
                   </div>
                 )}
 
-              {/* ERROR */}
-
               {error && (
                 <div className="mt-5 rounded-2xl bg-[#fff0f2] p-4 text-sm font-semibold text-[#b91c2b]">
                   {error}
                 </div>
               )}
 
-              {/* BUTTONS */}
-
+              {/* ปุ่มนำทาง ย้อนกลับ / ถัดไป / ส่งแบบประเมิน */}
               <div className="mt-8 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
 
                 {!isFirstQuestion && (

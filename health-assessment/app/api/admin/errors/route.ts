@@ -5,22 +5,16 @@ import { requireAdmin, serverError } from "@/lib/adminAuth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   แก้ไขข้อผิดพลาด
-
-   GET    /api/admin/errors?status=open|resolved|ignored|all&q=คำค้น
-   PATCH  /api/admin/errors   { logId, status, note }          → เปลี่ยนสถานะ
-   DELETE /api/admin/errors                                    → ล้างรายการที่แก้แล้วและข้ามไป
-========================================================= */
-
+// สถานะที่ใช้ได้ของ error log
 const STATUSES = ["open", "resolved", "ignored"] as const;
 
-// GET: คืนรายการข้อผิดพลาดของระบบ กรองตามสถานะและคำค้น
+// API: ดึงรายการ system_error_logs ตามสถานะ/คำค้น พร้อมจำนวนในแต่ละสถานะ
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
 
+    // สร้างเงื่อนไข WHERE จากสถานะและคำค้นที่ส่งมา
     const url = new URL(request.url);
     const status = url.searchParams.get("status") ?? "open";
     const q = (url.searchParams.get("q") ?? "").trim();
@@ -37,6 +31,7 @@ export async function GET(request: NextRequest) {
       where.push(`(e.source ILIKE $${params.length} OR e.message ILIKE $${params.length})`);
     }
 
+    // ดึงรายการ log (สูงสุด 200) และจำนวนแยกตามสถานะพร้อมกัน
     const [listRes, countRes] = await Promise.all([
       pool.query(
         `
@@ -64,12 +59,13 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH: เปลี่ยนสถานะและบันทึกโน้ตของรายการข้อผิดพลาด
+// API: อัปเดตสถานะและหมายเหตุการแก้ไขของ error log ที่ระบุ
 export async function PATCH(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
 
+    // ตรวจข้อมูลที่ส่งมา (logId, status, note)
     const body = await request.json().catch(() => ({}));
     const logId = Number(body.logId);
     const status = String(body.status ?? "");
@@ -82,6 +78,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
+    // อัปเดตสถานะใน DB (เปิดใหม่ = ล้างผู้แก้ไข/เวลา/หมายเหตุ)
     const isOpen = status === "open";
 
     const result = await pool.query(
@@ -110,7 +107,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE: ลบรายการข้อผิดพลาดที่แก้แล้วหรือข้ามไปทั้งหมด
+// API: ลบ error log ที่มีสถานะ resolved หรือ ignored ทั้งหมด
 export async function DELETE(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);

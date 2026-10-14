@@ -11,21 +11,16 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote, ResultSources } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   หน้ากลางสำหรับแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม
-   /assessment/<typeId>                 → ทำแบบประเมิน
-   /assessment/<typeId>?result=<id>     → ดูผล (ใช้จากหน้าประวัติด้วย)
-========================================================= */
-
+// ข้อมูลแบบประเมิน custom: ชื่อ คำอธิบาย และคำถามพร้อมตัวเลือก
 type Assessment = {
   id: number;
   name: string;
   description: string | null;
   questions: { id: number; text: string; choices: { id: number; text: string }[] }[];
-  // หน้าเมนูของหมวดที่แบบประเมินนี้อยู่
   menuHref?: string;
 };
 
+// ผลประเมินที่ได้จาก API (คะแนน ระดับ คำแนะนำ สายด่วน รอบประเมินซ้ำ)
 type Result = {
   assessmentId: number;
   name: string;
@@ -40,9 +35,10 @@ type Result = {
   assessedAt: string;
 };
 
+// ข้อความเมื่อไม่พบแบบประเมินหรือยังไม่เปิดใช้
 const NOT_FOUND_TEXT = "ไม่พบแบบประเมินนี้ หรือยังไม่เปิดให้ใช้งาน";
 
-// session หมดอายุ → ล้างข้อมูลแล้วกลับไปหน้า login
+// ถ้า response เป็น 401 ให้ลบ userId ใน localStorage แล้วพาไปหน้า login
 const toLoginOn401 = (res: Response, router: ReturnType<typeof useRouter>) => {
   if (res.status !== 401) return false;
   localStorage.removeItem("userId");
@@ -50,6 +46,7 @@ const toLoginOn401 = (res: Response, router: ReturnType<typeof useRouter>) => {
   return true;
 };
 
+// สีกล่องผลลัพธ์ตามระดับความรุนแรง (index = severity 0-3)
 const SEV_STYLE = [
   { box: "bg-[#eef8e9] border-[#d6ecd0]", text: "text-[#3f7f45]" },
   { box: "bg-[#fff8e8] border-[#f6e2b4]", text: "text-[#a77723]" },
@@ -57,7 +54,7 @@ const SEV_STYLE = [
   { box: "bg-[#ffe6ea] border-[#f2b9c2]", text: "text-[#8a1420]" },
 ];
 
-// หน้าแบบประเมินที่เจ้าหน้าที่สร้างเอง: วาง Sidebar และครอบเนื้อหาด้วย Suspense
+// หน้า: แบบประเมินที่เจ้าหน้าที่สร้างเอง (custom) ครอบด้วยเลย์เอาต์และ Suspense
 export default function CustomAssessmentPage() {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
@@ -75,17 +72,15 @@ export default function CustomAssessmentPage() {
   );
 }
 
-// อ่าน id จาก URL แล้วเลือกแสดงผลการประเมิน (?result=) หรือฟอร์มทำแบบประเมิน
+// เลือกแสดงฟอร์มทำแบบประเมิน หรือผลประเมินถ้ามีพารามิเตอร์ ?result
 function Content() {
   const params = useParams<{ id: string }>();
   const resultId = Number(useSearchParams().get("result")) || null;
   const typeId = Number(params.id);
-  // id ที่ไม่ใช่ตัวเลข (เช่น /assessment/abc) → แสดงข้อความเดียวกับ id ที่ไม่มีในระบบ
   if (!Number.isInteger(typeId) || typeId <= 0) {
     return <Message text={NOT_FOUND_TEXT} />;
   }
   if (resultId) return <ResultView key={resultId} assessmentId={resultId} typeId={typeId} />;
-  // ดูผลเก่าได้เสมอ แต่ถ้า staff ปิดแบบประเมินนี้อยู่ จะแจ้งเตือนทับหน้าทำแบบประเมิน
   return (
     <>
       <Form key={typeId} typeId={typeId} />
@@ -94,19 +89,17 @@ function Content() {
   );
 }
 
-/* =========================================================
-   ทำแบบประเมิน
-========================================================= */
-
-// ฟอร์มทำแบบประเมิน: โหลดคำถามตาม typeId ให้ผู้ใช้เลือกคำตอบแล้วส่งบันทึก
+// คอมโพเนนต์: โหลดคำถามจาก /api/assessments/custom ให้ผู้ใช้ตอบ และส่งคำตอบ
 function Form({ typeId }: { typeId: number }) {
   const router = useRouter();
+  // state: ข้อมูลแบบประเมิน คำตอบที่เลือก error และสถานะกำลังบันทึก
   const [data, setData] = useState<Assessment | null>(null);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [error, setError] = useState("");
   const [loadError, setLoadError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  // โหลดคำถามของแบบประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
     fetch(`/api/assessments/custom?type=${typeId}`, { cache: "no-store" })
       .then((r) => (toLoginOn401(r, router) ? null : r.json()))
@@ -120,7 +113,7 @@ function Form({ typeId }: { typeId: number }) {
 
   const answered = data ? data.questions.filter((q) => answers[q.id]).length : 0;
 
-  // ตรวจว่าตอบครบทุกข้อ แล้ว POST คำตอบไปบันทึก และพาไปหน้าแสดงผล
+  // ตรวจว่าตอบครบ แล้วส่งคำตอบไปบันทึกผล และเปิดหน้าผลประเมิน
   const submit = async () => {
     if (!data) return;
     const userId = localStorage.getItem("userId");
@@ -155,18 +148,19 @@ function Form({ typeId }: { typeId: number }) {
 
   return (
     <>
+      {/* ส่วนหัว: ชื่อแบบประเมิน คำอธิบาย และแหล่งอ้างอิง */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">Assessment</p>
           <h1 className="mt-3 text-3xl font-bold leading-tight sm:text-4xl">{data.name}</h1>
         </div>
-        {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
         <HealthConsentNotice />
         <AssessmentBackLink href={data.menuHref ?? "/assessment-type"} />
       </div>
       {data.description && <p className="mt-3 leading-7 text-[#8b8f98]">{data.description}</p>}
       <AssessmentSourceNote typeId={typeId} className="mt-2" />
 
+      {/* แถบความคืบหน้าการตอบ */}
       <div className="mt-6 h-2 overflow-hidden rounded-full bg-[#f1e9ea]" aria-hidden>
         <div className="h-full rounded-full bg-[#ef4962] transition-all" style={{ width: `${(answered / data.questions.length) * 100}%` }} />
       </div>
@@ -174,6 +168,7 @@ function Form({ typeId }: { typeId: number }) {
         ตอบแล้ว {answered} จาก {data.questions.length} ข้อ
       </p>
 
+      {/* รายการคำถามพร้อมตัวเลือกแบบ radio */}
       <div className="mt-6 space-y-5">
         {data.questions.map((q, i) => (
           <fieldset key={q.id} className="rounded-[26px] border border-[#eee8e9] bg-white p-6 shadow-[0_12px_35px_rgba(35,25,30,0.04)] sm:p-7">
@@ -217,6 +212,7 @@ function Form({ typeId }: { typeId: number }) {
         </div>
       )}
 
+      {/* ปุ่มกลับและปุ่มส่งแบบประเมิน */}
       <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
         <Link
           href={data.menuHref ?? "/assessment-type"}
@@ -237,16 +233,13 @@ function Form({ typeId }: { typeId: number }) {
   );
 }
 
-/* =========================================================
-   ผลการประเมิน
-========================================================= */
-
-// โหลดผลการประเมินตาม assessmentId แล้วแสดงระดับความเสี่ยง คะแนน และคำแนะนำ
+// คอมโพเนนต์: ดึงและแสดงผลประเมิน custom (คะแนน ระดับความเสี่ยง คำแนะนำ)
 function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: number }) {
   const router = useRouter();
   const [r, setR] = useState<Result | null>(null);
   const [error, setError] = useState("");
 
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
     const userId = localStorage.getItem("userId") ?? "";
     fetch(`/api/assessments/custom?assessmentId=${assessmentId}&userId=${userId}`, { cache: "no-store" })
@@ -271,6 +264,7 @@ function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: nu
         ประเมินเมื่อ {new Date(r.assessedAt).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" })}
       </p>
 
+      {/* กล่องสรุปผล: ระดับความเสี่ยงและคะแนน */}
       <div className={`mt-6 rounded-[26px] border p-6 sm:p-8 ${style.box}`}>
         <p className="text-sm font-semibold text-[#858991]">ผลการประเมินของคุณ</p>
         <p className={`mt-1 text-3xl font-black ${style.text}`}>{r.riskLevel}</p>
@@ -280,6 +274,7 @@ function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: nu
         </p>
       </div>
 
+      {/* การ์ดคำแนะนำ สายด่วน และรอบประเมินซ้ำ */}
       <div className="mt-5 rounded-[26px] border border-[#eee8e9] bg-white p-6 shadow-[0_12px_35px_rgba(35,25,30,0.04)] sm:p-7">
         <h2 className="flex items-center gap-2 text-lg font-bold">
           <ClipboardList size={20} className="text-[#b91c2b]" /> คำแนะนำ
@@ -298,6 +293,7 @@ function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: nu
 
       <p className="mt-4 text-xs leading-6 text-[#9a9ba2]">ผลนี้เป็นการคัดกรองเบื้องต้น ไม่ใช่การวินิจฉัยทางการแพทย์</p>
 
+      {/* ปุ่มดูประวัติและทำแบบประเมินอีกครั้ง */}
       <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
         <Link
           href="/history"
@@ -316,7 +312,7 @@ function ResultView({ assessmentId, typeId }: { assessmentId: number; typeId: nu
   );
 }
 
-// ไอคอนหมุนแสดงสถานะกำลังโหลด
+// คอมโพเนนต์: ไอคอนหมุนระหว่างกำลังโหลด
 function Spinner() {
   return (
     <div className="grid min-h-[50vh] place-items-center">
@@ -325,7 +321,7 @@ function Spinner() {
   );
 }
 
-// แสดงข้อความแจ้ง (เช่น ไม่พบแบบประเมิน) พร้อมลิงก์กลับไปเลือกแบบประเมิน
+// คอมโพเนนต์: แสดงข้อความแจ้ง พร้อมลิงก์กลับไปเลือกแบบประเมิน
 function Message({ text }: { text: string }) {
   return (
     <div className="grid min-h-[50vh] place-items-center text-center">

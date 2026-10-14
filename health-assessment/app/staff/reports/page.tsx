@@ -19,13 +19,10 @@ import {
   type TrendPoint,
 } from "../components/reports/ReportCharts";
 
-/* =========================================================
-   TYPES (ตรงกับ /api/staff/reports)
-   ค่า null = กลุ่มเล็กกว่าเกณฑ์ ไม่แสดงตัวเลขเพื่อป้องกันการระบุตัวบุคคล
-========================================================= */
-
+// หน่วยการจัดกลุ่มของกราฟแนวโน้ม
 type Bucket = "day" | "week" | "month";
 
+// โครงข้อมูลรายงานจาก /api/staff/reports (KPI แนวโน้ม การใช้งาน กลุ่มอายุ ปัญหาเด่น สรุปรายแบบประเมิน)
 type Report = {
   minGroup: number;
   range: { from: string; to: string; prevFrom: string; prevTo: string; days: number; bucket: Bucket; current: boolean };
@@ -47,27 +44,26 @@ type Report = {
   summary: { label: string; count: number; users: number | null; highPct: number | null; change: number | null; onTime: number | null }[];
 };
 
+// ตัวชี้วัดที่เลือกแสดงในกราฟแนวโน้ม (จำนวนครั้ง หรือ % เสี่ยงสูง)
 type Metric = "total" | "highPct";
 
+// ข้อความหัวข้อ/หน่วย/หมายเหตุช่วงไม่ครบ ของกราฟแนวโน้มตามหน่วยเวลา
 const BUCKET_TEXT: Record<Bucket, { title: string; unit: string; partial: string }> = {
   month: { title: "แนวโน้มรายเดือน", unit: "เดือน", partial: "เดือนปัจจุบันซึ่งยังไม่ครบเดือน" },
   week: { title: "แนวโน้มรายสัปดาห์", unit: "สัปดาห์", partial: "สัปดาห์ปัจจุบันซึ่งยังไม่ครบสัปดาห์" },
   day: { title: "แนวโน้มรายวัน", unit: "วัน", partial: "วันนี้ซึ่งยังไม่สิ้นสุดวัน" },
 };
 
-// จัดรูปแบบตัวเลขแบบไทย
+// จัดรูปแบบตัวเลขแบบไทยมีคอมมาคั่น
 const num = (n: number) => n.toLocaleString("th-TH");
 
-// ▲ +12.5% / ▼ 3% / 0% · suffix เช่น "%" หรือ " จุด"
+// แปลงค่าการเปลี่ยนแปลงเป็นข้อความพร้อมลูกศร ▲/▼ (null ถ้าไม่มีข้อมูล)
 const delta = (v: number | null, suffix = "%") =>
   v === null ? null : v > 0 ? `▲ +${num(v)}${suffix}` : v < 0 ? `▼ ${num(Math.abs(v))}${suffix}` : `0${suffix}`;
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้ารายงานและสถิติ: เลือกช่วงเวลา/ตัวกรอง โหลดรายงาน แสดงกราฟ ตาราง และส่งออก CSV/PDF
+// หน้า: รายงานและสถิติแบบไม่ระบุตัวตน กรองตามช่วงเวลา/แบบประเมิน/เพศ/อายุ จาก /api/staff/reports
 export default function ReportsPage() {
+  // state ตัวกรอง (ช่วงวันที่ แบบประเมิน เพศ อายุ) และข้อมูลรายงาน
   const dr = useDateRange();
   const { range } = dr;
   const [type, setType] = useState("all");
@@ -81,6 +77,7 @@ export default function ReportsPage() {
   const qs = new URLSearchParams({ from: range.from, to: range.to, type, gender, age }).toString();
   const loading = !range.invalid && loadedKey !== qs;
 
+  // โหลดรายงานจาก /api/staff/reports ทุกครั้งที่ตัวกรองเปลี่ยน
   useEffect(() => {
     if (range.invalid) return;
     let cancelled = false;
@@ -97,17 +94,20 @@ export default function ReportsPage() {
     };
   }, [qs, range.invalid]);
 
+  // ข้อความสรุปตัวกรองที่เลือก (ใช้ในหัวรายงานและไฟล์ CSV)
   const typeText = type === "all" ? "ทุกแบบประเมิน" : (data?.filters.types.find((t) => String(t.id) === type)?.label ?? "-");
   const genderText = { all: "ทุกเพศ", male: "ชาย", female: "หญิง" }[gender] ?? "-";
   const ageText = age === "all" ? "ทุกช่วงอายุ" : (data?.filters.ageGroups.find((g) => g.key === age)?.label ?? "-");
   const periodText = data ? rangeText(data.range.from, data.range.to) : rangeText(range.from, range.to);
   const prevText = data ? rangeText(data.range.prevFrom, data.range.prevTo) : "";
 
-  // ส่งออกรายงานตามตัวกรองปัจจุบันเป็นไฟล์ CSV
+  // ส่งออกรายงานที่กำลังแสดง (KPI แนวโน้ม กลุ่มอายุ สรุปรายแบบประเมิน) เป็นไฟล์ CSV
+  // ประกอบแถวตามลำดับหัวข้อในหน้า แล้วเรียก downloadCsv ตั้งชื่อไฟล์ตามช่วงวันที่
   const exportCsv = () => {
     if (!data) return;
     const { kpi, usage, range: r } = data;
     const bt = BUCKET_TEXT[r.bucket];
+    // แทนค่าว่างด้วย "–" ในไฟล์ CSV
     const dash = (v: number | null | undefined) => (v === null || v === undefined ? "–" : v);
     downloadCsv(`report_${r.from}_${r.to}.csv`, [
       [`ช่วงข้อมูล ${rangeText(r.from, r.to)} (${r.from} ถึง ${r.to})`],
@@ -148,12 +148,14 @@ export default function ReportsPage() {
     ]);
   };
 
+  // ค่าที่คำนวณสำหรับกราฟแนวโน้ม
   const bt = BUCKET_TEXT[data?.range.bucket ?? "month"];
   const trendEmpty = !!data && data.trend.every((t) => (metric === "total" ? t.total === 0 : t.highPct === null));
   const hasPartial = !!data?.trend.some((t) => t.partial);
 
   return (
     <div className="flex flex-col gap-6">
+      {/* หัวหน้าเพจ พร้อมปุ่มส่งออก CSV / พิมพ์ PDF */}
       <PageHeader
         eyebrow="REPORTS"
         title="รายงานและ"
@@ -171,7 +173,7 @@ export default function ReportsPage() {
         }
       />
 
-      {/* FILTERS */}
+      {/* แถบตัวกรอง: ช่วงวันที่ แบบประเมิน เพศ ช่วงอายุ */}
       <Card className="staff-no-print">
         <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))] lg:items-start">
           <div className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-staff-muted sm:col-span-3 lg:col-span-1">
@@ -217,7 +219,6 @@ export default function ReportsPage() {
         </div>
       </Card>
 
-      {/* ตัวกรองที่ใช้ (แสดงเฉพาะตอนพิมพ์) */}
       <p className="hidden text-sm text-staff-muted print:block">
         ช่วงเวลา {periodText} (เทียบกับ {prevText}) · {typeText} · {genderText} · {ageText}
       </p>
@@ -225,7 +226,7 @@ export default function ReportsPage() {
       <ErrorBox message={error} />
 
       <div className={`flex flex-col gap-4 transition-opacity ${loading ? "opacity-60" : ""}`}>
-        {/* KPI */}
+        {/* การ์ด KPI หลัก */}
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             label="การประเมินทั้งหมด"
@@ -250,7 +251,7 @@ export default function ReportsPage() {
           />
         </div>
 
-        {/* TREND */}
+        {/* กราฟแนวโน้ม (สลับจำนวนครั้ง / % เสี่ยงสูง) */}
         <Card>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -271,7 +272,6 @@ export default function ReportsPage() {
               />
             </div>
           </div>
-          {/* ระหว่างโหลดช่วงใหม่ ไม่แสดงแท่งของช่วงเดิม (กันกราฟไม่ตรงกับช่วงที่เลือก) */}
           {loading ? (
             <div className="h-56 animate-pulse rounded-2xl bg-staff-soft" />
           ) : (
@@ -295,7 +295,7 @@ export default function ReportsPage() {
           )}
         </Card>
 
-        {/* USAGE */}
+        {/* การใช้งานของผู้ใช้ และกราฟกรวยเส้นทางผู้ใช้ */}
         <Card>
           <h2 className="mb-4 text-lg font-bold">การใช้งานของผู้ใช้</h2>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -324,7 +324,7 @@ export default function ReportsPage() {
         </Card>
 
         <div className="flex flex-wrap gap-4">
-          {/* BY AGE */}
+          {/* กราฟความเสี่ยงสูงแยกตามช่วงอายุ */}
           <Card className="flex-[3_1_480px]">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <h2 className="text-lg font-bold">ความเสี่ยงสูง แยกตามช่วงอายุ</h2>
@@ -337,7 +337,7 @@ export default function ReportsPage() {
             <p className="mt-3 text-xs text-staff-muted">ร้อยละของผู้ใช้ในแต่ละช่วงอายุที่ผลล่าสุดอยู่ระดับสูง · – = ผู้ใช้น้อยกว่า {data?.minGroup ?? 5} คน</p>
           </Card>
 
-          {/* TOP ISSUES */}
+          {/* อันดับปัญหาสุขภาพที่พบมากที่สุด */}
           <Card className="flex-[2_1_320px]">
             <h2 className="mb-4 text-lg font-bold">ปัญหาสุขภาพที่พบมากที่สุด</h2>
             {data && (data.topIssues.length ? <RankedBars items={data.topIssues} /> : <Empty>ข้อมูลยังไม่พอสำหรับสรุป</Empty>)}
@@ -345,7 +345,7 @@ export default function ReportsPage() {
           </Card>
         </div>
 
-        {/* SUMMARY TABLE */}
+        {/* ตารางสรุปรายแบบประเมิน */}
         <Card>
           <h2 className="mb-3 text-lg font-bold">สรุปรายแบบประเมิน</h2>
           <div className="-mx-2 overflow-x-auto px-2">
@@ -396,7 +396,7 @@ export default function ReportsPage() {
   );
 }
 
-// ช่อง select ตัวกรองพร้อมป้ายกำกับ
+// ช่อง select สำหรับตัวกรองรายงานพร้อมป้ายชื่อ
 function Filter({ label, value, onChange, children }: { label: string; value: string; onChange: (v: string) => void; children: ReactNode }) {
   return (
     <label className="flex min-w-0 flex-col gap-1 text-xs font-semibold text-staff-muted">
@@ -408,7 +408,7 @@ function Filter({ label, value, onChange, children }: { label: string; value: st
   );
 }
 
-// ป้ายเปลี่ยนแปลงเทียบช่วงก่อน (ตัวอักษรสีเข้ม ใช้ลูกศรบอกทิศ)
+// ข้อความเทียบกับช่วงก่อน หรือข้อความสำรองเมื่อไม่มีค่า
 function DeltaNote({ text, fallback }: { text: string | null; fallback: string }) {
   if (!text) return <>{fallback}</>;
   return (
@@ -418,7 +418,7 @@ function DeltaNote({ text, fallback }: { text: string | null; fallback: string }
   );
 }
 
-// value = null → ยังไม่มีข้อมูล (เช่น ข้อมูลการเปิดทำแบบประเมินเพิ่งเริ่มเก็บ)
+// กล่องสถิติย่อย แสดง "ยังไม่มีข้อมูล" เมื่อค่าเป็น null
 function MiniStat({ label, value, note }: { label: string; value: string | null; note: ReactNode }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-2xl border border-staff-line bg-staff-soft px-4 py-3.5">

@@ -11,29 +11,20 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   สำรองข้อมูล (JSON)
-
-   GET  /api/admin/backup
-        → ประวัติการสำรอง 50 ครั้งล่าสุด
-
-   POST /api/admin/backup
-        → สำรองทุกตาราง ส่งไฟล์ JSON กลับไปให้ดาวน์โหลด และบันทึกลง backup_history
-          ไม่รวมข้อมูลลับ (รหัสผ่านที่เข้ารหัส, token รีเซ็ตรหัสผ่าน)
-========================================================= */
-
-// ตารางที่ไม่สำรอง และคอลัมน์ที่ตัดออกจากไฟล์
+// ตารางที่ไม่ต้องสำรอง (token รีเซ็ตรหัสผ่าน)
 const SKIP_TABLES = new Set(["password_reset_tokens"]);
+// คอลัมน์ลับที่ต้องตัดออกจากไฟล์สำรอง แยกตามตาราง
 const SECRET_COLUMNS: Record<string, string[]> = {
   users: ["password_hash"],
 };
 
-// GET: คืนประวัติการสำรองข้อมูล 50 รายการล่าสุด (เฉพาะแอดมิน)
+// API: ดึงประวัติการสำรองข้อมูล 50 รายการล่าสุดจากตาราง backup_history (เฉพาะ Admin)
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
 
+    // ดึงประวัติล่าสุดพร้อมชื่อผู้สั่งสำรอง
     const historyRes = await pool.query(
       `
       SELECT b.*, u.username AS created_by_name
@@ -51,8 +42,9 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST: สำรองข้อมูลทุกตาราง (ตัดคอลัมน์ลับ) เป็นไฟล์ JSON ให้ดาวน์โหลด และบันทึกประวัติ
+// API: ดึงข้อมูลทุกตาราง (ตัดคอลัมน์ลับ) ออกเป็นไฟล์ JSON ให้ดาวน์โหลด และบันทึกประวัติการสำรอง
 export async function POST(request: NextRequest) {
+  // ตรวจสิทธิ์ Admin
   const auth = await requireAdmin(request).catch((error) => {
     console.error(error);
     return null;
@@ -60,9 +52,9 @@ export async function POST(request: NextRequest) {
   if (!auth) return serverError("ตรวจสิทธิ์ไม่สำเร็จ", "auth failed");
   if (!auth.ok) return auth.response;
 
+  // เลือกตารางที่จะสำรอง และตั้งชื่อไฟล์ตามเวลาไทย
   const selected = (await listPublicTables()).filter((t) => !SKIP_TABLES.has(t));
 
-  // ชื่อไฟล์ใช้เวลาไทย ให้ตรงกับเวลาที่แสดงในประวัติ
   const stamp = new Date(Date.now() + 7 * 60 * 60 * 1000)
     .toISOString()
     .replace(/[:.]/g, "-")
@@ -70,9 +62,9 @@ export async function POST(request: NextRequest) {
   const fileName = `health-backup-${stamp}.json`;
   const note = null;
 
-  // ใช้ REPEATABLE READ ให้ทุกตารางเป็นภาพเดียวกัน ณ เวลาเดียว
   const client = await pool.connect();
   try {
+    // อ่านข้อมูลทุกตารางใน transaction แบบอ่านอย่างเดียว (snapshot เดียวกัน) และตัดคอลัมน์ลับ
     await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
 
     const data: Record<string, unknown[]> = {};
@@ -95,6 +87,7 @@ export async function POST(request: NextRequest) {
 
     await client.query("COMMIT");
 
+    // สร้างเนื้อหาไฟล์ JSON (meta + data)
     const payload = JSON.stringify(
       {
         meta: {
@@ -113,6 +106,7 @@ export async function POST(request: NextRequest) {
       2,
     );
 
+    // บันทึกประวัติการสำรองสำเร็จลง backup_history
     const sizeBytes = Buffer.byteLength(payload, "utf8");
 
     await pool.query(
@@ -124,6 +118,7 @@ export async function POST(request: NextRequest) {
       [auth.admin.user_id, fileName, selected, totalRows, sizeBytes, note],
     );
 
+    // ส่งไฟล์กลับเป็น attachment ให้ browser ดาวน์โหลด
     return new NextResponse(payload, {
       status: 200,
       headers: {
@@ -134,6 +129,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    // จัดการ error: rollback บันทึก log และบันทึกประวัติว่าล้มเหลว
     await client.query("ROLLBACK").catch(() => {});
     console.error("ADMIN BACKUP POST ERROR:", error);
     await logSystemError("POST /api/admin/backup", error);

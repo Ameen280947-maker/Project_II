@@ -1,18 +1,11 @@
 "use client";
 
-/* =========================================================
-   fetch สำหรับหน้า Staff
-   - ตัวตนจริงอยู่ที่ cookie session_staff (เบราว์เซอร์แนบให้เอง)
-   - แนบ x-staff-id ไปด้วยให้ server เช็คว่าตรงกับ cookie
-   - ค่าของ staff เก็บใน staffUserId / staffUsername แยกจากของผู้ใช้ทั่วไป
-========================================================= */
-
-// ลบข้อมูล staff (staffUserId / staffUsername) ออกจาก localStorage
+// ลบข้อมูลเจ้าหน้าที่ที่เก็บใน localStorage
 export function clearStaffSession() {
   ["staffUserId", "staffUsername"].forEach((k) => localStorage.removeItem(k));
 }
 
-// เรียก API ฝั่ง staff แบบไม่ใช้ cache แนบ x-staff-id และ throw error ถ้าสถานะไม่ ok
+// เรียก API ฝั่งเจ้าหน้าที่ แนบ header x-staff-id และ throw ข้อความ error ถ้าไม่สำเร็จ
 export async function staffFetch<T = unknown>(url: string, init: RequestInit = {}): Promise<T> {
   const staffId = typeof window !== "undefined" ? localStorage.getItem("staffUserId") : null;
   const res = await fetch(url, {
@@ -31,7 +24,7 @@ export async function staffFetch<T = unknown>(url: string, init: RequestInit = {
   return json as T;
 }
 
-// แปลงเวลาเป็นข้อความแบบ "x นาทีที่แล้ว" / "เมื่อวาน" หรือวันที่แบบไทยถ้าเกิน 7 วัน
+// แปลงเวลาเป็นข้อความแบบสัมพัทธ์ เช่น "5 นาทีที่แล้ว", "เมื่อวาน"
 export const relativeTime = (iso: string) => {
   const diff = (Date.now() - new Date(iso).getTime()) / 1000;
   if (diff < 60) return "เมื่อสักครู่";
@@ -43,8 +36,9 @@ export const relativeTime = (iso: string) => {
   return new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 };
 
-// ดาวน์โหลดตารางเป็น CSV (มี BOM ให้ Excel อ่านภาษาไทยได้)
+// สร้างไฟล์ CSV (UTF-8 BOM รองรับภาษาไทยใน Excel) จากข้อมูลแถวแล้วสั่งดาวน์โหลด
 export function downloadCsv(filename: string, rows: (string | number)[][]) {
+  // ครอบค่าด้วยเครื่องหมายคำพูดเมื่อมี , " หรือขึ้นบรรทัดใหม่
   const esc = (v: string | number) => {
     const s = String(v ?? "");
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

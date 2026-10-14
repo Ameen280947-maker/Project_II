@@ -2,23 +2,22 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import pool from "@/lib/db";
 
+// เงื่อนไขความยาวชื่อผู้ใช้ และรูปแบบอีเมลที่ยอมรับ
 const USERNAME_MIN = 3;
 const USERNAME_MAX = 30;
-// ต้องมีโดเมนท้าย เช่น .com .ac.th
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
-// POST: ตรวจข้อมูลสมัครสมาชิก แฮชรหัสผ่าน แล้วสร้างบัญชีผู้ใช้ใหม่
+// API: สมัครสมาชิก ตรวจข้อมูล/ความยินยอม hash รหัสผ่าน แล้วสร้าง users และ user_settings
 export async function POST(request: NextRequest) {
   try {
+    // ตรวจข้อมูลที่ส่งมา: ครบ ยินยอม ชื่อผู้ใช้ อีเมล และรหัสผ่าน
     const body = await request.json();
 
     const username = String(body.username || "").trim();
     const email = String(body.email || "").trim().toLowerCase();
     const password = String(body.password || "");
-    // ความยินยอมให้เก็บและประมวลผลข้อมูลสุขภาพ (จำเป็น) ตรงกับหน้าการตั้งค่า
     const consentHealth = body.consentHealth === true;
 
-    // ตรวจสอบข้อมูล
     if (!username || !email || !password) {
       return NextResponse.json(
         {
@@ -37,7 +36,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // กติกาเดียวกับ /api/settings/account
     if (username.length < USERNAME_MIN || username.length > USERNAME_MAX) {
       return NextResponse.json(
         {
@@ -47,7 +45,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // หน้าเข้าสู่ระบบตัดช่องว่างหัวท้าย จึงไม่ให้มีช่องว่างในชื่อ
     if (/\s/.test(username)) {
       return NextResponse.json(
         {
@@ -84,7 +81,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // ตรวจสอบ username/email ซ้ำ (ไม่สนตัวพิมพ์เล็ก-ใหญ่)
+    // ตรวจว่าชื่อผู้ใช้หรืออีเมลถูกใช้ไปแล้วหรือไม่
     const existingUser = await pool.query(
       `
       SELECT user_id
@@ -105,13 +102,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hash password
+    // hash รหัสผ่าน แล้วสร้าง users + user_settings (ความยินยอม) ใน transaction
     const passwordHash = await bcrypt.hash(password, 12);
 
-    // User ที่สมัครเองจะเป็น role_id = 2
     const roleId = 2;
 
-    // บันทึกผู้ใช้ และความยินยอมใน user_settings พร้อมกัน (สำเร็จทั้งคู่หรือไม่บันทึกเลย)
     const client = await pool.connect();
     let result;
     try {
@@ -132,7 +127,6 @@ export async function POST(request: NextRequest) {
         [username, passwordHash, email, roleId]
       );
 
-      // เก็บเวลาที่ตัดสินใจไว้ เหมือนตอนเปลี่ยนในหน้าการตั้งค่า
       await client.query(
         `
         INSERT INTO user_settings (
@@ -164,7 +158,7 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    // กันกรณีสมัครชื่อ/อีเมลเดียวกันพร้อมกัน (unique constraint)
+    // จัดการ error: ข้อมูลซ้ำ (23505) → 409 อื่น ๆ → 500
     if ((error as { code?: string }).code === "23505") {
       return NextResponse.json(
         {

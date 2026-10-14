@@ -12,16 +12,14 @@ import RecommendationLayout, {
   type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้าและลิงก์กลับไปทำแบบประเมินใหม่
 const TONE = "amber";
 const EDIT_HREF = "/assessment_alcohol";
 
-// คะแนนเต็มของแบบประเมิน (ผลรวมคะแนนสูงสุดของข้อ 2-7)
+// คะแนนเต็มของแบบประเมินการดื่ม ใช้คำนวณสัดส่วนวงคะแนน
 const MAX_SCORE = 39;
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// แถวผลประเมินจากตาราง assessments (คะแนน ระดับ คำแนะนำ)
 type Assessment = {
   assessment_id: number;
   user_id: number;
@@ -32,6 +30,7 @@ type Assessment = {
   assessed_at: string;
 };
 
+// คำตอบรายข้อของผู้ใช้ที่ API ส่งมาพร้อมผลประเมิน
 type Answer = {
   answer_id?: number;
   assessment_id: number;
@@ -44,6 +43,7 @@ type Answer = {
   answer_score: number | string;
 };
 
+// รูปแบบ response ของ API ผลประเมิน
 type ResultResponse = {
   success: boolean;
   assessment?: Assessment;
@@ -51,11 +51,7 @@ type ResultResponse = {
   message?: string;
 };
 
-/* =========================================================
-   PAGE WRAPPER
-========================================================= */
-
-// หน้าผลและคำแนะนำการดื่มแอลกอฮอล์: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลและคำแนะนำการประเมินการดื่มแอลกอฮอล์ ครอบด้วย Suspense
 export default function AlcoholRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -64,26 +60,21 @@ export default function AlcoholRecommendationPage() {
   );
 }
 
-/* =========================================================
-   CONTENT
-========================================================= */
-
-// เนื้อหาหน้าผลแอลกอฮอล์: โหลดผลตาม assessmentId แล้วแสดงระดับความเสี่ยงและคำแนะนำ
+// เนื้อหาหน้า: แสดงคะแนน ระดับความเสี่ยงการดื่ม และคำแนะนำตาม assessmentId
 function AlcoholRecommendationContent() {
   const searchParams = useSearchParams();
 
   const assessmentId = searchParams.get("assessmentId");
 
+  // state ของหน้า: ผลประเมิน สถานะโหลด และ error
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  /* =====================================================
-     LOAD RESULT
-  ====================================================== */
-
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
-    // ตรวจ assessmentId แล้วโหลดผลประเมินแอลกอฮอล์จาก API
+    // ดึงผลประเมินจาก /api/assessments/alcohol (401 → ลบ userId แล้วไปหน้า login)
+    // ขั้นตอน: ตรวจ assessmentId เป็นจำนวนเต็มบวก → fetch → ตรวจ success → เก็บผลลง state
     const loadResult = async () => {
       try {
         setLoading(true);
@@ -107,7 +98,6 @@ function AlcoholRecommendationContent() {
           },
         );
 
-        // session หมดอายุ → กลับไปหน้า login
         if (response.status === 401) {
           localStorage.removeItem("userId");
           window.location.replace("/login");
@@ -137,11 +127,7 @@ function AlcoholRecommendationContent() {
     void loadResult();
   }, [assessmentId]);
 
-  /* =====================================================
-     RESULT
-     ไม่เคยดื่ม / หยุดดื่มแล้ว / 0-10 ต่ำ / 11-26 ปานกลาง / 27+ สูง
-  ====================================================== */
-
+  // แปลผลคะแนน/risk_level เป็นระดับ ข้อความ และสี (ไม่เคยดื่ม/หยุดดื่มไม่มีคะแนน, ≤10 ต่ำ, ≤26 ปานกลาง, ที่เหลือสูง)
   const result = useMemo((): {
     title: string;
     subtitle: string;
@@ -199,6 +185,7 @@ function AlcoholRecommendationContent() {
     };
   }, [assessment]);
 
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -210,10 +197,7 @@ function AlcoholRecommendationContent() {
   const score = Number(assessment.total_score ?? 0);
   const t = RECOMMENDATION_TONES[TONE];
 
-  /* =====================================================
-     RENDER
-  ====================================================== */
-
+  // ส่วนแสดงผล: วงคะแนน สรุปผล และคำแนะนำ
   return (
     <RecommendationLayout
       tone={TONE}
@@ -245,10 +229,8 @@ function AlcoholRecommendationContent() {
       editHref={EDIT_HREF}
       menuHref="/assessment-menu-behavior"
     >
-      {/* =================================================
-          เกณฑ์การแปลผล
-      ================================================== */}
 
+      {/* เกณฑ์การแปลผล 3 ระดับ ไฮไลต์ระดับของผู้ใช้ */}
       <RecommendationSection
         icon={<ClipboardList size={27} className={t.eyebrow} />}
         title="เกณฑ์การแปลผล"
@@ -279,10 +261,7 @@ function AlcoholRecommendationContent() {
   );
 }
 
-/* =========================================================
-   RISK BOX (สีตามความหมายของระดับความเสี่ยง)
-========================================================= */
-
+// คลาสสีของกล่องระดับความเสี่ยง แยกแบบปกติ/แบบที่ไฮไลต์
 const RISK_BOX_STYLES = {
   green: {
     normal: "border-[#e0eee0] bg-[#f7fbf5] text-[#57965c]",
@@ -298,7 +277,7 @@ const RISK_BOX_STYLES = {
   },
 };
 
-// กล่องแสดงช่วงคะแนนและระดับความเสี่ยง ไฮไลต์เมื่อตรงกับผลของผู้ใช้
+// กล่องแสดงช่วงคะแนนและระดับความเสี่ยงหนึ่งระดับ (ไฮไลต์ถ้าเป็นระดับของผู้ใช้)
 function RiskBox({
   range,
   title,

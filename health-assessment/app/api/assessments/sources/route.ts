@@ -3,17 +3,10 @@ import pool from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { logSystemError } from "@/lib/errorLogger";
 
-/* =========================================================
-   แหล่งอ้างอิงที่เจ้าหน้าที่กรอกไว้ (แสดงฝั่งผู้ใช้)
-   GET ?typeId=<id>        → แหล่งอ้างอิงของแบบประเมิน (หน้าทำแบบประเมิน, ไม่ต้องล็อกอิน)
-   GET ?assessmentId=<id>  → แหล่งอ้างอิงของแบบประเมิน + ของคำแนะนำที่ได้ (หน้าผล, เฉพาะเจ้าของผล)
-     คำแนะนำใช้ฉบับที่ใช้อยู่ตอนทำแบบประเมิน (recommendation_at) เหมือนข้อความคำแนะนำ
-========================================================= */
-
-// ตัดช่องว่างหัวท้าย คืน null ถ้าไม่ใช่ข้อความหรือเป็นค่าว่าง
+// ตัดช่องว่างข้อความแหล่งอ้างอิง ถ้าว่างหรือไม่ใช่ string คืน null
 const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
 
-// GET: คืนแหล่งอ้างอิงของแบบประเมิน (typeId) หรือของผลประเมิน+คำแนะนำ (assessmentId)
+// API: ดึงแหล่งอ้างอิง (source) ของแบบประเมินตาม typeId หรือตามผลประเมิน assessmentId ของผู้ใช้
 export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
   const typeId = Number(p.get("typeId"));

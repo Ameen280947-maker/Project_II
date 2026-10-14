@@ -5,21 +5,16 @@ import { useRouter } from "next/navigation";
 import StaffSidebar from "./components/StaffSidebar";
 import { clearStaffSession } from "@/lib/staff/client";
 
-/* =========================================================
-   LAYOUT ฝั่ง Staff
-   - กันผู้ใช้ทั่วไปเข้าหน้า /staff (ด่านแรกฝั่งเบราว์เซอร์)
-   - ด่านจริงอยู่ที่ API ทุกตัว (requireStaff เช็ค role จากฐานข้อมูล)
-========================================================= */
-
+// role_id ของเจ้าหน้าที่ (เทียบแบบข้อความ)
 const STAFF_ROLE_ID = "3";
 
-// Layout ฝั่ง staff: ตรวจ session staff ก่อนแสดงหน้า ไม่ผ่านจะส่งกลับไปหน้า login
+// เลย์เอาต์ระบบเจ้าหน้าที่: ตรวจ session ว่าเป็น role staff ก่อนแสดง ถ้าไม่ใช่ให้กลับไปหน้า login
 export default function StaffLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  // ผ่านการตรวจสิทธิ์แล้วหรือยัง
   const [allowed, setAllowed] = useState(false);
 
-  // ตรวจจาก cookie session_staff ที่ server (แยกจาก session ของผู้ใช้ทั่วไป
-  // จึงเปิดหน้า staff กับหน้าผู้ใช้คนละแท็บพร้อมกันได้)
+  // ตรวจ session staff จาก /api/auth/session ตอนเปิดหน้า ไม่ผ่าน → ล้างข้อมูลแล้วไป /login
   useEffect(() => {
     let cancelled = false;
     fetch("/api/auth/session?role=staff", { cache: "no-store" })
@@ -40,6 +35,7 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
     };
   }, [router]);
 
+  // ระหว่างตรวจสิทธิ์ แสดงตัวหมุนโหลด
   if (!allowed) {
     return (
       <div className="grid min-h-screen place-items-center bg-staff-bg">
@@ -50,6 +46,7 @@ export default function StaffLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col bg-staff-bg text-staff-ink lg:flex-row">
+      {/* เมนูด้านข้าง และพื้นที่เนื้อหาของหน้า */}
       <StaffSidebar />
       <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-8">
         <div className="mx-auto max-w-7xl">{children}</div>

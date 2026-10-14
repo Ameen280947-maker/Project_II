@@ -15,12 +15,14 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
+// ตัวเลือกคำตอบหนึ่งรายการ พร้อมคะแนน
 type Choice = {
   choice_id: number;
   choice_text: string;
   option_score: number;
 };
 
+// คำถามหนึ่งข้อ พร้อมลำดับและตัวเลือก
 type Question = {
   question_id: number;
   question_text: string;
@@ -28,6 +30,7 @@ type Question = {
   choices: Choice[];
 };
 
+// รูปแบบ response จาก GET /api/assessments/diet
 type QuestionsResponse = {
   success: boolean;
   assessment_type_id?: number;
@@ -36,6 +39,7 @@ type QuestionsResponse = {
   message?: string;
 };
 
+// รูปแบบ response จาก POST /api/assessments/diet
 type SubmitResponse = {
   success: boolean;
   assessment_id?: number;
@@ -45,10 +49,11 @@ type SubmitResponse = {
   message?: string;
 };
 
-// หน้าแบบประเมินพฤติกรรมการกินอาหาร: แสดงคำถามทีละข้อ แล้วส่งคำตอบไปประเมินผล
+// หน้า: แบบประเมินพฤติกรรมการกิน ทีละข้อ
 export default function DietAssessmentPage() {
   const router = useRouter();
 
+  // state ของหน้า: คำถาม คำตอบ สถานะโหลด/ส่ง error และข้อปัจจุบัน
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, number>>({});
 
@@ -58,12 +63,9 @@ export default function DietAssessmentPage() {
 
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  /* =====================================================
-     LOAD QUESTIONS
-  ===================================================== */
-
+  // โหลดคำถามตอนเปิดหน้า
   useEffect(() => {
-    // โหลดคำถามแบบประเมินอาหารจาก API
+    // โหลดคำถามและตัวเลือกจาก GET /api/assessments/diet
     const loadQuestions = async () => {
       try {
         setLoading(true);
@@ -107,10 +109,7 @@ export default function DietAssessmentPage() {
     void loadQuestions();
   }, []);
 
-  /* =====================================================
-     CURRENT QUESTION
-  ===================================================== */
-
+  // ค่าที่คำนวณสำหรับแสดงผล: ข้อปัจจุบัน ความคืบหน้า และคำตอบที่เลือก
   const currentQuestion =
     questions[currentIndex];
 
@@ -134,10 +133,7 @@ export default function DietAssessmentPage() {
       ? answers[currentQuestion.question_id]
       : undefined;
 
-  /* =====================================================
-     QUESTION CATEGORY
-  ===================================================== */
-
+  // หมวด ไอคอน และสีของข้อปัจจุบันตามลำดับคำถาม (ผัก/หวาน/ไขมัน/เค็ม)
   const category = useMemo(() => {
     if (!currentQuestion) {
       return {
@@ -189,11 +185,7 @@ export default function DietAssessmentPage() {
     };
   }, [currentQuestion]);
 
-  /* =====================================================
-     SELECT ANSWER
-  ===================================================== */
-
-  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
+  // บันทึกคำตอบที่เลือกของข้อนั้นลง state
   const selectAnswer = (
     questionId: number,
     choiceId: number,
@@ -204,11 +196,7 @@ export default function DietAssessmentPage() {
     }));
   };
 
-  /* =====================================================
-     NEXT
-  ===================================================== */
-
-  // ตรวจว่าตอบข้อปัจจุบันแล้ว จึงไปข้อถัดไป
+  // ตรวจว่าเลือกคำตอบแล้วจึงเลื่อนไปข้อถัดไป
   const nextQuestion = () => {
     if (!currentQuestion) {
       return;
@@ -230,10 +218,6 @@ export default function DietAssessmentPage() {
     }
   };
 
-  /* =====================================================
-     PREVIOUS
-  ===================================================== */
-
   // ย้อนกลับไปข้อก่อนหน้า
   const previousQuestion = () => {
     setError("");
@@ -245,11 +229,7 @@ export default function DietAssessmentPage() {
     }
   };
 
-  /* =====================================================
-     SUBMIT
-  ===================================================== */
-
-  // ตรวจว่าตอบครบทุกข้อ แล้ว POST ผลแบบประเมินอาหาร และพาไปหน้าคำแนะนำ
+  // ส่งคำตอบ POST /api/assessments/diet แล้วพาไปหน้าผลลัพธ์
   const submitAssessment = async () => {
     if (
       questions.length === 0 ||
@@ -265,6 +245,7 @@ export default function DietAssessmentPage() {
       setSubmitting(true);
       setError("");
 
+      // ตรวจ userId แล้วส่งคำตอบไปบันทึกที่ API
       const userId =
         localStorage.getItem("userId");
 
@@ -288,6 +269,7 @@ export default function DietAssessmentPage() {
         },
       );
 
+      // ตรวจผลลัพธ์แล้วไปหน้าคำแนะนำ
       const data =
         (await response.json()) as SubmitResponse;
 
@@ -323,10 +305,7 @@ export default function DietAssessmentPage() {
     }
   };
 
-  /* =====================================================
-     LOADING
-  ===================================================== */
-
+  // หน้าระหว่างโหลดคำถาม
   if (loading) {
     return (
       <main className="min-h-screen bg-[#fbf9f9]">
@@ -347,10 +326,7 @@ export default function DietAssessmentPage() {
     );
   }
 
-  /* =====================================================
-     ERROR / EMPTY
-  ===================================================== */
-
+  // ไม่พบคำถาม → แสดงหน้าแจ้งเตือน
   if (
     !loading &&
     questions.length === 0
@@ -382,10 +358,6 @@ export default function DietAssessmentPage() {
     );
   }
 
-  /* =====================================================
-     PAGE
-  ===================================================== */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
@@ -394,8 +366,7 @@ export default function DietAssessmentPage() {
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-12">
           <div className="mx-auto max-w-4xl">
 
-            {/* HEADER */}
-
+            {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ความยินยอม และปุ่มย้อนกลับ */}
             <header className="flex items-start justify-between gap-4">
               <div className="min-w-0">
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b4235a]">
@@ -410,15 +381,12 @@ export default function DietAssessmentPage() {
               </h1>
               </div>
 
-              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
               <HealthConsentNotice />
               <AssessmentBackLink href="/assessment-menu-behavior" />
             </header>
-            {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
             <AssessmentSourceNote typeId={10} className="mt-3" />
 
-            {/* PROGRESS */}
-
+            {/* การ์ดแถบความคืบหน้า */}
             <section className="mt-8 rounded-[24px] border border-[#eee5e6] bg-white p-5 shadow-[0_12px_35px_rgba(35,25,30,0.04)]">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-bold text-[#65666f]">
@@ -441,12 +409,9 @@ export default function DietAssessmentPage() {
               </div>
             </section>
 
-            {/* QUESTION */}
-
+            {/* การ์ดคำถามข้อปัจจุบัน: หมวด คำถาม ตัวเลือก และปุ่มนำทาง */}
             {currentQuestion && (
               <section className="mt-7 rounded-[30px] border border-[#eee5e6] bg-white p-6 shadow-[0_14px_40px_rgba(35,25,30,0.05)] sm:p-8">
-
-                {/* CATEGORY */}
 
                 <div className="flex items-center gap-4">
                   <div
@@ -469,14 +434,11 @@ export default function DietAssessmentPage() {
                   </div>
                 </div>
 
-                {/* QUESTION TEXT */}
-
                 <h2 className="mt-8 text-xl font-bold leading-9 sm:text-2xl">
                   {currentQuestion.question_text}
                 </h2>
 
-                {/* OPTIONS */}
-
+                {/* รายการตัวเลือกคำตอบ */}
                 <div className="mt-7 space-y-3">
                   {currentQuestion.choices.map(
                     (choice) => {
@@ -536,18 +498,14 @@ export default function DietAssessmentPage() {
                   )}
                 </div>
 
-                {/* ERROR */}
-
                 {error && (
                   <div className="mt-5 rounded-2xl border border-[#f4d0d5] bg-[#fff0f2] px-4 py-3 text-sm font-semibold text-[#b91c2b]">
                     {error}
                   </div>
                 )}
 
-                {/* BUTTONS */}
-
+                {/* ปุ่มนำทาง ย้อนกลับ / ถัดไป / ส่งแบบประเมิน (ข้อสุดท้าย) */}
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
-                  {/* ย้อนกลับเฉพาะข้อคำถาม (ข้อ 1 ไม่มีปุ่มนี้) */}
                   {currentIndex > 0 && (
                     <button
                       type="button"

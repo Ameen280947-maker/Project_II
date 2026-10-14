@@ -1,7 +1,7 @@
-/* โครงข้อมูลจาก GET /api/staff/overview (หน้า "ภาพรวมระบบ") */
-
+// หน่วยการจัดกลุ่มข้อมูลในกราฟ
 export type Bucket = "hour" | "day" | "week" | "month";
 
+// โครงข้อมูลที่ /api/staff/overview ส่งกลับ: KPI กราฟ ผลประเมิน บัญชี รายงาน งานค้าง และกิจกรรมล่าสุด
 export type Overview = {
   staffName: string;
   from: string;
@@ -17,12 +17,10 @@ export type Overview = {
     activeTypes: number;
     totalTypes: number;
   };
-  // prev = ช่องเดียวกันของช่วงก่อนหน้า (null ถ้าช่วงก่อนมีจำนวนช่องน้อยกว่า)
   chart: { label: string; value: number; prev: number | null }[];
   outcome: {
     total: number;
     users: number;
-    // null = ผู้ยินยอมน้อยกว่า minGroup คน (ไม่แสดงสัดส่วน)
     counts: { ok: number; mid: number; high: number } | null;
   };
   accounts: { newUsers: number; active30: number; inactive30: number; suspended: number };

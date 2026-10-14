@@ -1,15 +1,10 @@
-/* =========================================================
-   ระดับความเสี่ยงกลางของฝั่ง Staff
-   สร้างจากค่า risk_level ที่มีจริงในตาราง assessment และ recommendation
-
-   severity: 0 = ปกติ, 1 = ควรระวัง, 2 = สูง, 3 = วิกฤต
-========================================================= */
-
+// ระดับความรุนแรง 0=ปกติ 1=ควรระวัง 2=สูง 3=วิกฤต
 export type Severity = 0 | 1 | 2 | 3;
 
-// แบบประเมินที่ไม่แสดงในฝั่ง Staff
+// แบบประเมินที่ไม่นำมาแสดงในสถิติของเจ้าหน้าที่
 export const EXCLUDED_TYPES = ["Oral Health", "Diabetes Risk"];
 
+// ชื่อไทยของแบบประเมินหลักที่ใช้ในหน้าเจ้าหน้าที่
 export const TYPE_LABELS: Record<string, string> = {
   BMI: "ดัชนีมวลกาย",
   "Blood Pressure": "ความดันโลหิต",
@@ -25,21 +20,21 @@ export const TYPE_LABELS: Record<string, string> = {
   "PHQ-2": "คัดกรองซึมเศร้า 2Q",
 };
 
-// แปลงชื่อแบบประเมินเป็นชื่อไทยสำหรับฝั่ง staff (ไม่มีในตารางคืนชื่อเดิม)
+// แปลงชื่อแบบประเมินเป็นชื่อไทยสำหรับหน้าเจ้าหน้าที่
 export const typeLabel = (name: string) => TYPE_LABELS[name] ?? name;
 
-// ค่าผลที่เก็บเป็นภาษาอังกฤษในตาราง assessment → ข้อความไทยสำหรับแสดงผล
+// แปลงรหัสระดับความเสี่ยงภาษาอังกฤษเป็นไทย
 const RISK_TEXT: Record<string, Record<string, string>> = {
   "Diabetes TDS": { low: "เสี่ยงน้อย", moderate: "เสี่ยงปานกลาง", high: "เสี่ยงสูง", very_high: "เสี่ยงสูงมาก" },
 };
 
-// แปลงระดับผลเป็นข้อความไทยสำหรับแสดงผล (ว่าง = "-")
+// แปลงรหัสระดับความเสี่ยงเป็นข้อความไทย (หรือ "-" ถ้าว่าง)
 export const riskLabel = (assessmentName: string, riskLevel: string | null | undefined) => {
   const risk = String(riskLevel ?? "").trim();
   return RISK_TEXT[assessmentName]?.[risk] ?? (risk || "-");
 };
 
-// ค่า risk_level → severity แยกตามแบบประเมิน (ตรงกับข้อมูลจริง)
+// ตารางความรุนแรงของแต่ละระดับผล แยกตามแบบประเมินหลัก
 const MAP: Record<string, Record<string, Severity>> = {
   "9Q": {
     "ไม่มีอาการซึมเศร้าหรือมีน้อยมาก": 0,
@@ -62,14 +57,12 @@ const MAP: Record<string, Record<string, Severity>> = {
   },
   BMI: { "ผอม": 1, "ปกติ": 0, "น้ำหนักเกิน": 1, "อ้วน": 2, "อ้วนอันตราย": 3 },
   "Thai CVD": { "เสี่ยงน้อย": 0, "เสี่ยงปานกลาง": 1, "เสี่ยงสูง": 2 },
-  // ในตาราง assessment เก็บเป็นภาษาอังกฤษ แต่ในตาราง recommendation เป็นภาษาไทย จึงรองรับทั้งคู่
   "Diabetes TDS": {
     low: 0, "เสี่ยงน้อย": 0,
     moderate: 1, "เสี่ยงปานกลาง": 1,
     high: 2, "เสี่ยงสูง": 2,
     very_high: 3, "เสี่ยงสูงมาก": 3,
   },
-  // ระดับเดิม (ติดนิโคติน…) ยังอยู่ในประวัติเก่า ระดับใหม่ตามเอกสารอ้างอิงตารางที่ 14
   Smoking: {
     "ติดนิโคตินระดับต่ำ": 1, "ติดนิโคตินระดับปานกลาง": 1, "ติดนิโคตินระดับสูง": 2,
     "เสี่ยงต่ำ": 0, "เสี่ยงปานกลาง": 1, "เสี่ยงสูง": 2,
@@ -85,7 +78,7 @@ const MAP: Record<string, Record<string, Severity>> = {
   Diet: { "พฤติกรรมเหมาะสม": 0, "ควรใส่ใจ": 1, "ควรปรับพฤติกรรม": 1, "ควรปรับพฤติกรรมมาก": 2 },
 };
 
-// สำรองกรณีเจอค่าที่ยังไม่อยู่ในตาราง MAP (เช็คคำเชิงลบก่อนเสมอ)
+// เดาความรุนแรง 0–3 จากคำสำคัญในข้อความระดับผล
 const fromText = (risk: string): Severity => {
   const v = risk.toLowerCase();
   if (v.includes("ไม่มีความเสี่ยง") || v.includes("ไม่มีอาการ")) return 0;
@@ -95,16 +88,16 @@ const fromText = (risk: string): Severity => {
   return 0;
 };
 
-// ระดับของแบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม (โหลดจากฐานข้อมูลด้วย loadCustomSeverities ฝั่งเซิร์ฟเวอร์)
+// cache ความรุนแรงของแบบประเมินที่เจ้าหน้าที่สร้างเอง (โหลดจาก DB)
 const CUSTOM: Record<string, Record<string, Severity>> = {};
 
-// แทนที่ตารางระดับของแบบประเมินที่เจ้าหน้าที่สร้างเพิ่มด้วยค่าชุดใหม่
+// แทนที่ตารางความรุนแรงของแบบประเมินที่สร้างเองด้วยข้อมูลชุดใหม่
 export function setCustomSeverities(map: Record<string, Record<string, Severity>>) {
   for (const k of Object.keys(CUSTOM)) delete CUSTOM[k];
   Object.assign(CUSTOM, map);
 }
 
-// ระดับที่ i จาก n ระดับ (เรียงคะแนนน้อย → มาก) → severity 0–3
+// คำนวณความรุนแรง 0–3 จากลำดับที่ i ของระดับทั้งหมด n ระดับ
 export const severityForRank = (i: number, n: number): Severity => {
   if (n <= 1) return 0;
   if (n === 2) return i === 0 ? 0 : 2;
@@ -112,7 +105,7 @@ export const severityForRank = (i: number, n: number): Severity => {
   return Math.round((i * 3) / (n - 1)) as Severity;
 };
 
-// หา severity (0–3) ของระดับผล: ดูจากตาราง MAP / CUSTOM ก่อน ไม่พบจึงเดาจากข้อความ
+// หาความรุนแรงของผลประเมิน จากตารางแบบประเมินหลัก/ที่สร้างเอง หรือเดาจากข้อความ
 export const severityOf = (assessmentName: string, riskLevel: string | null | undefined): Severity => {
   const risk = String(riskLevel ?? "").trim();
   if (!risk) return 0;
@@ -120,6 +113,7 @@ export const severityOf = (assessmentName: string, riskLevel: string | null | un
   return exact ?? fromText(risk);
 };
 
+// ชื่อไทยของระดับความรุนแรง
 export const SEVERITY_LABEL: Record<Severity, string> = {
   0: "ปกติ",
   1: "ควรระวัง",

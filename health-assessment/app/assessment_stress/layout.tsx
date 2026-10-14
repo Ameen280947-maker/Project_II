@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 
-// แบบประเมินความเครียด (assessment_type_id = 12) แจ้งผู้ใช้เมื่อ staff ปิดแบบประเมินนี้อยู่
+// เลย์เอาต์: ห่อหน้าประเมินความเครียดและแสดงประกาศเมื่อแบบประเมินถูกปิด
 export default function AssessmentStressLayout({ children }: { children: ReactNode }) {
   return (
     <>

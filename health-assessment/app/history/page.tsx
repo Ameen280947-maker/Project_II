@@ -20,10 +20,7 @@ import {
   useState,
 } from "react";
 
-/* =====================================================
-   TYPES
-===================================================== */
-
+// ข้อมูลผลประเมินหนึ่งรายการในประวัติ (คะแนน ระดับ วันที่ ชนิด และคำแนะนำ)
 type HistoryItem = {
   assessment_id: number;
   user_id: number;
@@ -51,6 +48,7 @@ type HistoryItem = {
   | null;
 };
 
+// รูปแบบ response จาก API /api/history
 type HistoryResponse = {
   success: boolean;
   total?: number;
@@ -58,14 +56,11 @@ type HistoryResponse = {
   message?: string;
 };
 
-/* =====================================================
-   PAGE
-===================================================== */
-
-// หน้าประวัติการประเมิน: โหลดผลทั้งหมดของผู้ใช้ กรองตามแบบประเมิน และแสดงเป็นการ์ด
+// หน้า: แสดงประวัติผลประเมินทั้งหมดของผู้ใช้ พร้อมสรุปและตัวกรองตามแบบประเมิน
 export default function HistoryPage() {
   const router = useRouter();
 
+  // state ของหน้า: รายการประวัติ สถานะโหลด/ผิดพลาด และตัวกรองชนิดแบบประเมิน
   const [history, setHistory] =
     useState<HistoryItem[]>([]);
 
@@ -78,12 +73,9 @@ export default function HistoryPage() {
   const [filter, setFilter] =
     useState("ทั้งหมด");
 
-  /* =====================================================
-     LOAD HISTORY
-  ===================================================== */
-
+  // โหลดประวัติการประเมินตอนเปิดหน้า
   useEffect(() => {
-    // ดึงประวัติจาก API ตาม userId (ไม่มี/ไม่ถูกต้องพาไป login) และเลือกหมวดจาก ?type= ถ้ามี
+    // ดึงประวัติผลประเมินจาก API /api/history ตาม userId (ถ้าไม่มี userId ให้กลับไปหน้า login)
     const loadHistory = async () => {
       try {
         setLoading(true);
@@ -134,7 +126,7 @@ export default function HistoryPage() {
         const items = data.history ?? [];
         setHistory(items);
 
-        // มาจากปุ่ม "ดูผล" ในแดชบอร์ด (?type=ชื่อแบบประเมิน) → เลือกหมวดนั้นไว้
+        // ถ้ามี ?type= ใน URL ให้ตั้งตัวกรองเป็นแบบประเมินนั้น
         const type = new URLSearchParams(window.location.search).get("type")?.toLowerCase().trim();
         const match = type && items.find((item) => item.assessment_name?.toLowerCase().trim() === type);
         if (match) setFilter(match.assessment_name);
@@ -157,11 +149,7 @@ export default function HistoryPage() {
     void loadHistory();
   }, [router]);
 
-  /* =====================================================
-     ASSESSMENT TYPES
-  ===================================================== */
-
-  // รายชื่อแบบประเมินที่มีในประวัติ (ไม่ซ้ำ) สำหรับปุ่มกรอง ขึ้นต้นด้วย "ทั้งหมด"
+  // ค่าที่คำนวณสำหรับแสดงผล: รายชื่อตัวกรอง และรายการที่ผ่านตัวกรอง
   const assessmentNames =
     useMemo(() => {
       return [
@@ -177,11 +165,6 @@ export default function HistoryPage() {
       ];
     }, [history]);
 
-  /* =====================================================
-     FILTER
-  ===================================================== */
-
-  // ประวัติที่ผ่านตัวกรองแบบประเมินที่เลือก
   const filteredHistory =
     useMemo(() => {
       if (
@@ -197,26 +180,15 @@ export default function HistoryPage() {
       );
     }, [history, filter]);
 
-  /* =====================================================
-     RENDER
-  ===================================================== */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
-
-        {/* =================================================
-            SIDEBAR
-        ================================================== */}
 
         <Sidebar />
 
         <section className="min-w-0 flex-1 px-5 py-7 sm:px-8 lg:px-12">
 
-          {/* =================================================
-              HEADER
-          ================================================== */}
-
+          {/* ส่วนหัวของหน้า */}
           <header>
 
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
@@ -236,10 +208,7 @@ export default function HistoryPage() {
 
           </header>
 
-          {/* =================================================
-              SUMMARY
-          ================================================== */}
-
+          {/* การ์ดสรุป: จำนวนครั้ง จำนวนประเภท และวันที่ประเมินล่าสุด */}
           <section className="mt-8 grid gap-4 md:grid-cols-3">
 
             <SummaryCard
@@ -280,10 +249,7 @@ export default function HistoryPage() {
 
           </section>
 
-          {/* =================================================
-              FILTER
-          ================================================== */}
-
+          {/* แถบตัวกรองตามประเภทแบบประเมิน */}
           <section className="mt-7 rounded-[24px] border border-[#eee5e6] bg-white p-5 shadow-[0_12px_35px_rgba(35,25,30,0.04)]">
 
             <p className="text-sm font-bold">
@@ -316,10 +282,7 @@ export default function HistoryPage() {
 
           </section>
 
-          {/* =================================================
-              LOADING
-          ================================================== */}
-
+          {/* สถานะกำลังโหลด */}
           {loading && (
             <div className="mt-7 rounded-[26px] border border-[#eee5e6] bg-white p-10 text-center">
 
@@ -332,10 +295,7 @@ export default function HistoryPage() {
             </div>
           )}
 
-          {/* =================================================
-              ERROR
-          ================================================== */}
-
+          {/* แสดงข้อผิดพลาด */}
           {error && !loading && (
             <div className="mt-7 rounded-[24px] border border-[#f2d3d7] bg-[#fff0f2] p-6 text-[#b91c2b]">
 
@@ -350,10 +310,7 @@ export default function HistoryPage() {
             </div>
           )}
 
-          {/* =================================================
-              EMPTY
-          ================================================== */}
-
+          {/* ยังไม่มีประวัติ → แสดงหน้าว่างพร้อมปุ่มเริ่มประเมิน */}
           {!loading &&
             !error &&
             filteredHistory.length === 0 && (
@@ -384,10 +341,7 @@ export default function HistoryPage() {
               </section>
             )}
 
-          {/* =================================================
-              HISTORY LIST
-          ================================================== */}
-
+          {/* รายการประวัติการประเมินย้อนหลัง */}
           {!loading &&
             !error &&
             filteredHistory.length > 0 && (
@@ -431,11 +385,7 @@ export default function HistoryPage() {
   );
 }
 
-/* =====================================================
-   HISTORY CARD
-===================================================== */
-
-// การ์ดผลประเมินหนึ่งรายการ: ชื่อ ระดับผล คะแนน วันที่ และปุ่มดูคำแนะนำ
+// การ์ดผลประเมินหนึ่งรายการในประวัติ พร้อมคะแนน ระดับความเสี่ยง และลิงก์ดูรายละเอียด
 function HistoryCard({
   item,
 }: {
@@ -452,10 +402,7 @@ function HistoryCard({
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
 
-        {/* =================================================
-            LEFT
-        ================================================== */}
-
+        {/* ฝั่งซ้าย: ไอคอน ชื่อแบบประเมิน ระดับความเสี่ยง และวันที่ */}
         <div className="flex min-w-0 gap-4">
 
           <div
@@ -506,10 +453,7 @@ function HistoryCard({
 
         </div>
 
-        {/* =================================================
-            RIGHT
-        ================================================== */}
-
+        {/* ฝั่งขวา: กล่องผลคะแนน และปุ่มดูรายละเอียด */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
 
           <div
@@ -527,10 +471,6 @@ function HistoryCard({
             </p>
 
           </div>
-
-          {/* =================================================
-              DETAIL BUTTON
-          ================================================== */}
 
           {detailHref ? (
             <Link
@@ -552,10 +492,7 @@ function HistoryCard({
 
       </div>
 
-      {/* =================================================
-          RECOMMENDATION
-      ================================================== */}
-
+      {/* ข้อความคำแนะนำแบบย่อ (ถ้ามี) */}
       {item.recommendation_text && (
         <div className="mt-5 border-t border-[#f0eaeb] pt-4">
 
@@ -570,11 +507,7 @@ function HistoryCard({
   );
 }
 
-/* =====================================================
-   RESULT STYLE
-   สีตามเอกสารอ้างอิงกรมควบคุมโรค (เขียว เหลือง ส้ม แดง)
-===================================================== */
-
+// ชุดสีของผลประเมินแยกตามสีระดับความเสี่ยง
 const RESULT_STYLE: Record<DocColor, ReturnType<typeof makeStyle>> = {
   green: makeStyle("bg-[#eef8e9]", "text-[#57965c]", "hover:bg-[#e0f2dc]"),
   yellow: makeStyle("bg-[#fff8e1]", "text-[#a8860b]", "hover:bg-[#fff0c2]"),
@@ -583,7 +516,7 @@ const RESULT_STYLE: Record<DocColor, ReturnType<typeof makeStyle>> = {
   unknown: makeStyle("bg-[#f4f4f5]", "text-[#74757d]", "hover:bg-[#ebebed]"),
 };
 
-// รวมคลาสสีพื้น/ตัวอักษร/hover เป็นชุดสไตล์สำหรับไอคอน ป้าย กล่อง และปุ่ม
+// สร้างชุดคลาสสี (icon, badge, box, button) จากสีพื้น สีตัวอักษร และสี hover
 function makeStyle(bg: string, text: string, hover: string) {
   return {
     icon: `${bg} ${text}`,
@@ -594,7 +527,7 @@ function makeStyle(bg: string, text: string, hover: string) {
   };
 }
 
-// เลือกชุดสีของผลประเมินตามสีระดับความเสี่ยงของกรมควบคุมโรค
+// เลือกชุดสีของผลประเมินตามชื่อแบบประเมินและระดับความเสี่ยง
 function getResultStyle(
   item: HistoryItem,
 ) {
@@ -606,11 +539,7 @@ function getResultStyle(
   ];
 }
 
-/* =====================================================
-   RISK DISPLAY NAME
-===================================================== */
-
-// แปลงระดับความเสี่ยงเป็นข้อความไทย (เฉพาะเบาหวานและบุหรี่ แบบอื่นคืนค่าเดิม)
+// แปลงระดับความเสี่ยงเป็นข้อความไทย (มีกรณีพิเศษสำหรับเบาหวานและการสูบบุหรี่)
 function getRiskDisplayName(
   riskLevel:
     | string
@@ -624,10 +553,7 @@ function getRiskDisplayName(
   const risk =
     riskLevel.toLowerCase();
 
-  /* =====================================================
-     DIABETES
-  ===================================================== */
-
+  // กรณีแบบประเมินเบาหวาน: แยก 4 ระดับ
   if (
     assessmentName ===
     "Diabetes TDS" ||
@@ -667,10 +593,7 @@ function getRiskDisplayName(
     }
   }
 
-  /* =====================================================
-     SMOKING
-  ===================================================== */
-
+  // กรณีแบบประเมินการสูบบุหรี่: แยก 3 ระดับ
   if (
     assessmentName ===
     "Smoking"
@@ -700,11 +623,7 @@ function getRiskDisplayName(
   return riskLevel;
 }
 
-/* =====================================================
-   SUMMARY CARD
-===================================================== */
-
-// การ์ดสรุปตัวเลข พร้อมไอคอน หัวข้อ และหน่วยต่อท้าย
+// การ์ดตัวเลขสรุปด้านบนของหน้าประวัติ
 function SummaryCard({
   icon,
   title,
@@ -753,11 +672,7 @@ function SummaryCard({
   );
 }
 
-/* =====================================================
-   ASSESSMENT NAME
-===================================================== */
-
-// แปลงชื่อแบบประเมินภาษาอังกฤษเป็นชื่อภาษาไทย (ไม่พบคืนชื่อเดิม)
+// แปลงชื่อแบบประเมิน (อังกฤษ) เป็นชื่อภาษาไทยสำหรับแสดงผล
 function getAssessmentDisplayName(
   assessmentName: string,
 ) {
@@ -811,11 +726,7 @@ function getAssessmentDisplayName(
   );
 }
 
-/* =====================================================
-   FORMAT SCORE
-===================================================== */
-
-// ข้อความคะแนนตามชนิดแบบประเมิน เช่น CVD/เบาหวานเป็น % BMI มีคำนำหน้า ความดันแสดงระดับ
+// จัดรูปแบบคะแนนตามชนิดแบบประเมิน (CVD/เบาหวานเป็น %, BMI, ความดันแสดงระดับ)
 function formatScore(
   item: HistoryItem,
 ) {
@@ -840,20 +751,12 @@ function formatScore(
     );
   }
 
-  /* =====================================================
-     CVD
-  ===================================================== */
-
   if (
     item.assessment_name ===
     "Thai CVD"
   ) {
     return `${score.toFixed(2)}%`;
   }
-
-  /* =====================================================
-     DIABETES
-  ===================================================== */
 
   if (
     item.assessment_name ===
@@ -864,20 +767,12 @@ function formatScore(
     return `${score.toFixed(2)}%`;
   }
 
-  /* =====================================================
-     BMI
-  ===================================================== */
-
   if (
     item.assessment_name ===
     "BMI"
   ) {
     return `BMI ${score.toFixed(2)}`;
   }
-
-  /* =====================================================
-     BLOOD PRESSURE
-  ===================================================== */
 
   if (
     item.assessment_name ===
@@ -887,10 +782,6 @@ function formatScore(
       item,
     );
   }
-
-  /* =====================================================
-     SMOKING
-  ===================================================== */
 
   if (
     item.assessment_name ===
@@ -902,11 +793,7 @@ function formatScore(
   return `${score}`;
 }
 
-/* =====================================================
-   BLOOD PRESSURE SCORE
-===================================================== */
-
-// ข้อความผลความดันโลหิต (ใช้ระดับความเสี่ยง ไม่มีแสดง "-")
+// ข้อความผลของแบบประเมินความดัน (ใช้ risk_level แทนคะแนน)
 function getBloodPressureScoreText(
   item: HistoryItem,
 ) {
@@ -917,11 +804,7 @@ function getBloodPressureScoreText(
   return risk || "-";
 }
 
-/* =====================================================
-   DATE TIME
-===================================================== */
-
-// แปลงวันเวลาเป็นรูปแบบไทยพร้อมเวลา (แปลงไม่ได้คืนค่าเดิม)
+// แปลงวันที่และเวลาเป็นรูปแบบภาษาไทยแบบเต็ม
 function formatDateTime(
   value: string,
 ) {
@@ -945,11 +828,7 @@ function formatDateTime(
   ).format(date);
 }
 
-/* =====================================================
-   DATE SHORT
-===================================================== */
-
-// แปลงวันที่เป็นรูปแบบไทยแบบย่อ (แปลงไม่ได้แสดง "-")
+// แปลงวันที่เป็นรูปแบบสั้นภาษาไทย ถ้าไม่ถูกต้องแสดง "-"
 function formatDateShort(
   value: string,
 ) {
@@ -974,14 +853,11 @@ function formatDateShort(
   ).format(date);
 }
 
-/* =====================================================
-   DETAIL URL
-===================================================== */
-
-// หาลิงก์หน้าคำแนะนำของผลประเมินตาม id/ชื่อแบบประเมิน (แบบที่สร้างเองใช้หน้ากลาง)
+// หา URL หน้าผลลัพธ์/คำแนะนำของผลประเมินตามชนิดแบบประเมิน พร้อม assessmentId
 function getDetailHref(
   item: HistoryItem,
 ) {
+  // จับคู่ด้วย assessment_type_id ก่อน (แบบที่ชื่ออาจไม่ตรง)
   if (item.assessment_type_id === 7) {
     return `/recommendation_alcohol?assessmentId=${item.assessment_id}`;
   }
@@ -994,30 +870,16 @@ function getDetailHref(
     return `/recommendation_diet?assessmentId=${item.assessment_id}`;
   }
 
+  // จับคู่ด้วยชื่อแบบประเมิน (รองรับทั้งชื่ออังกฤษและไทย)
   switch (
   item.assessment_name
   ) {
 
-    /* =================================================
-       CVD
-    ================================================== */
-
     case "Thai CVD":
       return `/recommendation-CVD?assessmentId=${item.assessment_id}`;
 
-    /* =================================================
-       BLOOD PRESSURE
-    ================================================== */
-
     case "Blood Pressure":
       return `/recommendation_DB?assessmentId=${item.assessment_id}`;
-
-    /* =================================================
-       DIABETES
-       
-       ใช้ recommendation_diabetes
-       ไม่ใช้ assessment_diabetes/result
-    ================================================== */
 
     case "Diabetes TDS":
       return `/recommendation_diabetes?assessmentId=${item.assessment_id}`;
@@ -1025,32 +887,16 @@ function getDetailHref(
     case "Diabetes Risk":
       return `/recommendation_diabetes?assessmentId=${item.assessment_id}`;
 
-    /* =================================================
-       BMI
-    ================================================== */
-
     case "BMI":
       return `/recommendation_BMI?assessmentId=${item.assessment_id}`;
 
-    /* =================================================
-       SMOKING
-    ================================================== */
-
     case "Smoking":
       return `/recommendation_smoking?assessmentId=${item.assessment_id}`;
-
-    /* =================================================
-       ALCOHOL
-    ================================================== */
 
     case "Alcohol":
     case "การดื่มเครื่องดื่มแอลกอฮอล์":
     case "การดื่มแอลกอฮอล์":
       return `/recommendation_alcohol?assessmentId=${item.assessment_id}`;
-
-    /* =================================================
-       PHYSICAL ACTIVITY
-    ================================================== */
 
     case "Physical Activity":
     case "กิจกรรมทางกาย":
@@ -1058,36 +904,20 @@ function getDetailHref(
     case "แบบประเมินกิจกรรมทางกายและการนอนหลับ":
       return `/recommendation_physical_activity?assessmentId=${item.assessment_id}`;
 
-    /* =================================================
-       DIET
-    ================================================== */
-
     case "Diet":
     case "พฤติกรรมการรับประทานอาหาร":
     case "แบบประเมินพฤติกรรมการรับประทานอาหาร":
       return `/recommendation_diet?assessmentId=${item.assessment_id}`;
-
-    /* =================================================
-       STRESS
-    ================================================== */
 
     case "Stress":
     case "ความเครียด":
     case "แบบประเมินความเครียด":
       return `/recommendation_stress?assessmentId=${item.assessment_id}`;
 
-    /* =================================================
-       SLEEP
-    ================================================== */
-
     case "Sleep":
     case "การนอนหลับ":
     case "แบบประเมินการนอนหลับ":
       return `/recommendation_sleep?assessmentId=${item.assessment_id}`;
-
-    /* =================================================
-       DEPRESSION 2Q & 9Q
-    ================================================== */
 
     case "PHQ-2":
     case "2Q":
@@ -1100,10 +930,6 @@ function getDetailHref(
     case "โรคซึมเศร้า 9Q":
       return `/recommendation_depression_9q?assessmentId=${item.assessment_id}`;
 
-    /* =================================================
-       OTHER
-    ================================================== */
-
     default:
       if (item.assessment_type_id === 13) {
         return `/recommendation_depression_2q?assessmentId=${item.assessment_id}`;
@@ -1111,7 +937,6 @@ function getDetailHref(
       if (item.assessment_type_id === 14) {
         return `/recommendation_depression_9q?assessmentId=${item.assessment_id}`;
       }
-      // แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม ใช้หน้ากลาง
       return `/assessment/${item.assessment_type_id}?result=${item.assessment_id}`;
   }
 }

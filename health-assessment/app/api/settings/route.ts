@@ -3,11 +3,7 @@ import pool from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { logSystemError } from "@/lib/errorLogger";
 
-/* =========================================================
-   GET  /api/settings?userId=...   → อ่านการตั้งค่า (ถ้ายังไม่มีจะคืนค่าเริ่มต้น)
-   PUT  /api/settings              → บันทึกเฉพาะฟิลด์ที่ส่งมา (body: { userId, ...fields })
-========================================================= */
-
+// ค่าเริ่มต้นของการตั้งค่าผู้ใช้ (ใช้เมื่อยังไม่มีแถวใน user_settings)
 const DEFAULTS = {
   notify_reassess: true,
   notify_weekly: true,
@@ -27,9 +23,10 @@ const DEFAULTS = {
   consent_health_at: null as string | null,
 };
 
+// ชื่อคีย์การตั้งค่าทั้งหมด
 type SettingKey = keyof typeof DEFAULTS;
 
-// คอลัมน์ที่อนุญาตให้แก้ไขได้ (กันการส่งชื่อคอลัมน์แปลก ๆ เข้ามาใน SQL)
+// คีย์ที่ผู้ใช้แก้ไขได้ผ่าน PUT
 const EDITABLE: SettingKey[] = [
   "notify_reassess",
   "notify_weekly",
@@ -48,6 +45,7 @@ const EDITABLE: SettingKey[] = [
   "consent_health",
 ];
 
+// ค่าที่อนุญาตของคีย์แบบตัวเลือก
 const ALLOWED_VALUES: Partial<Record<SettingKey, string[]>> = {
   notify_channel: ["app_email", "app", "email"],
   font_size: ["normal", "large", "xl"],
@@ -55,10 +53,9 @@ const ALLOWED_VALUES: Partial<Record<SettingKey, string[]>> = {
   year_format: ["be", "ce"],
 };
 
-// GET: คืนการตั้งค่าของผู้ใช้ (ค่าที่ยังไม่ได้ตั้งใช้ค่าเริ่มต้น)
+// API: ดึงค่าตั้งค่าของผู้ใช้จาก user_settings รวมกับค่าเริ่มต้น
 export async function GET(request: NextRequest) {
   try {
-    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(request, new URL(request.url).searchParams.get("userId"));
     if (!auth.ok) return auth.response;
     const userId = auth.userId;
@@ -76,7 +73,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PUT: บันทึกการตั้งค่าเฉพาะฟิลด์ที่แก้ไขได้ และตรวจว่าเป็นค่าที่อนุญาต
+// API: บันทึกค่าตั้งค่าที่แก้ไขได้ลง user_settings (upsert)
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
@@ -84,7 +81,7 @@ export async function PUT(request: NextRequest) {
     if (!auth.ok) return auth.response;
     const userId = auth.userId;
 
-    // เลือกเฉพาะฟิลด์ที่แก้ไขได้ และตรวจค่าที่อนุญาต
+    // ตรวจข้อมูลที่ส่งมา: เก็บเฉพาะคีย์ที่แก้ได้และค่าถูกต้อง
     const updates: Record<string, unknown> = {};
     for (const key of EDITABLE) {
       if (!(key in body)) continue;
@@ -99,7 +96,6 @@ export async function PUT(request: NextRequest) {
       updates[key] = key === "reassess_overrides" ? JSON.stringify(value ?? {}) : value;
     }
 
-    // บันทึกเวลาที่ให้/เปลี่ยนความยินยอม
     if ("consent_health" in updates) updates.consent_health_at = new Date().toISOString();
 
     const keys = Object.keys(updates);
@@ -107,6 +103,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ success: false, message: "ไม่มีข้อมูลที่ต้องบันทึก" }, { status: 400 });
     }
 
+    // สร้าง SQL upsert แบบไดนามิกแล้วบันทึกลง user_settings
     const columns = ["user_id", ...keys];
     const values = [String(userId), ...keys.map((k) => updates[k])];
     const placeholders = columns.map((_, i) => `$${i + 1}`);

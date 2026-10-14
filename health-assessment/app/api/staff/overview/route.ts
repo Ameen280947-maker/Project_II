@@ -17,32 +17,25 @@ import {
   spanDays,
 } from "@/lib/staff/overviewRange";
 
-/* =========================================================
-   GET /api/staff/overview?from=YYYY-MM-DD&to=YYYY-MM-DD
-   ข้อมูลหน้า "ภาพรวมระบบ" ของ Staff (from / to เป็นวันที่ตามเวลาไทย รวมทั้งสองวัน)
-   - ตัวเลขการใช้งาน (ผู้ใช้ / จำนวนครั้ง / แบบประเมิน) นับทุกคน
-   - สถิติผลสุขภาพ (สัดส่วนผล ปัญหาที่พบมาก ประเมินซ้ำตามรอบ) นับเฉพาะผู้ที่ยินยอม
-     ให้ประมวลผลข้อมูลสุขภาพ (user_settings.consent_health ไม่มีแถว = ยินยอม) และซ่อนกลุ่มที่น้อยกว่า 5 คน
-   - ไม่มีผลประเมินรายบุคคลในข้อมูลที่ส่งกลับ
-========================================================= */
-
+// ค่าคงที่: ขนาดกลุ่มขั้นต่ำที่แสดง % ได้, วันผ่อนผันประเมินซ้ำ, มิลลิวินาทีต่อวัน, ชื่อเดือนไทย, action ที่ไม่แสดงในกิจกรรม
 const MIN_GROUP = 5;
-const GRACE_DAYS = 7; // ประเมินซ้ำช้ากว่ากำหนดไม่เกิน 7 วัน ยังนับว่าตามรอบ (เหมือนหน้ารายงาน)
+const GRACE_DAYS = 7;
 const DAY_MS = 86_400_000;
 const TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-// กิจกรรมที่ไม่แสดงในฟีด (การเปิดดูข้อมูล / ระบบติดตามเดิมที่ยกเลิกแล้ว)
 const HIDDEN_ACTIONS = ["view_user_detail", "view_follow_up_case"];
 
+// แถวผลประเมินที่ใช้คำนวณสถิติ (t = เวลาเป็นมิลลิวินาที)
 type ResultRow = { user_id: number; type_id: number; name: string; risk_level: string; t: number; in_range: boolean };
 
-// คิด % (ทศนิยม 1 ตำแหน่ง) คืน null ถ้ากลุ่มเล็กกว่า MIN_GROUP
+// คำนวณร้อยละ (ทศนิยม 1 ตำแหน่ง) คืน null ถ้ากลุ่มเล็กกว่า MIN_GROUP
 const pctOf = (n: number, d: number) => (d >= MIN_GROUP ? Math.round((n / d) * 1000) / 10 : null);
 
-// GET: คืนข้อมูลหน้าภาพรวมระบบของ staff ตามช่วงวันที่ from–to
+// API (เจ้าหน้าที่): สรุปภาพรวมระบบในช่วงวันที่ เช่น จำนวนผู้ใช้ การประเมิน ความเสี่ยง และกิจกรรมล่าสุด
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
 
+  // อ่านช่วงวันที่ และคำนวณช่วงก่อนหน้า/ขนาด bucket ของกราฟ
   const parsed = parseRange(new URL(request.url).searchParams);
   if ("error" in parsed) {
     return NextResponse.json({ success: false, message: parsed.error }, { status: 400 });
@@ -53,7 +46,6 @@ export async function GET(request: NextRequest) {
   const bucket = bucketFor(days);
   const keyFormat = KEY_FORMAT[bucket];
   const multiYear = from.slice(0, 4) !== to.slice(0, 4);
-  // ช่วงก่อนหน้าที่ยาวเท่ากัน
   const prevFrom = addDays(from, -days);
   const prevTo = addDays(from, -1);
 
@@ -63,6 +55,7 @@ export async function GET(request: NextRequest) {
   try {
     await loadCustomSeverities();
 
+    // ดึงข้อมูลจาก DB พร้อมกัน: ผู้ใช้ จำนวนประเมิน ช่วงกราฟ ผลประเมิน รายเดือน งานค้าง และ log
     const [
       usersRes,
       countsRes,
@@ -76,7 +69,6 @@ export async function GET(request: NextRequest) {
       logsRes,
       signupsRes,
     ] = await Promise.all([
-      // ผู้ใช้: ทั้งหมด ณ สิ้นช่วง / ใหม่ในช่วง / สถานะบัญชีปัจจุบัน (นิยามเดียวกับหน้าผู้ใช้งาน)
       pool.query(
         `WITH x AS (
            SELECT u.user_id, u.created_at, COALESCE(u.is_active, TRUE) AS is_active,
@@ -93,7 +85,6 @@ export async function GET(request: NextRequest) {
            FROM x`,
         [USER_ROLE_ID, from, to]
       ),
-      // จำนวนการประเมินต่อช่วงเวลา ทั้งช่วงนี้และช่วงก่อนหน้า (ทุกคน)
       pool.query(
         `SELECT ${LOCAL_ASSESSED} >= $5::date AS cur,
                 to_char(date_trunc($3, ${LOCAL_ASSESSED}), $4) AS b, COUNT(*)::int AS n
@@ -105,7 +96,6 @@ export async function GET(request: NextRequest) {
           GROUP BY 1, 2`,
         [USER_ROLE_ID, EXCLUDED_TYPES, bucket, keyFormat, from, prevFrom, to]
       ),
-      // ช่องเวลาทั้งหมดของช่วงนี้และช่วงก่อน (ช่องที่ไม่มีข้อมูลเป็น 0)
       pool.query(
         `SELECT p.cur, to_char(g, $2) AS b
            FROM (VALUES (TRUE, $3::date, $4::date), (FALSE, $5::date, $6::date)) AS p(cur, f, t)
@@ -116,7 +106,6 @@ export async function GET(request: NextRequest) {
           ORDER BY p.cur, g`,
         [bucket, keyFormat, from, to, prevFrom, prevTo]
       ),
-      // ผู้ใช้ที่ใช้งานในช่วง = ทำแบบประเมินหรือสมัครในช่วง
       pool.query(
         `SELECT COUNT(DISTINCT user_id)::int AS n FROM (
            SELECT a.user_id
@@ -130,7 +119,6 @@ export async function GET(request: NextRequest) {
          ) x`,
         [USER_ROLE_ID, EXCLUDED_TYPES, from, to]
       ),
-      // แบบประเมิน + จำนวนครั้งที่ถูกทำในช่วง (ทุกคน)
       pool.query(
         `SELECT t.assessment_type_id AS id, t.assessment_name AS name, COALESCE(t.is_active, TRUE) AS is_active,
                 COUNT(x.assessment_id)::int AS n
@@ -145,8 +133,6 @@ export async function GET(request: NextRequest) {
           ORDER BY n DESC, t.assessment_type_id`,
         [USER_ROLE_ID, EXCLUDED_TYPES, from, to]
       ),
-      // ผลประเมินของผู้ที่ยินยอมให้ประมวลผลข้อมูลสุขภาพ (ใช้คิดสถิติผล ไม่ส่งออกรายบุคคล)
-      // ย้อนหลังพอให้คิดรอบประเมินซ้ำ (รอบยาวสุด 1 ปี)
       pool.query<ResultRow>(
         `SELECT a.user_id, a.assessment_type_id AS type_id, t.assessment_name AS name, a.risk_level,
                 (EXTRACT(EPOCH FROM a.assessed_at) * 1000)::float8 AS t,
@@ -159,7 +145,6 @@ export async function GET(request: NextRequest) {
             AND (a.assessed_at >= NOW() - INTERVAL '800 days' OR ${inRange(LOCAL_ASSESSED, "$3", "$4")})`,
         [USER_ROLE_ID, EXCLUDED_TYPES, from, to]
       ),
-      // จำนวนการประเมินรายเดือน 6 เดือนล่าสุด (ทุกคน)
       pool.query(
         `WITH m AS (
            SELECT generate_series(
@@ -178,7 +163,6 @@ export async function GET(request: NextRequest) {
           GROUP BY m.month ORDER BY m.month`,
         [USER_ROLE_ID, EXCLUDED_TYPES]
       ),
-      // ระดับผลของแบบประเมินที่เปิดใช้งาน แต่ยังไม่มีข้อความคำแนะนำ
       pool.query(
         `SELECT t.assessment_type_id AS id, t.assessment_name AS name, r.risk_level
            FROM recommendation r
@@ -188,7 +172,6 @@ export async function GET(request: NextRequest) {
           ORDER BY t.assessment_type_id, r.min_score NULLS LAST, r.rec_id`,
         [EXCLUDED_TYPES]
       ),
-      // ฉบับร่างที่ยังไม่เผยแพร่
       pool.query(
         `SELECT v.assessment_type_id AS id, t.assessment_name AS name,
                 (v.updated_at AT TIME ZONE 'UTC') AS updated_at, s.username AS updated_by
@@ -198,7 +181,6 @@ export async function GET(request: NextRequest) {
           WHERE v.status = 'draft'
           ORDER BY v.updated_at DESC`
       ),
-      // การดำเนินการของเจ้าหน้าที่ในช่วง (created_at เป็น timestamptz)
       pool.query(
         `SELECT l.action, l.detail, l.created_at, s.username AS staff, tu.username AS target_user,
                 COALESCE(t.assessment_name, rt.assessment_name) AS type_name, r.risk_level AS rec_level
@@ -216,7 +198,6 @@ export async function GET(request: NextRequest) {
           LIMIT 8`,
         [from, to, HIDDEN_ACTIONS]
       ),
-      // ผู้สมัครใหม่รายวันในช่วง
       pool.query(
         `SELECT to_char(${LOCAL_CREATED}, 'YYYY-MM-DD') AS d, COUNT(*)::int AS n,
                 MAX(u.created_at AT TIME ZONE 'UTC') AS at
@@ -227,7 +208,7 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
-    /* ---------- KPI ---------- */
+    // คำนวณ KPI และข้อมูลกราฟเทียบช่วงปัจจุบันกับช่วงก่อนหน้า
     const u = usersRes.rows[0];
     const curSlots = slotsRes.rows.filter((r) => r.cur).map((r) => r.b as string);
     const prevSlots = slotsRes.rows.filter((r) => !r.cur).map((r) => r.b as string);
@@ -240,14 +221,13 @@ export async function GET(request: NextRequest) {
     const types = typesRes.rows;
     const activeTypes = types.filter((t) => t.is_active).length;
 
-    /* ---------- กราฟรายช่วง (ช่องที่ i ของช่วงนี้เทียบกับช่องที่ i ของช่วงก่อน) ---------- */
     const chart = curSlots.map((b, i) => ({
       label: bucketLabel(b, bucket, days, multiYear),
       value: curCounts.get(b) ?? 0,
       prev: prevSlots[i] !== undefined ? prevCounts.get(prevSlots[i]) ?? 0 : null,
     }));
 
-    /* ---------- สถิติผล (เฉพาะผู้ยินยอม) ---------- */
+    // นับผลประเมินตามระดับความรุนแรง (ปกติ/ปานกลาง/สูง)
     const results = resultsRes.rows;
     const inRangeRows = results.filter((r) => r.in_range);
     const resultUsers = new Set(inRangeRows.map((r) => r.user_id)).size;
@@ -259,7 +239,7 @@ export async function GET(request: NextRequest) {
       else outcome.high++;
     }
 
-    // ปัญหาที่พบมากที่สุด: แบบประเมินที่ % ผู้ใช้ซึ่งผลล่าสุด "ควรระวัง" ขึ้นไปสูงสุด
+    // หาปัญหาสุขภาพที่พบความเสี่ยงมากที่สุดจากผลล่าสุดของแต่ละคน
     const latest = new Map<string, ResultRow>();
     for (const r of inRangeRows) {
       const k = `${r.user_id}:${r.type_id}`;
@@ -279,13 +259,13 @@ export async function GET(request: NextRequest) {
         .filter((x): x is { label: string; pct: number } => x.pct !== null)
         .sort((a, b) => b.pct - a.pct)[0] ?? null;
 
-    // ประเมินซ้ำตามรอบ: 30 วันล่าสุดที่ตัดสินได้แล้ว เทียบกับ 30 วันก่อนหน้า
+    // อัตราประเมินซ้ำตรงเวลา 30 วันล่าสุด เทียบ 30 วันก่อนหน้า
     const now = Date.now();
     const windowEnd = now - GRACE_DAYS * DAY_MS;
     const onTime = onTimeRate(results, windowEnd - 30 * DAY_MS, windowEnd);
     const onTimePrev = onTimeRate(results, windowEnd - 60 * DAY_MS, windowEnd - 30 * DAY_MS);
 
-    /* ---------- งานค้าง ---------- */
+    // งานค้าง (คำแนะนำว่าง/ฉบับร่าง) และกิจกรรมล่าสุดของเจ้าหน้าที่+การสมัครใหม่
     const missing = missingRes.rows.map((r) => ({ typeId: r.id as number, assessment: typeLabel(r.name), level: r.risk_level as string }));
     const drafts = draftsRes.rows.map((r) => ({
       typeId: r.id as number,
@@ -294,7 +274,6 @@ export async function GET(request: NextRequest) {
       updatedBy: r.updated_by as string | null,
     }));
 
-    /* ---------- กิจกรรมล่าสุด ---------- */
     const activity = [
       ...logsRes.rows.map((r) => ({ kind: "staff" as const, text: describeLog(r), at: new Date(r.created_at).toISOString() })),
       ...signupsRes.rows.map((r) => ({ kind: "signup" as const, text: `ผู้ใช้สมัครใหม่ ${r.n} คน`, at: new Date(r.at).toISOString() })),
@@ -302,6 +281,7 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b.at.localeCompare(a.at))
       .slice(0, 6);
 
+    // ส่งข้อมูลภาพรวมทั้งหมดกลับไปให้หน้า dashboard เจ้าหน้าที่
     return NextResponse.json({
       success: true,
       staffName: auth.staff.username,
@@ -322,7 +302,6 @@ export async function GET(request: NextRequest) {
       outcome: {
         total: inRangeRows.length,
         users: resultUsers,
-        // กลุ่มเล็กกว่า MIN_GROUP คน ไม่แสดงสัดส่วน
         counts: resultUsers >= MIN_GROUP ? outcome : null,
       },
       accounts: {
@@ -362,8 +341,7 @@ function sum(values: Iterable<number>) {
   return s;
 }
 
-/* อัตราประเมินซ้ำตามรอบ (ตรรกะเดียวกับหน้ารายงาน แต่รวมทุกแบบประเมิน)
-   จากผลที่ครบกำหนดประเมินซ้ำในช่วง [start, end) มีกี่ % ที่ผู้ใช้กลับมาทำภายในกำหนด (+GRACE_DAYS) */
+// คำนวณอัตราการกลับมาประเมินซ้ำตรงเวลาของผู้ใช้ที่ถึงกำหนดในช่วงเวลา
 function onTimeRate(rows: ResultRow[], start: number, end: number) {
   const groups = new Map<string, ResultRow[]>();
   for (const r of rows) {
@@ -389,8 +367,7 @@ function onTimeRate(rows: ResultRow[], start: number, end: number) {
   return users.size >= MIN_GROUP ? pctOf(ok, due) : null;
 }
 
-/* ---------- ข้อความกิจกรรมของเจ้าหน้าที่ ---------- */
-
+// แถว access log พร้อมชื่อเจ้าหน้าที่ ผู้ใช้เป้าหมาย และแบบประเมินที่เกี่ยวข้อง
 type LogRow = {
   action: string;
   detail: string | null;
@@ -400,16 +377,17 @@ type LogRow = {
   rec_level: string | null;
 };
 
-// แปลง access log เป็นข้อความภาษาไทยสำหรับแสดงในฟีดกิจกรรม
+// แปลง access log ของเจ้าหน้าที่เป็นข้อความภาษาไทยที่อ่านเข้าใจได้
 function describeLog(r: LogRow) {
   const who = r.staff ?? "เจ้าหน้าที่";
   const detail = r.detail ?? "";
-  // ชื่อแบบประเมิน: จาก "type <id>" ใน detail หรือข้อความหลัง "·" (กรณีถูกลบไปแล้ว)
   const afterDot = detail.includes("·") ? detail.split("·").slice(1).join("·").trim() : "";
   const typeName = r.type_name ? typeLabel(r.type_name) : afterDot || null;
+  // ครอบข้อความด้วยเครื่องหมายคำพูด ถ้าไม่มีค่าคืนสตริงว่าง
   const q = (s: string | null | undefined) => (s ? ` “${s}”` : "");
   const version = detail.match(/(?:version|เวอร์ชัน|v)\s*(\d+)/i)?.[1];
 
+  // เลือกข้อความตามประเภท action
   switch (r.action) {
     case "suspend_user":
       return `${who} ระงับบัญชีผู้ใช้${q(r.target_user)}`;

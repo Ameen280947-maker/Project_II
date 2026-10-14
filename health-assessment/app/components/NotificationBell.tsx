@@ -17,24 +17,26 @@ import {
 } from "lucide-react";
 import type { CalculatedNotification } from "@/lib/notificationRules";
 
-// แจ้งให้ส่วนอื่น (เช่น Sidebar) โหลดจำนวนแจ้งเตือนใหม่
+// ชื่อ event ที่ใช้แจ้ง component อื่น (เช่น Sidebar) ว่าจำนวนแจ้งเตือนเปลี่ยน
 export const NOTIFICATIONS_UPDATED_EVENT = "notifications:updated";
 
-// จำนวนรายการที่ต้องให้ผู้ใช้สนใจ = ยังไม่อ่าน หรือ ครบกำหนดแล้ว (ไม่นับซ้ำ)
+// นับจำนวนแจ้งเตือนที่ต้องสนใจ (ยังไม่อ่าน, เลยกำหนด หรือถึงกำหนดวันนี้)
 export function countAlerts(notifications: CalculatedNotification[]) {
   return notifications.filter(
     (n) => !n.isRead || n.status === "overdue" || n.status === "due_today"
   ).length;
 }
 
+// props: className เพิ่มเติม และ callback เมื่อกดไปหน้าอื่น (เช่นปิดเมนูมือถือ)
 interface NotificationBellProps {
   className?: string;
   onNavigate?: () => void;
 }
 
-// คอมโพเนนต์กระดิ่งแจ้งเตือน: โหลดแจ้งเตือนทุก 1 นาที แสดงรายการแบบแท็บ และกดอ่าน/ไปยังหน้าที่เกี่ยวข้อง
+// กระดิ่งแจ้งเตือนพร้อม dropdown รายการนัดประเมินซ้ำ แยกแท็บ ทั้งหมด/ถึงกำหนด/ใกล้ถึง
 export default function NotificationBell({ className = "", onNavigate }: NotificationBellProps) {
   const router = useRouter();
+  // state: เปิด dropdown, รายการแจ้งเตือน, จำนวนยังไม่อ่าน/ถึงกำหนด และแท็บที่เลือก
   const [isOpen, setIsOpen] = useState(false);
   const [notifications, setNotifications] = useState<CalculatedNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -42,7 +44,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
   const [activeTab, setActiveTab] = useState<"all" | "due" | "upcoming">("all");
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // โหลดรายการแจ้งเตือนและสรุปจำนวน (ยังไม่อ่าน / ครบกำหนด) ของผู้ใช้จาก API
+  // ดึงรายการแจ้งเตือนและสรุปจำนวนที่ยังไม่อ่าน/ถึงกำหนดจาก API /api/notifications
   const fetchNotifications = async () => {
     try {
       const userId = localStorage.getItem("userId");
@@ -63,14 +65,16 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
     }
   };
 
+  // โหลดแจ้งเตือนตอนเปิดหน้า และดึงใหม่ทุก 60 วินาที
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000); // refresh every 1 min
+    const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, []);
 
-  // Close dropdown on outside click
+  // ผูก/ถอด listener คลิกนอก dropdown เฉพาะตอนที่เปิดอยู่
   useEffect(() => {
+    // ปิด dropdown เมื่อคลิกนอกพื้นที่กระดิ่ง
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
@@ -84,7 +88,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
     };
   }, [isOpen]);
 
-  // ทำเครื่องหมายว่าอ่านแล้ว: ระบุ id = อ่านรายการเดียว, ไม่ระบุ = อ่านทั้งหมด
+  // PATCH /api/notifications เพื่อทำเครื่องหมายอ่านแล้ว (รายการเดียว หรือทั้งหมดถ้าไม่ส่ง id)
   const markAsRead = async (notificationId?: number, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     try {
@@ -115,7 +119,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
     }
   };
 
-  // กดที่แจ้งเตือน: ทำเครื่องหมายอ่าน ปิด dropdown แล้วไปยังหน้าที่แจ้งเตือนกำหนด
+  // เมื่อกดแจ้งเตือน: มาร์กว่าอ่านแล้ว ปิด dropdown แล้วพาไปหน้า actionUrl
   const handleAction = (notif: CalculatedNotification) => {
     if (!notif.isRead && notif.notificationId) {
       markAsRead(notif.notificationId);
@@ -128,21 +132,21 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
   const alertCount = countAlerts(notifications);
   const hasAlerts = alertCount > 0;
 
-  // แจ้ง Sidebar ให้ใช้ตัวเลขเดียวกัน
+  // กระจาย event จำนวนแจ้งเตือนใหม่ให้ Sidebar อัปเดต badge
   useEffect(() => {
     window.dispatchEvent(
       new CustomEvent<number>(NOTIFICATIONS_UPDATED_EVENT, { detail: alertCount })
     );
   }, [alertCount]);
 
-  // Filter items based on activeTab
+  // กรองรายการตามแท็บที่เลือก (ทั้งหมด/ถึงกำหนด/ใกล้ถึง)
   const filteredNotifications = notifications.filter((n) => {
     if (activeTab === "due") return n.status === "overdue" || n.status === "due_today";
     if (activeTab === "upcoming") return n.status === "upcoming";
     return true;
   });
 
-  // เลือกสี ป้ายข้อความ และไอคอนของแจ้งเตือนตามสถานะ/ความเร่งด่วน
+  // คืนสี ป้ายข้อความ และไอคอนของ badge ตามสถานะ/ความเร่งด่วนของแจ้งเตือน
   const getUrgencyBadge = (urgency: string, status: string) => {
     if (status === "overdue") {
       return {
@@ -181,7 +185,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
-      {/* Bell Button */}
+      {/* ปุ่มกระดิ่ง: กดเพื่อเปิด/ปิด dropdown พร้อม badge จำนวนแจ้งเตือน */}
       <button
         type="button"
         onClick={() => {
@@ -195,7 +199,6 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
             : "bg-white text-[#b91c2b] border border-[#f1e3e5] shadow-[0_10px_26px_rgba(35,25,30,0.08)] hover:border-[#f5c9cf]"
         } ${isOpen ? "ring-4 ring-[#ef4962]/20" : ""}`}
       >
-        {/* Soft halo while there are alerts */}
         {hasAlerts && (
           <span className="pointer-events-none absolute inset-0 rounded-[20px] bg-[#ef4962]/40 animate-ping [animation-duration:2.2s]" />
         )}
@@ -209,7 +212,6 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
           }`}
         />
 
-        {/* Alert count badge */}
         {hasAlerts && (
           <span className="absolute -top-2 -right-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-white px-1.5 text-xs font-extrabold text-[#b91c2b] ring-2 ring-[#b91c2b] shadow-[0_4px_10px_rgba(185,28,43,0.35)] tabular-nums">
             {alertCount > 9 ? "9+" : alertCount}
@@ -217,10 +219,10 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
         )}
       </button>
 
-      {/* Notification Dropdown Panel */}
+      {/* dropdown รายการแจ้งเตือน */}
       {isOpen && (
         <div className="absolute right-0 mt-3 w-[360px] sm:w-[420px] max-w-[90vw] bg-white border border-gray-100 rounded-3xl shadow-2xl z-50 overflow-hidden transform transition-all duration-200 animate-in fade-in slide-in-from-top-2">
-          {/* Header */}
+          {/* ส่วนหัว: ชื่อ จำนวนที่ครบกำหนด ปุ่มอ่านทั้งหมด และปุ่มปิด */}
           <div className="p-4 bg-gradient-to-r from-[#faf5f5] to-white border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-red-50 flex items-center justify-center text-[#b91c2b]">
@@ -260,7 +262,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
             </div>
           </div>
 
-          {/* Filter Tabs */}
+          {/* แท็บกรอง: ทั้งหมด / ครบกำหนด / เร็วๆ นี้ */}
           <div className="flex border-b border-gray-100 bg-[#fbf9f9] px-3 pt-2 text-xs font-semibold">
             <button
               onClick={() => setActiveTab("all")}
@@ -299,7 +301,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
             </button>
           </div>
 
-          {/* Notifications List */}
+          {/* รายการแจ้งเตือน หรือข้อความว่างเมื่อไม่มีในหมวดนี้ */}
           <div className="max-h-[380px] overflow-y-auto divide-y divide-gray-50">
             {filteredNotifications.length === 0 ? (
               <div className="p-8 text-center text-gray-400">
@@ -337,7 +339,6 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
                         </span>
                       </div>
 
-                      {/* Overdue/Remaining text */}
                       <span
                         className={`text-xs font-semibold ${
                           isDue ? "text-[#b91c2b]" : "text-gray-500"
@@ -347,7 +348,6 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
                       </span>
                     </div>
 
-                    {/* Title & Assessment */}
                     <div className="mt-2">
                       <h4 className="text-sm font-bold text-gray-800 leading-tight">
                         {notif.assessmentName}
@@ -357,7 +357,6 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
                       </p>
                     </div>
 
-                    {/* Meta info & Action */}
                     <div className="mt-3 flex items-center justify-between pt-2 border-t border-gray-100">
                       <div className="text-[11px] text-gray-400">
                         ผลล่าสุด:{" "}
@@ -388,7 +387,7 @@ export default function NotificationBell({ className = "", onNavigate }: Notific
             )}
           </div>
 
-          {/* Footer */}
+          {/* ลิงก์ไปหน้ารายการแจ้งเตือนทั้งหมด */}
           <div className="p-3 bg-gray-50/80 border-t border-gray-100 text-center">
             <Link
               href="/notifications"

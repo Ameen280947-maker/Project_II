@@ -21,8 +21,10 @@ import RecommendationLayout, {
     type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้า ใช้กับคอมโพเนนต์แสดงผลประเมิน
 const TONE = "mint";
 
+// รูปแบบผลประเมิน BMI จาก API (น้ำหนัก ส่วนสูง ค่า BMI ระดับ คำแนะนำ)
 type AssessmentResult = {
     assessmentId: number;
     weightKg: number | null;
@@ -34,17 +36,14 @@ type AssessmentResult = {
     assessmentName: string;
 };
 
+// รูปแบบ response ของ API ผลประเมิน
 type ResultResponse = {
     success: boolean;
     result?: AssessmentResult;
     message?: string;
 };
 
-/* =========================================================
-   เกณฑ์ระดับ BMI (ตรงกับ API)
-   สีตามตารางของสำนักโภชนาการ กรมอนามัย
-========================================================= */
-
+// ตารางเกณฑ์ BMI แต่ละระดับ พร้อมช่วงค่าและสีที่ใช้แสดง
 const BMI_LEVELS: { level: string; range: string; color: RiskColor }[] = [
     { level: "ผอม", range: "< 18.5", color: "green" },
     { level: "ปกติ", range: "18.5 – 22.9", color: "yellow" },
@@ -53,6 +52,7 @@ const BMI_LEVELS: { level: string; range: string; color: RiskColor }[] = [
     { level: "อ้วนอันตราย", range: "≥ 30.0", color: "red" },
 ];
 
+// คลาสสีของจุดนำหน้าแต่ละระดับในตารางเกณฑ์
 const DOT: Record<RiskColor, string> = {
     green: "bg-[#4f9857]",
     yellow: "bg-[#d9a400]",
@@ -61,7 +61,7 @@ const DOT: Record<RiskColor, string> = {
     gray: "bg-[#a3a4ab]",
 };
 
-// หน้าผลและคำแนะนำ BMI: ครอบเนื้อหาด้วย Suspense (เพราะใช้ useSearchParams)
+// หน้า: ผลประเมิน BMI และคำแนะนำ ครอบด้วย Suspense
 export default function BmiResultPage() {
     return (
         <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -70,17 +70,21 @@ export default function BmiResultPage() {
     );
 }
 
-// เนื้อหาหน้าผล BMI: โหลดผลตาม assessmentId แล้วแสดงระดับและการ์ดคำแนะนำ
+// เนื้อหาหน้า: แสดงค่า BMI ระดับความเสี่ยง และการ์ดคำแนะนำตาม assessmentId
+// แสดงวงคะแนน BMI สรุปน้ำหนัก/ส่วนสูง ตารางเกณฑ์ BMI (ไฮไลต์ระดับผู้ใช้) และการ์ดแนวทางดูแล
 function BmiResultContent() {
     const searchParams = useSearchParams();
     const assessmentId = searchParams.get("assessmentId");
 
+    // state ของหน้า: ผลประเมิน สถานะโหลด และ error
     const [result, setResult] = useState<AssessmentResult | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
+    // โหลดผลประเมินจาก API ตอนเปิดหน้า
     useEffect(() => {
-        // โหลดผลประเมิน BMI ตาม assessmentId จาก API
+        // ดึงผลประเมินจาก /api/assessments/bmi (401 → ลบ userId แล้วไปหน้า login)
+        // ขั้นตอน: ไม่มี assessmentId → error → fetch → ตรวจ success → เก็บผลลง state
         const loadResult = async () => {
             if (!assessmentId) {
                 setError("ไม่พบ assessmentId");
@@ -97,7 +101,6 @@ function BmiResultContent() {
                     { method: "GET", cache: "no-store" },
                 );
 
-                // session หมดอายุ → กลับไปหน้า login
                 if (response.status === 401) {
                     localStorage.removeItem("userId");
                     window.location.replace("/login");
@@ -125,6 +128,7 @@ function BmiResultContent() {
         void loadResult();
     }, [assessmentId]);
 
+    // สถานะกำลังโหลด / error
     if (loading) {
         return <RecommendationLoading tone={TONE} />;
     }
@@ -133,10 +137,12 @@ function BmiResultContent() {
         return <RecommendationError tone={TONE} message={error} editHref="/assessment_BMI" />;
     }
 
+    // ค่าที่คำนวณสำหรับแสดงผล (สีตามระดับ BMI, ชุดสีของโทน)
     const riskColor: RiskColor =
         BMI_LEVELS.find((b) => b.level === result.riskLevel)?.color ?? "gray";
     const t = RECOMMENDATION_TONES[TONE];
 
+    // ส่วนแสดงผล: วงค่า BMI สรุปผล และคำแนะนำ
     return (
         <RecommendationLayout
             tone={TONE}
@@ -149,7 +155,6 @@ function BmiResultContent() {
             score={
                 <ScoreCircle
                     tone={TONE}
-                    // เทียบกับเกณฑ์อ้วนอันตราย (BMI 30)
                     progress={result.bmi / 30}
                     value={result.bmi.toFixed(1)}
                     caption="BMI (kg/m²)"
@@ -175,10 +180,8 @@ function BmiResultContent() {
             assessmentId={assessmentId}
             editHref="/assessment_BMI"
         >
-            {/* =====================================================
-                เกณฑ์ BMI + แนวทางดูแลสุขภาพตามระดับ
-            ====================================================== */}
 
+            {/* ตารางเกณฑ์ BMI ไฮไลต์ระดับของผู้ใช้ */}
             <RecommendationSection
                 icon={<Ruler size={27} className={t.eyebrow} />}
                 title="เกณฑ์ดัชนีมวลกาย (BMI)"
@@ -205,6 +208,7 @@ function BmiResultContent() {
                 </div>
             </RecommendationSection>
 
+            {/* การ์ดแนวทางดูแลสุขภาพตามระดับ BMI */}
             <RecommendationSection
                 icon={<ShieldCheck size={27} className={t.eyebrow} />}
                 title="แนวทางดูแลสุขภาพ"
@@ -221,10 +225,8 @@ function BmiResultContent() {
     );
 }
 
-/*
-  การ์ดแนวทางแยกตามระดับ ให้สอดคล้องกับคำแนะนำในเอกสารอ้างอิง ตารางที่ 12
-  ผอม = ควรเพิ่มน้ำหนัก, ปกติ = ควบคุมน้ำหนัก, น้ำหนักเกินขึ้นไป = ลดน้ำหนัก, อ้วนอันตราย = พบแพทย์
-*/
+// คืนรายการการ์ดคำแนะนำ 3 ใบ (โภชนาการ/ออกกำลังกาย/ติดตามสุขภาพ) ตามระดับ BMI
+// ผอม → เพิ่มพลังงาน, ปกติ → คงน้ำหนัก, เกิน/อ้วน → ลดน้ำหนัก (อ้วนอันตรายให้พบแพทย์)
 function getAdviceCards(riskLevel: string): { icon: ReactNode; title: string; description: string }[] {
     const nutrition = <Apple size={31} />;
     const exercise = <PersonStanding size={32} />;

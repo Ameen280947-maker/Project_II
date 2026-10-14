@@ -10,25 +10,18 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// แถวคำถามจากตาราง questions
 type QuestionRow = {
   question_id: number;
   question_text: string;
   display_order: number;
 };
 
-/* =========================================================
-   ฟังก์ชันแปลระดับความดัน
-========================================================= */
-
+// แปลค่าความดันตัวบน/ตัวล่างเป็นระดับความเสี่ยงความดันโลหิต
 function calculateRiskLevel(
   systolic: number,
   diastolic: number,
 ) {
-  /*
-    เรียงจากระดับรุนแรงที่สุดลงมา (เอกสารอ้างอิง ตารางที่ 4)
-    เช็กแค่ขอบล่างของแต่ละระดับ เพราะระดับที่สูงกว่าถูกคัดออกไปก่อนแล้ว
-    ค่าทศนิยม เช่น 139.5 จึงไม่ตกช่องว่างระหว่างระดับ
-  */
 
   if (systolic >= 180 || diastolic >= 110) {
     return "ความดันโลหิตสูงอันตราย";
@@ -53,16 +46,13 @@ function calculateRiskLevel(
   return "ความดันอยู่ในระดับปกติ";
 }
 
-/* =========================================================
-   GET
-   ดึงผล assessment จาก assessmentId
-========================================================= */
-
+// API: ดึงผลประเมินความดันโลหิตตาม assessmentId ของผู้ใช้ที่ล็อกอิน พร้อมคำแนะนำ
 export async function GET(request: Request) {
   const auth = requireUser(request);
   if (!auth.ok) return auth.response;
 
   try {
+    // ตรวจ assessmentId จาก query string
     const url = new URL(request.url);
 
     const assessmentId = Number(
@@ -82,10 +72,7 @@ export async function GET(request: Request) {
       );
     }
 
-    /*
-      ดึงข้อมูล assessment 
-    */
-
+    // ดึงผลประเมินของผู้ใช้พร้อมคำแนะนำฉบับ ณ เวลาที่ประเมิน
     const assessmentResult = await pool.query<{
       assessment_id: number;
       user_id: number;
@@ -138,10 +125,7 @@ export async function GET(request: Request) {
       );
     }
 
-    /*
-      ดึงคำตอบ SBP / DBP
-    */
-
+    // ดึงคำตอบ แล้วแยกค่าความดันตัวบน (ข้อ 1) และตัวล่าง (ข้อ 2)
     const answersResult =
       await pool.query<{
         display_order: number;
@@ -180,6 +164,7 @@ export async function GET(request: Request) {
       }
     }
 
+    // ประกอบผลลัพธ์แล้วคืน JSON
     const assessment =
       assessmentResult.rows[0];
 
@@ -213,6 +198,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/blood-pressure", error);
     console.error(
       "GET BLOOD PRESSURE ERROR:",
@@ -230,32 +216,22 @@ export async function GET(request: Request) {
   }
 }
 
-/* =========================================================
-   POST
-   บันทึกแบบประเมินความดัน
-========================================================= */
-
+// API: ตรวจค่าความดันที่กรอก คำนวณระดับความเสี่ยง แล้วบันทึกผลประเมินลงฐานข้อมูล
 export async function POST(request: Request) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน และความยินยอม
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
   const auth = requireUser(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(2);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(auth.userId);
   if (noConsent) return noConsent;
   const userId = auth.userId;
 
-  /* ================= Validation =================
-     ค่าความดันเป็นจำนวนเต็ม mmHg
-     SBP 60-250, DBP 30-150 และตัวบนต้องสูงกว่าตัวล่าง
-  ================================================= */
-
+  // ตรวจค่าความดันที่กรอก (ช่วงค่าที่ยอมรับ และตัวบนต้องมากกว่าตัวล่าง)
   const systolic = toIntInRange(body.systolic, 60, 250);
   const diastolic = toIntInRange(body.diastolic, 30, 150);
 
@@ -278,9 +254,8 @@ export async function POST(request: Request) {
       return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
+    // เริ่ม transaction แล้วหา assessment_type_id ของแบบประเมินความดัน
     await client.query("BEGIN");
-
-    /* ================= Assessment Type ================= */
 
     const typeResult =
       await client.query<{
@@ -312,8 +287,7 @@ export async function POST(request: Request) {
       typeResult.rows[0]
         .assessment_type_id;
 
-    /* ================= ดึงคำถาม ================= */
-
+    // ดึงคำถาม SBP (ข้อ 1) และ DBP (ข้อ 2) จาก DB
     const questionResult =
       await client.query<QuestionRow>(
         `
@@ -359,15 +333,12 @@ export async function POST(request: Request) {
       );
     }
 
-    /* ================= คำนวณระดับ ================= */
-
+    // คำนวณระดับความเสี่ยงและหาคำแนะนำที่ตรงกัน
     const riskLevel =
       calculateRiskLevel(
         systolic,
         diastolic,
       );
-
-    /* ================= Recommendation ================= */
 
     const recommendationResult =
       await client.query<{
@@ -396,8 +367,7 @@ export async function POST(request: Request) {
       recommendationResult.rows[0] ??
       null;
 
-    /* ================= Insert Assessment ================= */
-
+    // บันทึกผลประเมินลงตาราง assessment
     const assessmentResult =
       await client.query<{
         assessment_id: number;
@@ -427,21 +397,16 @@ export async function POST(request: Request) {
           recommendation?.rec_id ??
             null,
 
-          /*
-            Blood Pressure ไม่ใช่แบบรวมคะแนน
-            ดังนั้น total_score ให้ NULL
-          */
           null,
 
           riskLevel,
         ],
       );
 
+    // บันทึกคำตอบ SBP และ DBP ลง assessment_answers
     const assessmentId =
       assessmentResult.rows[0]
         .assessment_id;
-
-    /* ================= บันทึก SBP ================= */
 
     await client.query(
       `
@@ -468,8 +433,6 @@ export async function POST(request: Request) {
       ],
     );
 
-    /* ================= บันทึก DBP ================= */
-
     await client.query(
       `
       INSERT INTO assessment_answers (
@@ -495,9 +458,9 @@ export async function POST(request: Request) {
       ],
     );
 
+    // commit ผูกเวอร์ชันแบบประเมิน แล้วคืนผลลัพธ์ (201)
     await client.query("COMMIT");
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId, typeId: assessmentTypeId, assessmentId: assessmentId });
 
     return NextResponse.json(
@@ -519,6 +482,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    // จัดการ error → บันทึก log, rollback และคืน 500
     void logSystemError("POST /api/assessments/blood-pressure", error);
     try {
       await client.query("ROLLBACK");

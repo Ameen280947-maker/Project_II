@@ -4,23 +4,18 @@ import { syncUserNotifications } from "@/lib/notificationRules";
 import { requireUser } from "@/lib/session";
 import { logSystemError } from "@/lib/errorLogger";
 
-/* =========================================================
-   GET /api/notifications?userId=xxx
-========================================================= */
-// GET: ซิงค์และคืนการแจ้งเตือนของผู้ใช้ แยกครบกำหนด/ใกล้ถึง พร้อมจำนวนที่ยังไม่อ่าน
+// API: ซิงก์การแจ้งเตือนประเมินซ้ำของผู้ใช้ แล้วแยกเป็นรายการถึงกำหนด/ใกล้ถึง พร้อมจำนวนที่ยังไม่อ่าน
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(request, searchParams.get("userId"));
     if (!auth.ok) return auth.response;
     const userIdNumber = auth.userId;
 
-    // ซิงค์และดึงการแจ้งเตือนทั้งหมดของผู้ใช้
+    // ซิงก์การแจ้งเตือนจากผลประเมินล่าสุด แล้วแยกกลุ่มถึงกำหนด/ใกล้ถึง/ยังไม่อ่าน
     const notifications = await syncUserNotifications(pool, userIdNumber);
 
-    // จำแนกตามสถานะ
     const dueNotifications = notifications.filter(
       (n) => n.status === "overdue" || n.status === "due_today"
     );
@@ -60,21 +55,17 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* =========================================================
-   PATCH /api/notifications
-   Mark notification(s) as read
-========================================================= */
-// PATCH: ทำเครื่องหมายว่าอ่านแล้ว (รายการเดียว หรือทั้งหมดเมื่อส่ง markAll)
+// API: ทำเครื่องหมายการแจ้งเตือนว่าอ่านแล้ว ทีละรายการหรือทั้งหมด (user_notifications)
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const { userId, notificationId, markAll } = body;
 
-    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(request, userId);
     if (!auth.ok) return auth.response;
     const userIdNumber = auth.userId;
 
+    // markAll → อ่านทั้งหมด
     if (markAll) {
       await pool.query(
         `
@@ -91,6 +82,7 @@ export async function PATCH(request: NextRequest) {
       });
     }
 
+    // ไม่งั้นอ่านเฉพาะรายการที่ระบุ (ต้องเป็นของผู้ใช้เอง)
     if (!notificationId) {
       return NextResponse.json(
         { success: false, message: "ไม่พบ Notification ID" },

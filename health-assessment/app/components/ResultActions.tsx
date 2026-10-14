@@ -2,15 +2,10 @@ import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import type { CardTone } from "@/app/components/AssessmentMenuCard";
 
-/* =========================================================
-   ปุ่มท้ายหน้าผลประเมิน/คำแนะนำ
-   "กลับไปแก้แบบประเมิน" + "เลือกแบบประเมินอื่น"
-   ใช้เหมือนกันทุกแบบประเมิน (อิงหน้าโรคหัวใจ) สีตามโทนของแบบประเมิน
-========================================================= */
-
+// คลาสพื้นฐานของปุ่มท้ายหน้าผลลัพธ์
 const btnBase = "flex h-13 items-center justify-center gap-2 rounded-full px-6 font-semibold";
 
-// เขียนคลาสเต็มทุกตัว ให้ Tailwind สร้าง CSS ได้
+// ชุดสีของปุ่ม "แก้แบบประเมิน" และ "เลือกแบบประเมินอื่น" ตาม tone ของการ์ด
 const TONES: Record<CardTone, { edit: string; menu: string }> = {
   rose: { edit: "border-[#ead9db] text-[#8a1420]", menu: "bg-[#fff0f2] text-[#ef4962]" },
   green: { edit: "border-[#cde0c0] text-[#2c5a20]", menu: "bg-[#ebf3e2] text-[#3f7a2e]" },
@@ -22,7 +17,7 @@ const TONES: Record<CardTone, { edit: string; menu: string }> = {
   pink: { edit: "border-[#efc1d3] text-[#8c1a45]", menu: "bg-[#fce9f0] text-[#b4235a]" },
 };
 
-// ปุ่มท้ายหน้าผล: กลับไปแก้แบบประเมิน และเลือกแบบประเมินอื่น (สีตามโทน)
+// ปุ่มท้ายหน้าผลลัพธ์: กลับไปแก้แบบประเมิน และไปเลือกแบบประเมินอื่น (สีตาม tone)
 export default function ResultActions({
   editHref,
   menuHref = "/assessment-menu",
@@ -32,7 +27,6 @@ export default function ResultActions({
 }: {
   editHref: string;
   menuHref?: string;
-  /* ใช้แทนลิงก์ เมื่อหน้าต้องทำอย่างอื่นก่อนเปลี่ยนหน้า เช่น เปิด popup */
   onMenuClick?: () => void;
   tone?: CardTone;
   className?: string;

@@ -4,12 +4,9 @@ import type { ReactNode } from "react";
 import type { SnapLevel, SnapQuestion, Snapshot } from "@/lib/staff/assessmentVersions";
 import type { CategoryTheme } from "@/lib/assessmentCategories";
 
-/* =========================================================
-   ชนิดข้อมูลและตัวช่วยของหน้าจัดการแบบประเมิน (ตรงกับ /api/staff/assessments)
-========================================================= */
-
 export type { SnapLevel, SnapQuestion, Snapshot };
 
+// แถวแบบประเมินในรายการฝั่งเจ้าหน้าที่ (สถานะ จำนวนคำถาม ร่าง เวอร์ชัน)
 export type TypeRow = {
   id: number;
   name: string;
@@ -24,7 +21,7 @@ export type TypeRow = {
   builtIn: boolean;
 };
 
-// หมวดหมู่แบบประเมิน (types = จำนวนแบบประเมินในหมวด)
+// ตัวเลือกหมวดหมู่สำหรับ dropdown พร้อมจำนวนแบบประเมินในหมวด
 export type CategoryOption = {
   id: number;
   name: string;
@@ -35,6 +32,7 @@ export type CategoryOption = {
   types: number;
 };
 
+// รายละเอียดแบบประเมินที่เปิดแก้ไข: เนื้อหาร่าง/ที่ใช้อยู่ ข้อมูลเวอร์ชัน และผู้แก้ล่าสุดของแต่ละระดับ
 export type Detail = {
   id: number;
   name: string;
@@ -52,15 +50,17 @@ export type Detail = {
   levelMeta: Record<string, { at: string | null; by: string | null }>;
 };
 
+// ชนิดข้อมูลฝั่งฟอร์มแก้ไข (เพิ่ม key ให้แต่ละคำถาม/ระดับ) และ state ทั้งหมดของฟอร์ม
 export type EQuestion = SnapQuestion & { key: string };
 export type ELevel = SnapLevel & { key: string };
 export type EState = { description: string; source: string; questions: EQuestion[]; levels: ELevel[] };
 
+// ตัวนับสำหรับสร้าง key ชั่วคราว
 let keySeq = 0;
-// สร้าง key ไม่ซ้ำสำหรับรายการในตัวแก้ไข (ใช้เป็น React key)
+// สร้าง key ชั่วคราวที่ไม่ซ้ำสำหรับรายการในฟอร์มแก้ไข
 export const newKey = () => `k${++keySeq}`;
 
-// แปลง snapshot จาก API เป็น state ที่แก้ไขได้ (คัดลอกและเติม key)
+// แปลง snapshot จาก API เป็น state ที่แก้ไขได้ (คัดลอกข้อมูลและใส่ key ให้ทุกรายการ)
 export const toEditable = (s: Snapshot): EState => ({
   description: s.description ?? "",
   source: s.source ?? "",
@@ -68,7 +68,7 @@ export const toEditable = (s: Snapshot): EState => ({
   levels: s.levels.map((l) => ({ ...l, key: newKey() })),
 });
 
-// แปลง state ที่แก้ไขกลับเป็น snapshot (ตัด key, คำถามแบบตัวเลขไม่มีตัวเลือก)
+// แปลง state ในฟอร์มกลับเป็น snapshot สำหรับบันทึกร่าง/เผยแพร่ (ตัด key ออก)
 export const toSnapshot = (e: EState, base: { name: string; generic: boolean }): Snapshot => ({
   name: base.name,
   generic: base.generic,
@@ -93,12 +93,13 @@ export const toSnapshot = (e: EState, base: { name: string; generic: boolean }):
   })),
 });
 
-// เช็คว่าระดับผลยังไม่มีข้อความคำแนะนำ
+// ตรวจว่าระดับผลยังไม่มีข้อความคำแนะนำหรือไม่
 export const isMissing = (l: { text: string }) => !l.text.trim();
 
+// ความยาวคำแนะนำที่แนะนำ (ตัวอักษร) ให้อ่านง่ายบนมือถือ
 export const MAX_HINT = 300;
 
-// ค่าเดิมจากหน้าคำแนะนำสุขภาพ (ค่าที่ไม่อยู่ในรายการจะแสดงเพิ่มให้เลือกได้)
+// รายการสายด่วนที่เลือกแสดงคู่กับคำแนะนำได้
 export const HOTLINES = [
   { value: "", label: "ไม่แสดงสายด่วน" },
   { value: "1323 สายด่วนสุขภาพจิต", label: "1323 สายด่วนสุขภาพจิต" },
@@ -108,6 +109,7 @@ export const HOTLINES = [
   { value: "1422 กรมควบคุมโรค", label: "1422 กรมควบคุมโรค" },
 ];
 
+// คลาสสีจุดและป้ายระดับผล ตามความรุนแรง 0–3
 export const SEV_DOT = ["bg-risk-ok", "bg-risk-mid", "bg-[#f07a3a]", "bg-risk-crit"];
 export const SEV_PILL_USER = [
   "bg-[#e8f7ed] text-[#21733f]",
@@ -116,11 +118,11 @@ export const SEV_PILL_USER = [
   "bg-[#fde6e7] text-[#a61e28]",
 ];
 
-// ข้อความช่วงคะแนนของระดับผล (ไม่มี min/max = เกณฑ์คำนวณในระบบ)
+// แสดงช่วงคะแนนของระดับผลเป็นข้อความ หรือบอกว่าคำนวณในระบบ
 export const rangeText = (l: { min: number | null; max: number | null }) =>
   l.min !== null && l.max !== null ? `คะแนน ${l.min}–${l.max}` : "เกณฑ์คำนวณในระบบ";
 
-// ช่วงคะแนนรวมที่เป็นไปได้จากคำถามแบบตัวเลือก
+// คำนวณคะแนนรวมต่ำสุด-สูงสุดที่เป็นไปได้จากคำถามแบบเลือกตอบทั้งหมด
 export function possibleRange(questions: SnapQuestion[]) {
   const qs = questions.filter((q) => q.type === "choice" && q.choices.length);
   return {
@@ -130,7 +132,7 @@ export function possibleRange(questions: SnapQuestion[]) {
   };
 }
 
-// ปุ่มไอคอนขนาดเล็ก (มี tooltip และโหมดอันตรายสีแดง)
+// ปุ่มไอคอนสี่เหลี่ยมเล็ก มี tooltip/aria-label และโหมดสีแดงสำหรับการลบ
 export function IconBtn({
   children,
   label,

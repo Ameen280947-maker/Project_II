@@ -18,16 +18,14 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ตัวเลือกคำตอบหนึ่งรายการ พร้อมคะแนน
 type Choice = {
   choice_id: number;
   choice_text: string;
   score: number;
 };
 
+// คำถามหนึ่งข้อจาก API พร้อมตัวเลือก
 type Question = {
   question_id: number;
   question_text: string;
@@ -37,23 +35,17 @@ type Question = {
   choices: Choice[];
 };
 
+// คำตอบหนึ่งข้อที่ส่งไป API
 type Answer = {
   question_id: number;
   choice_id: number;
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าแบบคัดกรองภาวะซึมเศร้า 2Q: ตอบทีละข้อ แล้วส่งผล (อาจต่อไปทำ 9Q)
+// หน้า: แบบคัดกรองโรคซึมเศร้า 2Q ทีละข้อ
 export default function Depression2QPage() {
   const router = useRouter();
 
-  /* =======================================================
-     STATE
-  ======================================================= */
-
+  // state ของหน้า: คำถาม คำตอบ สถานะโหลด/ส่ง error ข้อปัจจุบัน และ userId
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, number>>({});
 
@@ -64,17 +56,14 @@ export default function Depression2QPage() {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
 
-  /* =======================================================
-     CHECK USER & LOAD QUESTIONS
-  ======================================================= */
-
+  // อ่าน userId และโหลดคำถาม 2Q ตอนเปิดหน้า
   useEffect(() => {
     if (typeof window !== "undefined") {
       const storedId = localStorage.getItem("userId");
       setUserId(storedId);
     }
 
-    // โหลดคำถาม 2Q จาก API
+    // โหลดคำถาม 2Q จาก GET /api/assessments/depression?stage=2q
     const loadQuestions = async () => {
       try {
         setLoading(true);
@@ -119,11 +108,7 @@ export default function Depression2QPage() {
     loadQuestions();
   }, []);
 
-  /* =======================================================
-     SELECT ANSWER
-  ======================================================= */
-
-  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
+  // บันทึกตัวเลือกที่ผู้ใช้เลือกของข้อปัจจุบันลง state
   const handleSelectAnswer = (
     questionId: number,
     choiceId: number
@@ -136,10 +121,7 @@ export default function Depression2QPage() {
     setError("");
   };
 
-  /* =======================================================
-     CHECK CURRENT ANSWER
-  ======================================================= */
-
+  // ข้อมูลของข้อปัจจุบันและคำตอบที่เลือกไว้
   const currentQuestionData = questions[currentQuestion];
 
   const currentAnswer =
@@ -147,11 +129,7 @@ export default function Depression2QPage() {
       ? answers[currentQuestionData.question_id]
       : undefined;
 
-  /* =======================================================
-     NEXT QUESTION
-  ======================================================= */
-
-  // ตรวจว่าตอบข้อปัจจุบันแล้ว จากนั้นไปข้อถัดไป หรือส่งผลถ้าเป็นข้อสุดท้าย
+  // ตรวจว่าตอบข้อบังคับแล้ว จากนั้นไปข้อถัดไปหรือส่งผลเมื่อถึงข้อสุดท้าย
   const handleNext = () => {
     if (!currentQuestionData) {
       return;
@@ -181,11 +159,7 @@ export default function Depression2QPage() {
     handleSubmit();
   };
 
-  /* =======================================================
-     PREVIOUS QUESTION
-  ======================================================= */
-
-  // ย้อนกลับไปข้อก่อนหน้า
+  // ย้อนกลับไปข้อก่อนหน้าและเลื่อนหน้าขึ้นบนสุด
   const handlePrevious = () => {
     if (currentQuestion > 0) {
       setCurrentQuestion((previous) => previous - 1);
@@ -198,16 +172,13 @@ export default function Depression2QPage() {
     }
   };
 
-  /* =======================================================
-     SUBMIT 2Q
-  ======================================================= */
-
-  // ตรวจว่าตอบครบ แล้ว POST ผล 2Q และพาไปหน้า 9Q หรือหน้าคำแนะนำตามผลที่ได้
+  // ส่งคำตอบ POST /api/assessments/depression แล้วไปต่อ 9Q (ถ้ามี next_path) หรือหน้าผลลัพธ์
   const handleSubmit = async () => {
     try {
       setSubmitting(true);
       setError("");
 
+      // ตรวจ userId
       const activeUserId =
         userId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
 
@@ -217,7 +188,7 @@ export default function Depression2QPage() {
         return;
       }
 
-      /* ตรวจสอบว่าตอบครบทุกข้อ */
+      // ตรวจว่าตอบครบ ถ้ายังไม่ครบให้กระโดดไปข้อแรกที่ยังไม่ได้ตอบ
       const unansweredQuestions = questions.filter(
         (question) =>
           question.is_required &&
@@ -239,6 +210,7 @@ export default function Depression2QPage() {
         return;
       }
 
+      // ส่งคำตอบ stage 2q ไปบันทึกที่ API
       const answerPayload: Answer[] = questions.map((question) => ({
         question_id: question.question_id,
         choice_id: answers[question.question_id],
@@ -264,6 +236,7 @@ export default function Depression2QPage() {
         );
       }
 
+      // เลือกหน้าถัดไป: next_path จาก API → มีความเสี่ยงไป 9Q → ไม่เสี่ยงไปหน้าคำแนะนำ 2Q
       if (data?.next_path) {
         router.push(data.next_path);
         return;
@@ -295,10 +268,7 @@ export default function Depression2QPage() {
     }
   };
 
-  /* =======================================================
-     LOADING
-  ======================================================= */
-
+  // หน้าระหว่างโหลดคำถาม
   if (loading) {
     return (
       <div className="flex min-h-screen bg-[#f8f9fb]">
@@ -317,10 +287,7 @@ export default function Depression2QPage() {
     );
   }
 
-  /* =======================================================
-     ERROR
-  ======================================================= */
-
+  // โหลดคำถามไม่สำเร็จ → หน้า error พร้อมปุ่มลองใหม่
   if (error && questions.length === 0) {
     return (
       <div className="flex min-h-screen bg-[#f8f9fb]">
@@ -350,15 +317,7 @@ export default function Depression2QPage() {
     );
   }
 
-  /* =======================================================
-     PROGRESS
-  ======================================================= */
-
   const progress = ((currentQuestion + 1) / questions.length) * 100;
-
-  /* =======================================================
-     MAIN UI
-  ======================================================= */
 
   return (
     <div className="flex min-h-screen bg-[#f8f9fb]">
@@ -367,9 +326,7 @@ export default function Depression2QPage() {
       <main className="min-w-0 flex-1">
         <div className="mx-auto w-full max-w-5xl px-6 py-8 lg:px-10">
 
-          {/* =================================================
-              HEADER
-          ================================================= */}
+          {/* ส่วนหัว: ชื่อแบบประเมิน คำอธิบาย และแจ้งเตือนถ้ายังไม่ login */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -388,7 +345,6 @@ export default function Depression2QPage() {
                 </div>
               </div>
 
-              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
               <HealthConsentNotice />
               <AssessmentBackLink href="/assessment-menu-mental-health" />
             </div>
@@ -410,9 +366,7 @@ export default function Depression2QPage() {
             )}
           </div>
 
-          {/* =================================================
-              PROGRESS CARD
-          ================================================= */}
+          {/* การ์ดความคืบหน้า พร้อมปุ่มเลขข้อสำหรับกระโดดไปข้อที่ตอบแล้ว */}
           <div className="mb-6 rounded-3xl border border-[#eee5e6] bg-white p-5 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -427,7 +381,6 @@ export default function Depression2QPage() {
               </div>
             </div>
 
-            {/* Progress bar */}
             <div className="h-2.5 overflow-hidden rounded-full bg-[#f1eeee]">
               <div
                 className="h-full rounded-full bg-[#5b3ea6] transition-all duration-300"
@@ -435,7 +388,6 @@ export default function Depression2QPage() {
               />
             </div>
 
-            {/* Question indicators */}
             <div className="mt-4 flex items-center justify-center gap-3">
               {questions.map((question, index) => {
                 const answered = answers[question.question_id] !== undefined;
@@ -471,12 +423,9 @@ export default function Depression2QPage() {
             </div>
           </div>
 
-          {/* =================================================
-              QUESTION CARD
-          ================================================= */}
+          {/* การ์ดคำถามข้อปัจจุบัน: ตัวเลือก ข้อความ error และปุ่มย้อนกลับ/ถัดไป */}
           {currentQuestionData && (
             <div className="rounded-[28px] border border-[#eee5e6] bg-white p-6 shadow-sm sm:p-8">
-              {/* Question number badge */}
               <div className="mb-6 flex items-center gap-3">
                 <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#5b3ea6] text-sm font-bold text-white shadow-sm">
                   {currentQuestion + 1}
@@ -492,7 +441,6 @@ export default function Depression2QPage() {
                 </div>
               </div>
 
-              {/* Question text */}
               <h2 className="max-w-3xl text-xl font-bold leading-9 text-[#2f3037] sm:text-2xl">
                 {currentQuestionData.question_text}
               </h2>
@@ -501,9 +449,7 @@ export default function Depression2QPage() {
                 กรุณาเลือกคำตอบที่ตรงกับความรู้สึกของท่าน
               </p>
 
-              {/* =================================================
-                  CHOICES
-              ================================================= */}
+              {/* รายการตัวเลือกคำตอบ */}
               <div className="mt-8 space-y-4">
                 {currentQuestionData.choices.map((choice) => {
                   const selected = currentAnswer === choice.choice_id;
@@ -570,14 +516,13 @@ export default function Depression2QPage() {
                 })}
               </div>
 
-              {/* Error */}
               {error && (
                 <div className="mt-6 rounded-2xl border border-red-100 bg-red-50 px-5 py-4">
                   <p className="text-sm font-medium text-red-600">{error}</p>
                 </div>
               )}
 
-              {/* Buttons */}
+              {/* ปุ่มนำทาง ย้อนกลับ / ข้อถัดไป / ส่งแบบประเมิน */}
               <div className="mt-8 flex flex-col-reverse gap-3 border-t border-[#f0eded] pt-6 sm:flex-row sm:items-center sm:justify-between">
                 <button
                   type="button"
@@ -625,7 +570,7 @@ export default function Depression2QPage() {
             </div>
           )}
 
-          {/* Footer Note */}
+          {/* หมายเหตุท้ายหน้า: ถ้าพบความเสี่ยงจะไปต่อแบบประเมิน 9Q */}
           <div className="mt-6 rounded-2xl bg-[#f7f4fc] border border-[#f5ecec] px-5 py-4">
             <p className="text-center text-xs leading-6 text-[#999aa2]">
               แบบคัดกรอง 2Q เป็นการประเมินเบื้องต้น หากผลพบความเสี่ยง ระบบจะนำท่านเข้าสู่แบบประเมินโรคซึมเศร้า 9Q เพื่อการประเมินที่ละเอียดต่อไป

@@ -3,11 +3,7 @@
 import type { ReactNode } from "react";
 import { AlertTriangle } from "lucide-react";
 
-/* =========================================================
-   ชิ้นส่วน UI ที่ใช้ร่วมกันทุกหน้าของ Staff (โทน staff-* ใน globals.css)
-========================================================= */
-
-// หัวเพจ: eyebrow ชื่อเรื่อง (ส่วนเน้นสี) คำอธิบาย และปุ่มด้านขวา
+// หัวหน้าเพจของระบบเจ้าหน้าที่ (eyebrow, ชื่อเรื่องพร้อมส่วนเน้น, คำอธิบาย และปุ่มด้านขวา)
 export function PageHeader({
   eyebrow,
   title,
@@ -36,7 +32,7 @@ export function PageHeader({
   );
 }
 
-// การ์ดพื้นขาวขอบมนสำหรับห่อเนื้อหา
+// กล่องการ์ดพื้นขาวขอบมนสำหรับห่อเนื้อหา
 export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div className={`min-w-0 rounded-[22px] border border-staff-line bg-white p-6 shadow-[0_1px_2px_rgba(20,20,19,0.04)] ${className}`}>
@@ -45,7 +41,7 @@ export function Card({ children, className = "" }: { children: ReactNode; classN
   );
 }
 
-// การ์ดตัวเลขสถิติพร้อมป้ายและหมายเหตุ ถ้าส่ง onClick จะกดดูรายละเอียดได้
+// การ์ดตัวเลข KPI พร้อมจุดสีตามโทน และกดดูรายละเอียดได้เมื่อมี onClick
 export function StatCard({
   label,
   value,
@@ -57,11 +53,12 @@ export function StatCard({
   value?: ReactNode;
   note?: ReactNode;
   tone?: "brand" | "danger" | "warn" | "ok";
-  // ส่งมา = กดดูรายละเอียดได้
   onClick?: () => void;
 }) {
+  // เลือกสีจุดและสีตัวเลขตามโทน
   const dot = { brand: "bg-staff-ink", danger: "bg-risk-high", warn: "bg-risk-mid", ok: "bg-risk-ok" }[tone];
   const num = { brand: "text-staff-ink", danger: "text-risk-high", warn: "text-staff-ink", ok: "text-staff-ink" }[tone];
+  // เนื้อหาการ์ด: ป้ายชื่อ ตัวเลข หมายเหตุ และลิงก์ดูรายละเอียด
   const content = (
     <>
       <div className="flex items-center justify-between gap-2">
@@ -79,6 +76,7 @@ export function StatCard({
   );
   const base = "flex flex-col gap-1.5 rounded-[22px] border border-staff-line bg-white px-6 py-5";
 
+  // ไม่มี onClick → การ์ดธรรมดา, มี → ห่อด้วยปุ่มที่กดได้
   if (!onClick) return <div className={base}>{content}</div>;
 
   return (
@@ -92,7 +90,7 @@ export function StatCard({
   );
 }
 
-// ป้ายระดับความเสี่ยงตาม severity 0–3
+// คลาสสีของป้ายระดับความเสี่ยง ตาม severity 0–3
 const SEV_PILL = [
   "bg-[#e8f7ed] text-[#21733f]",
   "bg-[#fff3dc] text-[#8a5a00]",
@@ -100,7 +98,7 @@ const SEV_PILL = [
   "bg-[#fbd9dc] text-[#8e1b25]",
 ];
 
-// ป้ายแสดงระดับความเสี่ยง สีตาม severity
+// ป้ายแคปซูลแสดงระดับความเสี่ยง สีตาม severity 0–3
 export function RiskPill({ severity, children }: { severity: number; children: ReactNode }) {
   return (
     <span className={`inline-flex max-w-full items-center truncate rounded-full px-2.5 py-0.5 text-xs font-semibold ${SEV_PILL[severity] ?? SEV_PILL[0]}`}>
@@ -109,7 +107,7 @@ export function RiskPill({ severity, children }: { severity: number; children: R
   );
 }
 
-// วงกลมแสดงตัวอักษรแรกของชื่อผู้ใช้
+// รูปโปรไฟล์วงกลมแสดงอักษรตัวแรกของชื่อ
 export function Avatar({ name, tone = "brand", size = 36 }: { name: string; tone?: "brand" | "danger"; size?: number }) {
   return (
     <span
@@ -123,7 +121,7 @@ export function Avatar({ name, tone = "brand", size = 36 }: { name: string; tone
   );
 }
 
-// แถบปุ่มตัวกรองแบบชิป (tab) แสดงจำนวนของแต่ละตัวเลือกได้
+// กลุ่มปุ่มแคปซูลสำหรับกรอง/เลือกแท็บ พร้อมตัวนับจำนวน
 export function Chips<T extends string>({
   items,
   value,
@@ -163,7 +161,7 @@ export function Chips<T extends string>({
   );
 }
 
-// ปุ่มเลือกแบบแบ่งส่วน (segmented control) เลือกได้ทีละตัวเลือก
+// ปุ่มสลับแบบแบ่งช่อง (segmented control) เลือกได้ทีละค่า
 export function Segmented<T extends string>({
   items,
   value,
@@ -195,7 +193,7 @@ export function Segmented<T extends string>({
   );
 }
 
-// กล่องแสดงข้อความผิดพลาด (ไม่แสดงถ้าไม่มีข้อความ)
+// กล่องแจ้งข้อผิดพลาดสีแดง (ไม่แสดงถ้าไม่มีข้อความ)
 export function ErrorBox({ message }: { message: string }) {
   if (!message) return null;
   return (
@@ -206,12 +204,12 @@ export function ErrorBox({ message }: { message: string }) {
   );
 }
 
-// ข้อความกึ่งกลางกรณีไม่มีข้อมูล
+// ข้อความกลางกล่องเมื่อไม่มีข้อมูล
 export function Empty({ children }: { children: ReactNode }) {
   return <p className="py-8 text-center text-sm text-staff-muted">{children}</p>;
 }
 
-// คำอธิบายสัญลักษณ์กราฟ (สี่เหลี่ยมสี + ชื่อ)
+// สัญลักษณ์สีพร้อมป้ายชื่อสำหรับคำอธิบายกราฟ
 export function Legend({ color, label }: { color: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
@@ -221,6 +219,7 @@ export function Legend({ color, label }: { color: string; label: string }) {
   );
 }
 
+// คลาส Tailwind ที่ใช้ซ้ำ: ช่องกรอก ปุ่มหลัก และปุ่มรอง
 export const inputCls =
   "w-full rounded-xl border border-staff-line bg-staff-soft px-3.5 py-2.5 text-sm text-staff-ink outline-none transition placeholder:text-[#a8a59e] focus:border-staff-400 focus:bg-white focus:ring-4 focus:ring-staff-100";
 
@@ -230,7 +229,7 @@ export const btnPrimary =
 export const btnGhost =
   "inline-flex h-11 items-center justify-center gap-2 rounded-2xl border border-staff-line bg-white px-4 text-sm font-semibold text-staff-ink transition hover:border-staff-300 hover:bg-staff-soft disabled:opacity-50";
 
-// แปลง ISO date เป็นวันที่ภาษาไทย (เลือกแสดงเวลาได้) ถ้าไม่มีค่าแสดง -
+// แปลงวันที่ ISO เป็นรูปแบบไทย (เลือกแสดงเวลาได้) หรือ "-" ถ้าไม่มีค่า
 export const thDate = (iso?: string | null, withTime = false) =>
   iso
     ? new Date(iso).toLocaleDateString("th-TH", {
@@ -241,7 +240,7 @@ export const thDate = (iso?: string | null, withTime = false) =>
       })
     : "-";
 
-// สวิตช์เปิด/ปิด (role=switch)
+// สวิตช์เปิด/ปิดแบบ toggle
 export function Switch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
   return (
     <button

@@ -1,21 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 
-/* =========================================================
-   Session ฝั่งผู้ใช้ (cookie ที่ลงลายเซ็น HMAC)
-
-   - ตอน login สำเร็จ server ตั้ง cookie "session" (HttpOnly)
-   - API อ่านผู้ใช้จาก cookie นี้ แทนการเชื่อ userId ที่หน้าเว็บส่งมา
-   - หน้าเว็บยังส่ง userId มาได้เหมือนเดิม แต่ต้องตรงกับ session
-     ไม่งั้นตอบ 403 (กันการเปลี่ยน userId เพื่อดูข้อมูลคนอื่น)
-
-   ต้องตั้ง SESSION_SECRET ใน .env.local (สุ่มยาวอย่างน้อย 32 ตัวอักษร)
-
-   แยก cookie ตาม role เพื่อให้เปิดคนละ role ได้ในคนละแท็บของเบราว์เซอร์เดียวกัน
-   (ล็อกอิน role หนึ่งจะไม่ทับ session ของอีก role)
-     ผู้ใช้ทั่วไป → "session"  ·  staff → "session_staff"  ·  system admin → "session_admin"
-========================================================= */
-
+// ชื่อคุกกี้ session แยกตามบทบาท (ผู้ใช้ / เจ้าหน้าที่ / ผู้ดูแล) ให้ล็อกอินพร้อมกันได้
 export const SESSION_COOKIE = "session";
 
 export const SESSION_COOKIES = {
@@ -24,19 +10,22 @@ export const SESSION_COOKIES = {
   admin: "session_admin",
 } as const;
 
+// ชนิดบทบาทของ session
 export type SessionRole = keyof typeof SESSION_COOKIES;
 
-// role_id ในตาราง roles: 1 = system_admin, 2 = user, 3 = staff
+// แปลง role_id เป็นชนิด session (1=admin, 3=staff, อื่น ๆ=user)
 export const roleOf = (roleId: number | null): SessionRole =>
   roleId === 1 ? "admin" : roleId === 3 ? "staff" : "user";
 
-// อ่าน ?role= จากคำขอ (ค่าเริ่มต้น user) ใช้กับ /api/auth/logout และ /api/auth/session
+// อ่านชนิด session จาก query ?role= ของ request (ค่าเริ่มต้น user)
 export const roleFromRequest = (request: Request): SessionRole => {
   const role = new URL(request.url).searchParams.get("role");
   return role === "staff" || role === "admin" ? role : "user";
 };
-const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 วัน
+// อายุ session 7 วัน (วินาที)
+const MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
+// ข้อมูล session ที่ถอดได้ และ payload ที่เก็บในคุกกี้ (uid, rid, exp)
 export type Session = {
   userId: number;
   roleId: number | null;
@@ -48,7 +37,7 @@ type Payload = {
   exp: number;
 };
 
-// อ่าน SESSION_SECRET จาก env (ต้องยาวอย่างน้อย 32 ตัวอักษร ไม่งั้น throw)
+// อ่าน SESSION_SECRET จาก env และตรวจว่ายาวอย่างน้อย 32 ตัวอักษร
 function getSecret() {
   const secret = process.env.SESSION_SECRET;
   if (!secret || secret.length < 32) {
@@ -57,12 +46,12 @@ function getSecret() {
   return secret;
 }
 
-// สร้างลายเซ็น HMAC-SHA256 ของข้อมูล (base64url)
+// สร้างลายเซ็น HMAC-SHA256 ของข้อมูล session
 function sign(data: string) {
   return crypto.createHmac("sha256", getSecret()).update(data).digest("base64url");
 }
 
-// อ่านค่า cookie ตามชื่อจาก header ของคำขอ (ไม่พบคืน null)
+// อ่านค่าคุกกี้ตามชื่อจาก header Cookie ของ request
 function readCookie(request: Request, name: string) {
   const header = request.headers.get("cookie") ?? "";
   for (const part of header.split(";")) {
@@ -75,9 +64,7 @@ function readCookie(request: Request, name: string) {
   return null;
 }
 
-/* ---------- ตั้ง / ลบ cookie ---------- */
-
-// สร้าง token session ที่ลงลายเซ็น (อายุ 7 วัน) แล้วตั้งเป็น cookie ตาม role ของผู้ใช้
+// ตั้งคุกกี้ session แบบลงลายเซ็น (httpOnly อายุ 7 วัน) แยกชื่อคุกกี้ตาม role
 export function setSessionCookie(
   response: NextResponse,
   user: { userId: number; roleId: number | null }
@@ -98,7 +85,7 @@ export function setSessionCookie(
   });
 }
 
-// ลบ cookie session ของ role ที่ระบุ (ตั้งค่าว่างและหมดอายุทันที)
+// ลบคุกกี้ session ของ role ที่ระบุ (ใช้ตอนออกจากระบบ)
 export function clearSessionCookie(response: NextResponse, role: SessionRole = "user") {
   response.cookies.set(SESSION_COOKIES[role], "", {
     httpOnly: true,
@@ -109,13 +96,12 @@ export function clearSessionCookie(response: NextResponse, role: SessionRole = "
   });
 }
 
-/* ---------- อ่าน session ---------- */
-
-// อ่านและตรวจลายเซ็น/วันหมดอายุของ session cookie ตาม role คืน Session หรือ null
+// อ่านและตรวจลายเซ็น/วันหมดอายุของคุกกี้ session คืน userId และ roleId หรือ null
 export function getSession(request: Request, role: SessionRole = "user"): Session | null {
   const token = readCookie(request, SESSION_COOKIES[role]);
   if (!token) return null;
 
+  // ตรวจลายเซ็นแบบ timing-safe
   const [data, signature] = token.split(".");
   if (!data || !signature) return null;
 
@@ -125,6 +111,7 @@ export function getSession(request: Request, role: SessionRole = "user"): Sessio
     return null;
   }
 
+  // ถอด payload และตรวจวันหมดอายุ
   try {
     const payload = JSON.parse(Buffer.from(data, "base64url").toString()) as Payload;
     if (!Number.isInteger(payload.uid) || payload.exp < Date.now() / 1000) return null;
@@ -134,24 +121,12 @@ export function getSession(request: Request, role: SessionRole = "user"): Sessio
   }
 }
 
-/* =========================================================
-   requireUser
-   ใช้ใน API ฝั่งผู้ใช้:
-
-     const auth = requireUser(request, body.userId);
-     if (!auth.ok) return auth.response;
-     const userId = auth.userId;
-
-   claimedUserId = userId ที่หน้าเว็บส่งมา (ไม่ส่งก็ได้)
-   - ไม่มี session            → 401
-   - ส่งมาแต่ไม่ตรงกับ session → 403
-========================================================= */
-
+// ผลของ requireUser: ผ่าน (ได้ userId) หรือไม่ผ่าน (ได้ response error)
 type RequireUserResult =
   | { ok: true; userId: number; session: Session }
   | { ok: false; response: NextResponse };
 
-// ตรวจว่ามี session ผู้ใช้ และ userId ที่ส่งมา (ถ้ามี) ตรงกับ session ไม่ผ่านคืน response 401/403
+// บังคับว่าต้องล็อกอิน และ userId ที่ส่งมา (ถ้ามี) ต้องตรงกับ session ไม่งั้นคืน 401/403
 export function requireUser(request: Request, claimedUserId?: unknown): RequireUserResult {
   const session = getSession(request);
 
@@ -165,6 +140,7 @@ export function requireUser(request: Request, claimedUserId?: unknown): RequireU
     };
   }
 
+  // ถ้ามีการระบุ userId มา ต้องตรงกับเจ้าของ session
   const hasClaim = claimedUserId !== undefined && claimedUserId !== null && claimedUserId !== "";
 
   if (hasClaim && Number(claimedUserId) !== session.userId) {

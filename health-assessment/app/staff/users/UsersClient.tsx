@@ -5,16 +5,12 @@ import { ChevronLeft, ChevronRight, Info, Search } from "lucide-react";
 import { staffFetch } from "@/lib/staff/client";
 import { Avatar, Card, Chips, Empty, ErrorBox, PageHeader, StatCard, btnGhost, btnPrimary, inputCls } from "../components/ui";
 
-/* =========================================================
-   จัดการผู้ใช้งาน (Staff)
-   - แสดงเฉพาะข้อมูลบัญชีและ "จำนวนครั้ง" ที่ใช้งาน ไม่แสดงผลประเมินรายบุคคล
-   - ระงับ / เปิดใช้งานบัญชี (บันทึกใน access_logs ฝั่ง API)
-========================================================= */
-
+// สถานะบัญชี ตัวกรองรายการ และวิธีเรียงลำดับ
 type Status = "active" | "inactive" | "suspended";
 export type Filter = "all" | Status;
 type Sort = "recent" | "newest" | "most" | "name";
 
+// แถวผู้ใช้หนึ่งคนในตาราง
 type UserRow = {
   userId: number;
   username: string;
@@ -25,6 +21,7 @@ type UserRow = {
   status: Status;
 };
 
+// ผลตอบกลับของรายการผู้ใช้: KPI จำนวนตามสถานะ และผู้ใช้หน้าปัจจุบัน
 type ListResponse = {
   kpis: { total: number; active30: number; newMonth: number; suspended: number };
   counts: Record<Filter, number>;
@@ -34,6 +31,7 @@ type ListResponse = {
   users: UserRow[];
 };
 
+// รายละเอียดผู้ใช้: สถานะระงับ การใช้งานแยกตามแบบประเมิน และประวัติการจัดการบัญชี
 type UserDetail = UserRow & {
   isActive: boolean;
   suspendedReason: string | null;
@@ -42,8 +40,10 @@ type UserDetail = UserRow & {
   history: { action: "suspend" | "activate"; reason: string | null; staff: string; at: string }[];
 };
 
+// การกระทำที่รอยืนยัน (ระงับ/เปิดใช้งาน) กับผู้ใช้คนใด
 type Pending = { user: Pick<UserRow, "userId" | "username">; action: "suspend" | "activate" };
 
+// ปุ่มกรองสถานะผู้ใช้
 const FILTERS: { key: Filter; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
   { key: "active", label: "ใช้งานอยู่" },
@@ -51,24 +51,24 @@ const FILTERS: { key: Filter; label: string }[] = [
   { key: "suspended", label: "ถูกระงับ" },
 ];
 
+// ข้อความและสีของป้ายสถานะบัญชี
 const STATUS_VIEW: Record<Status, { label: string; dot: string; text: string }> = {
   active: { label: "ใช้งาน", dot: "bg-staff-ink", text: "text-staff-ink" },
   inactive: { label: "ไม่ใช้งานเกิน 30 วัน", dot: "bg-risk-mid", text: "text-[#8a5a00]" },
   suspended: { label: "ระงับ", dot: "bg-risk-high", text: "text-risk-crit" },
 };
 
+// ความยาวสูงสุดของเหตุผลการระงับบัญชี
 const REASON_MAX = 200;
 
-// วันที่แบบย่อ ปี พ.ศ. 2 หลัก เช่น "12 มี.ค. 69"
+// แปลงวันที่ ISO เป็นวันที่ไทยแบบย่อ หรือ "-" ถ้าไม่มี
 const shortDate = (iso?: string | null) =>
   iso ? new Date(iso).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" }) : "-";
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้ารายชื่อผู้ใช้งาน: ค้นหา กรองสถานะ เรียงลำดับ แบ่งหน้า และระงับ/เปิดใช้งานบัญชี
+// รายชื่อผู้ใช้สำหรับเจ้าหน้าที่: ค้นหา กรองสถานะ เรียง แบ่งหน้า ดูรายละเอียด และระงับ/เปิดบัญชี
+// รับ initialStatus จาก query ?status= และโหลดข้อมูลจาก GET /api/staff/users
 export default function UsersClient({ initialStatus }: { initialStatus: Filter }) {
+  // state ของหน้า: ตัวกรอง การเรียง คำค้น หน้า ข้อมูล ผู้ใช้ที่เลือก และกล่องยืนยัน
   const [filter, setFilter] = useState<Filter>(initialStatus);
   const [sort, setSort] = useState<Sort>("recent");
   const [q, setQ] = useState("");
@@ -82,7 +82,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
   const [pending, setPending] = useState<Pending | null>(null);
   const detailRef = useRef<HTMLDivElement>(null);
 
-  // หน่วงการค้นหาเล็กน้อย ไม่ยิง API ทุกตัวอักษร
+  // หน่วงคำค้น 300ms ก่อนนำไปค้นจริง แล้วกลับไปหน้า 1
   useEffect(() => {
     const t = setTimeout(() => {
       const next = q.trim();
@@ -98,6 +98,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
   const key = `${params}#${reload}`;
   const loading = loadedKey !== key;
 
+  // โหลดรายชื่อผู้ใช้จาก /api/staff/users ตามตัวกรอง/หน้า/รอบรีโหลด
   useEffect(() => {
     let cancelled = false;
     staffFetch<ListResponse>(`/api/staff/users?${params}`)
@@ -115,15 +116,15 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- key รวม params + reload แล้ว
   }, [key]);
 
-  // เลือกผู้ใช้เพื่อดูรายละเอียด (จอเล็กเลื่อนลงไปที่แผงข้อมูล)
+  // เลือกผู้ใช้เพื่อดูรายละเอียด และเลื่อนลงไปที่แผงรายละเอียดบนจอเล็ก
   const view = (id: number) => {
     setSelectedId(id);
-    // จอเล็ก: แผงข้อมูลอยู่ใต้ตาราง เลื่อนลงไปให้เห็น
     if (window.matchMedia("(max-width: 1279px)").matches) {
       requestAnimationFrame(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }));
     }
   };
 
+  // ค่าที่คำนวณสำหรับตัวแบ่งหน้า
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;
   const from = data && data.total ? (data.page - 1) * data.pageSize + 1 : 0;
   const to = data ? Math.min(data.total, data.page * data.pageSize) : 0;
@@ -131,6 +132,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
 
   return (
     <div className="flex flex-col gap-6">
+      {/* หัวหน้าเพจ */}
       <PageHeader
         eyebrow="USERS"
         title="จัดการ"
@@ -138,6 +140,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
         desc="ดูข้อมูลบัญชีและการใช้งาน ระงับหรือเปิดใช้งานบัญชี · ไม่แสดงผลประเมินรายบุคคล · การกำหนดสิทธิ์ดูแลโดย System Admin"
       />
 
+      {/* การ์ดสรุปจำนวนผู้ใช้ */}
       <section className="grid grid-cols-2 gap-4 xl:grid-cols-4" aria-label="สรุปผู้ใช้งาน">
         <StatCard label="ผู้ใช้ทั้งหมด" value={k?.total} />
         <StatCard label="ใช้งานใน 30 วัน" value={k?.active30} note="สมัครหรือทำแบบประเมิน" />
@@ -151,10 +154,9 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
 
       <ErrorBox message={error} />
 
-      {/* กล่องรายชื่อกว้างขึ้น แผงรายละเอียดด้านขวาแคบลง */}
       <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-        {/* ===== รายชื่อผู้ใช้ ===== */}
         <Card className="!p-4 sm:!p-6">
+          {/* แถบกรองสถานะ ช่องค้นหา และการเรียง */}
           <div className="mb-4 flex flex-col gap-3">
             <Chips
               label="สถานะผู้ใช้"
@@ -196,8 +198,8 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
             </div>
           </div>
 
+          {/* ตารางรายชื่อผู้ใช้ และสถานะว่าง/กำลังโหลด */}
           <div className={`transition-opacity ${loading ? "opacity-60" : ""}`} aria-busy={loading}>
-            {/* ตารางเลื่อนแนวนอนภายในการ์ดบนจอเล็ก */}
             <div className="-mx-4 overflow-x-auto px-4 sm:-mx-6 sm:px-6">
               <table className="w-full min-w-[680px] text-sm">
                 <thead>
@@ -255,6 +257,7 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
             {!data && !error && <Empty>กำลังโหลด…</Empty>}
           </div>
 
+          {/* จำนวนที่แสดง และตัวแบ่งหน้า */}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-staff-muted">
             <span>
               แสดง {from}–{to} จาก {data?.total ?? 0} คน
@@ -283,12 +286,13 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
           </div>
         </Card>
 
-        {/* ===== ข้อมูลผู้ใช้ที่เลือก ===== */}
+        {/* แผงรายละเอียดผู้ใช้ที่เลือก */}
         <div ref={detailRef} className="scroll-mt-6 xl:sticky xl:top-6">
           <UserPanel userId={selectedId} reload={reload} onAction={setPending} />
         </div>
       </div>
 
+      {/* กล่องยืนยันระงับ/เปิดใช้งานบัญชี */}
       {pending && (
         <ActionDialog
           pending={pending}
@@ -303,13 +307,9 @@ export default function UsersClient({ initialStatus }: { initialStatus: Filter }
   );
 }
 
-/* =========================================================
-   ชิ้นส่วนย่อย
-========================================================= */
-
 const smallBtn = "inline-flex h-9 items-center justify-center whitespace-nowrap rounded-xl border px-2.5 text-sm font-semibold transition";
 
-// ปุ่มระงับ/เปิดใช้งานตามสถานะบัญชี (กดแล้วเปิดกล่องยืนยัน)
+// ปุ่มระงับบัญชี หรือเปิดใช้งานบัญชีที่ถูกระงับ
 function ActionButton({
   user,
   suspended,
@@ -340,7 +340,7 @@ function ActionButton({
   );
 }
 
-// ป้ายสถานะบัญชี (ใช้งาน/ไม่ใช้งานเกิน 30 วัน/ระงับ)
+// ป้ายสถานะบัญชี (ใช้งาน / ไม่ใช้งานเกิน 30 วัน / ระงับ)
 function StatusBadge({ status }: { status: Status }) {
   const st = STATUS_VIEW[status];
   return (
@@ -351,7 +351,7 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
-// เลขหน้าแบบย่อ: 1 … 4 5 6 … 20 (0 = ช่องว่าง)
+// สร้างรายการเลขหน้าที่จะแสดง (หน้าแรก สุดท้าย และรอบหน้าปัจจุบัน) ใช้ 0 แทน "…"
 function pageNumbers(cur: number, total: number) {
   const set = new Set([1, total, cur - 1, cur, cur + 1].filter((n) => n >= 1 && n <= total));
   const list = Array.from(set).sort((a, b) => a - b);
@@ -363,7 +363,7 @@ function pageNumbers(cur: number, total: number) {
   return out;
 }
 
-// ปุ่มเปลี่ยนหน้าของตารางรายชื่อ
+// ปุ่มเลขหน้าของตัวแบ่งหน้า
 function PageBtn({
   children,
   label,
@@ -393,11 +393,7 @@ function PageBtn({
   );
 }
 
-/* =========================================================
-   แผง "ข้อมูลผู้ใช้"
-========================================================= */
-
-// แผงข้อมูลผู้ใช้ที่เลือก: รายละเอียดบัญชี การใช้งานแยกตามแบบประเมิน และประวัติการจัดการ
+// แผงรายละเอียดผู้ใช้ที่เลือก โหลดจาก /api/staff/users?userId=
 function UserPanel({
   userId,
   reload,
@@ -407,11 +403,13 @@ function UserPanel({
   reload: number;
   onAction: (p: Pending) => void;
 }) {
+  // state รายละเอียดผู้ใช้ที่โหลดมา
   const [u, setU] = useState<UserDetail | null>(null);
   const [error, setError] = useState("");
   const [loadedKey, setLoadedKey] = useState("");
   const key = `${userId}#${reload}`;
 
+  // โหลดรายละเอียดผู้ใช้เมื่อเลือกคนใหม่หรือหลังจัดการบัญชี
   useEffect(() => {
     if (userId === null) return;
     let cancelled = false;
@@ -436,6 +434,7 @@ function UserPanel({
     <Card className="!p-5 sm:!p-6">
       <h2 className="text-lg font-bold">ข้อมูลผู้ใช้</h2>
 
+      {/* ยังไม่เลือก / กำลังโหลด / error / แสดงรายละเอียด */}
       {userId === null ? (
         <Empty>เลือก “ดูข้อมูล” จากรายชื่อเพื่อดูรายละเอียดบัญชี</Empty>
       ) : !shown ? (
@@ -457,6 +456,7 @@ function UserPanel({
             </div>
           </div>
 
+          {/* ข้อมูลบัญชี: วันที่สมัคร ใช้งานล่าสุด จำนวนการประเมิน */}
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <Field label="สมัครเมื่อ">{shortDate(shown.createdAt)}</Field>
             <Field label="ใช้งานล่าสุด">{shortDate(shown.lastActive)}</Field>
@@ -477,6 +477,7 @@ function UserPanel({
             <ActionButton user={shown} suspended={!shown.isActive} onAction={onAction} />
           </div>
 
+          {/* การใช้งานแยกตามแบบประเมิน */}
           <section>
             <h3 className="mb-2 font-bold">การใช้งานแยกตามแบบประเมิน</h3>
             {shown.byType.length === 0 ? (
@@ -497,6 +498,7 @@ function UserPanel({
             </p>
           </section>
 
+          {/* ประวัติการระงับ/เปิดใช้งานบัญชี */}
           <section>
             <h3 className="mb-2 font-bold">ประวัติการจัดการบัญชี</h3>
             {shown.history.length === 0 ? (
@@ -526,7 +528,7 @@ function UserPanel({
   );
 }
 
-// ช่องแสดงข้อมูล (ป้าย + ค่า) ในแผงผู้ใช้
+// ช่องแสดงข้อมูลหนึ่งรายการ (ป้ายชื่อ + ค่า) ในแผงรายละเอียด
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div className="min-w-0 rounded-2xl bg-staff-soft px-4 py-3">
@@ -536,28 +538,26 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-/* =========================================================
-   กล่องยืนยัน ระงับ (ต้องระบุเหตุผล) / เปิดใช้งาน
-========================================================= */
-
-// กล่องยืนยันระงับ (ต้องใส่เหตุผล) หรือเปิดใช้งานบัญชี
+// กล่องยืนยันระงับ/เปิดใช้งานบัญชี (ระงับต้องใส่เหตุผล) กด Esc เพื่อปิด
 function ActionDialog({ pending, onClose, onDone }: { pending: Pending; onClose: () => void; onDone: () => void }) {
   const { user, action } = pending;
   const suspend = action === "suspend";
+  // state เหตุผลการระงับ สถานะกำลังบันทึก และ error
   const [reason, setReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const firstRef = useRef<HTMLTextAreaElement | HTMLButtonElement | null>(null);
 
+  // โฟกัสช่องแรกเมื่อเปิด และให้กด Esc ปิดกล่องได้
   useEffect(() => {
     firstRef.current?.focus();
-    // ปิดกล่องเมื่อกด Escape
+    // ปิดกล่องเมื่อกดปุ่ม Escape
     const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", esc);
     return () => window.removeEventListener("keydown", esc);
   }, [onClose]);
 
-  // ส่งคำขอระงับ/เปิดใช้งานบัญชีไปที่ API
+  // ส่ง PATCH /api/staff/users เพื่อระงับหรือเปิดใช้งานบัญชี แล้วแจ้งให้รีโหลดรายการ
   const submit = async () => {
     setSaving(true);
     setError("");
@@ -597,6 +597,7 @@ function ActionDialog({ pending, onClose, onDone }: { pending: Pending; onClose:
             ? "ผู้ใช้จะเข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง ข้อมูลเดิมยังอยู่ครบ"
             : "ผู้ใช้จะกลับมาเข้าสู่ระบบและใช้งานได้ตามปกติ"}
         </p>
+        {/* ช่องกรอกเหตุผล (เฉพาะการระงับ) */}
         {suspend && (
           <label className="mt-4 flex flex-col gap-1.5 text-sm font-semibold">
             เหตุผลการระงับ (จำเป็น)

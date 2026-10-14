@@ -8,11 +8,7 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   แบบประเมินภาวะน้ำหนักเกิน (BMI)
-   หน้าตาเดียวกับแบบประเมินความดันโลหิต
-========================================================= */
-
+// รูปแบบ response จาก POST /api/assessments/bmi
 type SubmitResponse = {
   success: boolean;
   assessmentId?: number;
@@ -24,26 +20,23 @@ type SubmitResponse = {
   message?: string;
 };
 
-// หน้าแบบประเมินภาวะน้ำหนักเกิน (BMI): กรอกน้ำหนัก/ส่วนสูง แล้วส่งไปคำนวณและบันทึกผล
+// หน้า: กรอกน้ำหนัก/ส่วนสูงเพื่อประเมิน BMI
 export default function WeightAssessmentPage() {
   const router = useRouter();
 
-  // เก็บเป็นข้อความ เพื่อให้ลบช่องจนว่างได้ แล้วเติมจากข้อมูลสุขภาพในโปรไฟล์ (ถ้ามี)
+  // state ของฟอร์ม: น้ำหนัก ส่วนสูง สถานะกำลังส่ง และข้อความ error
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  /* =========================================================
-     โหลดน้ำหนัก/ส่วนสูงจากโปรไฟล์
-  ========================================================= */
-
+  // โหลดโปรไฟล์มาเติมค่าเริ่มต้นตอนเปิดหน้า
   useEffect(() => {
     const id = localStorage.getItem("userId");
     if (!id) return;
 
-    // ดึงน้ำหนัก/ส่วนสูงจากโปรไฟล์มาเติมในช่องกรอก (ไม่ทับค่าที่ผู้ใช้พิมพ์แล้ว)
+    // ดึงน้ำหนัก/ส่วนสูงจากโปรไฟล์ (/api/profile) มาเติมในช่องกรอกอัตโนมัติ
     const loadProfile = async () => {
       try {
         const response = await fetch(`/api/profile?userId=${id}`, {
@@ -51,7 +44,6 @@ export default function WeightAssessmentPage() {
           cache: "no-store",
         });
 
-        // session หมดอายุ → กลับไปหน้า login
         if (response.status === 401) {
           localStorage.removeItem("userId");
           router.replace("/login");
@@ -65,11 +57,9 @@ export default function WeightAssessmentPage() {
         const w = Number(source.weight_kg ?? source.weight ?? 0);
         const h = Number(source.height_cm ?? source.height ?? 0);
 
-        // ไม่ทับค่าที่ผู้ใช้พิมพ์ไปแล้ว
         if (w > 0) setWeight((prev) => prev || String(w));
         if (h > 0) setHeight((prev) => prev || String(h));
       } catch (loadError) {
-        // โหลดไม่ได้ก็ให้กรอกเองได้ตามปกติ
         console.error("BMI profile load error:", loadError);
       }
     };
@@ -77,11 +67,7 @@ export default function WeightAssessmentPage() {
     void loadProfile();
   }, [router]);
 
-  /* =========================================================
-     บันทึกผลประเมิน
-  ========================================================= */
-
-  // ตรวจค่าน้ำหนัก/ส่วนสูง แล้ว POST ไปบันทึกผล BMI และพาไปหน้าคำแนะนำ
+  // ตรวจค่าที่กรอก ส่งไป /api/assessments/bmi แล้วพาไปหน้าผลประเมิน
   const handleStartAssessment = async () => {
     try {
       setSubmitting(true);
@@ -129,7 +115,6 @@ export default function WeightAssessmentPage() {
         }),
       });
 
-      // session หมดอายุ → กลับไปหน้า login
       if (response.status === 401) {
         localStorage.removeItem("userId");
         router.push("/login");
@@ -166,10 +151,9 @@ export default function WeightAssessmentPage() {
 
         <Sidebar />
 
-        {/* Content */}
-
         <section className="flex min-h-screen min-w-0 flex-1 flex-col px-5 py-7 sm:px-8 lg:px-12">
 
+          {/* ส่วนหัว: ชื่อแบบประเมิน ประกาศความยินยอม และปุ่มกลับ */}
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
 
@@ -186,20 +170,16 @@ export default function WeightAssessmentPage() {
 
             </div>
 
-            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
             <HealthConsentNotice />
             <AssessmentBackLink href="/assessment-menu" />
           </header>
-          {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
           <AssessmentSourceNote typeId={1} className="mt-3" />
 
-          {/* จัดฟอร์มให้อยู่กลางพื้นที่ที่เหลือ (ขยับขึ้นเล็กน้อยให้ดูสมดุล) */}
           <div className="flex flex-1 items-center py-10 lg:pb-24">
 
             <div className="mx-auto w-full max-w-2xl space-y-7">
 
-              {/* Input card */}
-
+              {/* การ์ดกรอกน้ำหนักและส่วนสูง */}
               <section className="rounded-[28px] border border-[#eee5e6] bg-white p-8 shadow-[0_16px_45px_rgba(35,25,30,0.05)]">
 
                 <div className="flex items-center gap-4">
@@ -248,8 +228,7 @@ export default function WeightAssessmentPage() {
                 </div>
               )}
 
-              {/* Submit */}
-
+              {/* ปุ่มเริ่มประเมิน */}
               <button
                 type="button"
                 disabled={submitting}
@@ -281,11 +260,7 @@ export default function WeightAssessmentPage() {
   );
 }
 
-/* =========================================================
-   Measure input (รูปแบบเดียวกับช่องกรอกความดันโลหิต)
-========================================================= */
-
-// ช่องกรอกตัวเลขพร้อมป้ายชื่อและหน่วย (ใช้กรอกน้ำหนัก/ส่วนสูง)
+// คอมโพเนนต์: ช่องกรอกตัวเลขพร้อมป้ายชื่อและหน่วย
 function MeasureInput({
   label,
   unit,

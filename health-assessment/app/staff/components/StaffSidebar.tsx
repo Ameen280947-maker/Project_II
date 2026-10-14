@@ -15,13 +15,7 @@ import {
 } from "lucide-react";
 import { clearStaffSession } from "@/lib/staff/client";
 
-/* =========================================================
-   SIDEBAR ฝั่ง Staff
-   - จอใหญ่: แถบด้านซ้าย / จอเล็ก: แถบบน + เมนูเลื่อนออก
-   - ระบบเป็นการประเมินเบื้องต้น ไม่มีการติดตามผู้ใช้รายบุคคล
-     คำแนะนำแก้ได้ในหน้าแบบประเมิน (แท็บเกณฑ์ผลและคำแนะนำ)
-========================================================= */
-
+// รายการเมนูของเจ้าหน้าที่ (ลิงก์ ชื่อ ไอคอน)
 const MENU: { href: string; label: string; icon: ReactNode }[] = [
   { href: "/staff", label: "ภาพรวมระบบ", icon: <LayoutDashboard size={21} /> },
   { href: "/staff/users", label: "ผู้ใช้งาน", icon: <Users size={21} /> },
@@ -29,28 +23,31 @@ const MENU: { href: string; label: string; icon: ReactNode }[] = [
   { href: "/staff/reports", label: "รายงานและสถิติ", icon: <BarChart3 size={21} /> },
 ];
 
-// แถบเมนูนำทางของ staff พร้อมชื่อผู้ใช้และปุ่มออกจากระบบ (รองรับจอเล็ก/จอใหญ่)
+// แถบเมนูด้านข้างของเจ้าหน้าที่ (ลิงก์เมนู ชื่อผู้ใช้ ปุ่มออกจากระบบ รองรับมือถือ)
 export default function StaffSidebar() {
+  // state: ชื่อเจ้าหน้าที่ และสถานะเปิดเมนูบนมือถือ
   const pathname = usePathname();
   const router = useRouter();
   const [name, setName] = useState("");
   const [open, setOpen] = useState(false);
 
+  // อ่านชื่อเจ้าหน้าที่จาก localStorage ตอนเปิดหน้า
   useEffect(() => {
     setName(localStorage.getItem("staffUsername") || "เจ้าหน้าที่");
   }, []);
 
-  // เช็คว่าเมนูตรงกับ path ปัจจุบันหรือไม่ (ใช้ไฮไลต์เมนูที่เลือก)
+  // ตรวจว่าเมนูนี้ตรงกับหน้าปัจจุบันหรือไม่ (รวมหน้าย่อย)
   const isActive = (href: string) =>
     href === "/staff" ? pathname === "/staff" : pathname === href || pathname.startsWith(href + "/");
 
-  // ออกเฉพาะ session ของ staff แท็บที่เปิดเป็นผู้ใช้หรือ admin ยังใช้งานต่อได้
+  // ออกจากระบบเจ้าหน้าที่: เรียก /api/auth/logout?role=staff ล้าง session แล้วไปหน้า login
   const logout = async () => {
     await fetch("/api/auth/logout?role=staff", { method: "POST" }).catch(() => {});
     clearStaffSession();
     router.replace("/login");
   };
 
+  // ส่วนประกอบที่ใช้ซ้ำทั้งบนมือถือและเดสก์ท็อป: โลโก้ เมนู และกล่องบัญชี/ออกจากระบบ
   const brand = (
     <Link href="/staff" className="flex items-center gap-3 px-2">
       <div className="grid h-12 w-12 place-items-center rounded-2xl bg-linear-to-br from-[#3a3936] to-black text-white shadow-[0_12px_28px_rgba(0,0,0,0.22)]">
@@ -109,7 +106,7 @@ export default function StaffSidebar() {
 
   return (
     <>
-      {/* จอเล็ก */}
+      {/* แถบบนสำหรับมือถือ + ปุ่มเปิดเมนู */}
       <header className="staff-no-print sticky top-0 z-30 flex items-center justify-between border-b border-staff-line bg-white/90 px-4 py-3 backdrop-blur lg:hidden">
         {brand}
         <button
@@ -121,6 +118,7 @@ export default function StaffSidebar() {
           <Menu size={20} />
         </button>
       </header>
+      {/* เมนูแบบลิ้นชักบนมือถือ */}
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="เมนูเจ้าหน้าที่">
           <button type="button" aria-label="ปิดเมนู" className="absolute inset-0 bg-staff-ink/30" onClick={() => setOpen(false)} />
@@ -140,7 +138,7 @@ export default function StaffSidebar() {
         </div>
       )}
 
-      {/* จอใหญ่ */}
+      {/* แถบเมนูด้านข้างบนเดสก์ท็อป */}
       <aside className="staff-no-print sticky top-0 hidden h-screen w-[248px] shrink-0 flex-col border-r border-staff-line bg-white px-4 py-7 lg:flex">
         {brand}
         {nav}

@@ -12,28 +12,28 @@ import {
 } from "../components/AdminUI";
 import { adminFetch, formatBytes } from "../components/adminApi";
 
-/* =========================================================
-   หน้า: ดูแลฐานข้อมูล  (/admin/database)
-========================================================= */
-
+// ข้อมูลของแต่ละตาราง: ชื่อ จำนวนแถว และขนาด
 type TableInfo = {
   table_name: string;
   rows: number;
   total_bytes: number;
 };
 
+// ผลตรวจความถูกต้องหนึ่งรายการ (จำนวนแถวที่ผิด หรือ error ถ้าตรวจไม่ได้)
 type Integrity = { key: string; label: string; count: number | null; error: string | null };
 
+// ข้อมูลทั้งหมดที่ได้จาก API /api/admin/database
 type DbData = { databaseSize: string; tables: TableInfo[]; integrity: Integrity[] };
 
-// หน้าดูแลฐานข้อมูลของแอดมิน: ดูขนาดตาราง ตรวจความถูกต้องของข้อมูล และสั่งซ่อมแซม
+// หน้า Admin: ดูขนาดตาราง/จำนวนแถว และตรวจ-แก้ความถูกต้องของข้อมูลในฐานข้อมูล
 export default function AdminDatabasePage() {
+  // state ของหน้า: ข้อมูล DB สถานะโหลด คำสั่งที่กำลังรัน และข้อความแจ้งเตือน
   const [data, setData] = useState<DbData | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
-  // โหลดข้อมูลขนาดฐานข้อมูล ตาราง และผลตรวจความถูกต้องจาก API
+  // ดึงข้อมูลตารางและผลตรวจความถูกต้องจาก API /api/admin/database
   const load = useCallback(async () => {
     setLoading(true);
     const res = await adminFetch<DbData>("/api/admin/database");
@@ -42,11 +42,12 @@ export default function AdminDatabasePage() {
     setLoading(false);
   }, []);
 
+  // โหลดข้อมูลตอนเปิดหน้า
   useEffect(() => {
     load();
   }, [load]);
 
-  // สั่งงานบำรุงฐานข้อมูลผ่าน API (ถามยืนยันก่อนถ้ากำหนด) แล้วโหลดข้อมูลใหม่
+  // ยืนยันแล้วส่งคำสั่งดูแลฐานข้อมูล (POST) แสดงผล และโหลดข้อมูลใหม่
   const run = async (key: string, json: Record<string, string>, confirmText?: string) => {
     if (confirmText && !window.confirm(confirmText)) return;
     setBusy(key);
@@ -57,6 +58,7 @@ export default function AdminDatabasePage() {
     load();
   };
 
+  // ค่าที่คำนวณสำหรับแสดงผล: จำนวนแถวรวมทุกตาราง
   const totalRows = data?.tables.reduce((s, t) => s + t.rows, 0) ?? 0;
 
   return (
@@ -72,11 +74,13 @@ export default function AdminDatabasePage() {
         }
       />
 
+      {/* ข้อความแจ้งผล และสถานะกำลังโหลดครั้งแรก */}
       {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
       {loading && !data && <LoadingBlock />}
 
       {data && (
         <div className="space-y-6">
+          {/* การ์ดสรุปขนาดฐานข้อมูลและจำนวนตาราง/แถว */}
           <div className="grid gap-4 sm:grid-cols-2">
             <Card>
               <p className="text-sm text-[#64748b]">ขนาดฐานข้อมูล</p>
@@ -90,7 +94,7 @@ export default function AdminDatabasePage() {
             </Card>
           </div>
 
-          {/* ตรวจความถูกต้อง */}
+          {/* การ์ดตรวจความถูกต้องของข้อมูล พร้อมปุ่มแก้ไขแต่ละรายการ */}
           <Card>
             <h2 className="mb-1 flex items-center gap-2 text-lg font-bold">
               <ShieldCheck size={18} className="text-[#1e3a8a]" /> ตรวจความถูกต้องของข้อมูล
@@ -127,7 +131,7 @@ export default function AdminDatabasePage() {
             </ul>
           </Card>
 
-          {/* ตาราง */}
+          {/* ตารางรายชื่อตารางในฐานข้อมูล พร้อมจำนวนแถวและขนาด */}
           <Card className="overflow-hidden p-0">
             <div className="p-6 pb-3">
               <h2 className="text-lg font-bold">ตารางในฐานข้อมูล</h2>

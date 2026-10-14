@@ -6,19 +6,13 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   GET /api/history/answers?assessmentId=...
-   ดึงข้อคำถามและคำตอบที่ผู้ใช้เคยตอบในการประเมินครั้งนั้น
-   ใช้ได้กับทุกแบบประเมิน (อ่านจาก assessment_answers)
-   ดูได้เฉพาะการประเมินของตัวเองเท่านั้น
-========================================================= */
-
-// ค่าที่บางแบบประเมินบันทึกเป็นรหัส แปลงให้อ่านง่าย
+// แปลงค่าคำตอบภาษาอังกฤษเป็นข้อความไทยสำหรับแสดงผล
 const VALUE_LABELS: Record<string, string> = {
   male: "ชาย",
   female: "หญิง",
 };
 
+// แถวคำตอบจาก SQL พร้อมคะแนนเต็มของข้อ
 type AnswerRow = {
   question_id: number;
   question_text: string;
@@ -29,7 +23,7 @@ type AnswerRow = {
   max_score: string | number | null;
 };
 
-// GET: คืนคำตอบรายข้อของผลประเมินหนึ่งครั้ง (เฉพาะของผู้ใช้เอง)
+// API: ดึงคำถามและคำตอบที่ผู้ใช้ตอบไว้ในผลประเมิน assessmentId
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
@@ -46,7 +40,7 @@ export async function GET(request: Request) {
       );
     }
 
-    // ตรวจว่าการประเมินนี้เป็นของผู้ใช้ที่ล็อกอินอยู่
+    // ตรวจว่าผลประเมินนี้เป็นของผู้ใช้จริง
     const owner = await pool.query(
       `SELECT 1 FROM assessment WHERE assessment_id = $1 AND user_id = $2`,
       [assessmentId, auth.userId],
@@ -59,6 +53,7 @@ export async function GET(request: Request) {
       );
     }
 
+    // ดึงคำถาม คำตอบ และคะแนน แล้วแปลงเป็นรูปแบบแสดงผล
     const result = await pool.query<AnswerRow>(
       `
       SELECT
@@ -87,7 +82,6 @@ export async function GET(request: Request) {
       return {
         questionId: row.question_id,
         question: row.question_text,
-        // ตัวเลือกที่เลือก ใช้ข้อความของตัวเลือกก่อน ถ้าไม่มี (เช่นช่องกรอกตัวเลข) ใช้ค่าที่กรอก
         answer: row.choice_text || VALUE_LABELS[raw.toLowerCase()] || raw || "-",
         score: row.score === null ? null : Number(row.score),
         maxScore: row.max_score === null ? null : Number(row.max_score),

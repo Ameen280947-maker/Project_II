@@ -6,12 +6,11 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// GET: คืนประวัติการประเมินทั้งหมดของผู้ใช้ เรียงจากล่าสุด พร้อมคำแนะนำ
+// API: ดึงประวัติผลประเมินทั้งหมดของผู้ใช้เรียงตามเวลา
 export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
 
-    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(
       request,
       url.searchParams.get("userId"),
@@ -33,6 +32,7 @@ export async function GET(request: Request) {
       );
     }
 
+    // ดึงผลประเมินทั้งหมดพร้อมชื่อแบบประเมินและคำแนะนำ ณ เวลาที่ประเมิน
     const result = await pool.query(
       `
       SELECT

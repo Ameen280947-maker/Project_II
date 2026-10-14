@@ -3,18 +3,14 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ListChecks } from "lucide-react";
 
-/* =========================================================
-   ข้อคำถามและคำตอบของผู้ใช้ในการประเมินครั้งนั้น
-   ใช้ร่วมกันในหน้ารายละเอียดผลของทุกแบบประเมิน
-========================================================= */
-
+// โครงข้อมูลคำถาม-คำตอบหนึ่งข้อที่ได้จาก API
 type Answer = {
   questionId: number;
   question: string;
   answer: string;
 };
 
-// คอมโพเนนต์แสดงคำถาม-คำตอบของการประเมินครั้งนั้น (โหลดจาก API, พับ/กางได้)
+// คอมโพเนนต์: ดึงคำถาม-คำตอบของผลประเมินจาก /api/history/answers แล้วแสดงเป็นรายการพับเก็บได้
 export default function AnswerReview({
   assessmentId,
   className = "",
@@ -25,6 +21,7 @@ export default function AnswerReview({
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [open, setOpen] = useState(false);
 
+  // โหลดคำตอบจาก API เมื่อ assessmentId เปลี่ยน
   useEffect(() => {
     if (!assessmentId) return;
 
@@ -44,7 +41,6 @@ export default function AnswerReview({
     };
   }, [assessmentId]);
 
-  // ไม่มีคำตอบที่บันทึกไว้ ไม่ต้องแสดงส่วนนี้
   if (answers.length === 0) return null;
 
   return (
@@ -74,6 +70,7 @@ export default function AnswerReview({
         />
       </button>
 
+      {/* รายการคำถามและคำตอบ (แสดงเมื่อกดเปิด) */}
       {open && (
         <ol className="space-y-3 border-t border-[#f0eaeb] px-6 pb-6 pt-5 sm:px-7">
           {answers.map((item, index) => (

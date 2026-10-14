@@ -4,28 +4,20 @@ import { riskLevelOf } from "@/lib/riskLevel";
 import { requireUser } from "@/lib/session";
 import { logSystemError } from "@/lib/errorLogger";
 
-// แบบประเมิน 9Q (ข้อสุดท้าย = คิดทำร้ายตนเอง)
+// assessment_type_id ของแบบประเมินซึมเศร้า 9Q (ใช้ตรวจข้อคิดทำร้ายตนเอง)
 const TYPE_9Q = 14;
 
-/* =========================================================
-   GET DASHBOARD
-========================================================= */
-
-// GET: สรุปข้อมูลแดชบอร์ดจากผลการประเมินของผู้ใช้ที่ล็อกอินอยู่
+// API: ดึงผลประเมินของผู้ใช้เพื่อสรุปข้อมูลแสดงบนหน้า Dashboard
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
 
-    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(request, searchParams.get("userId"));
     if (!auth.ok) return auth.response;
 
     const userIdNumber = auth.userId;
 
-    /* =====================================================
-       ดึงข้อมูลการประเมินของผู้ใช้คนนี้
-    ===================================================== */
-
+    // ดึงผลประเมินทั้งหมดของผู้ใช้ พร้อมค่าความดัน ธงทำร้ายตนเอง และคำแนะนำ
     const result = await pool.query(
       `
       SELECT
@@ -92,11 +84,8 @@ export async function GET(request: NextRequest) {
       [userIdNumber, TYPE_9Q]
     );
 
+    // คำนวณสรุป: จำนวนครั้ง จำนวนประเภท ผลล่าสุด และจำนวนที่มีความเสี่ยง
     const assessments = result.rows;
-
-    /* =====================================================
-       SUMMARY
-    ===================================================== */
 
     const totalAssessments = assessments.length;
 
@@ -113,16 +102,10 @@ export async function GET(request: NextRequest) {
         ? assessments[0]
         : null;
 
-    /* =====================================================
-       นับผลที่มีความเสี่ยง
-    ===================================================== */
-
     const riskAssessments = assessments.filter(
       (item) => {
-        // 9Q ที่ตอบข้อคิดทำร้ายตนเอง ถือเป็นความเสี่ยงเสมอ
         if (item.self_harm_flag) return true;
 
-        // ใช้เกณฑ์เดียวกับหน้า Dashboard (lib/riskLevel.ts)
         const level = riskLevelOf(
           item.assessment_name,
           item.risk_level
@@ -135,10 +118,7 @@ export async function GET(request: NextRequest) {
       }
     ).length;
 
-    /* =====================================================
-       เอาผลล่าสุดของแต่ละประเภท
-    ===================================================== */
-
+    // เก็บผลล่าสุดของแต่ละประเภทแบบประเมิน
     const latestByTypeMap = new Map();
 
     for (const item of assessments) {
@@ -156,10 +136,6 @@ export async function GET(request: NextRequest) {
 
     const latestByType =
       Array.from(latestByTypeMap.values());
-
-    /* =====================================================
-       RESPONSE
-    ===================================================== */
 
     return NextResponse.json({
       success: true,

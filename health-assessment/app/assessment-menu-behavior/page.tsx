@@ -15,10 +15,7 @@ import {
   Wine,
 } from "lucide-react";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ข้อมูลการ์ดแบบประเมินพฤติกรรม 1 ใบ (ชื่อ ลิงก์ ไอคอน สี)
 type BehaviorAssessment = {
   title: string;
   href: string;
@@ -33,10 +30,7 @@ type BehaviorAssessment = {
   tone: CardTone;
 };
 
-/* =========================================================
-   DATA
-========================================================= */
-
+// รายการแบบประเมินด้านพฤติกรรมที่แสดงในเมนู
 const behaviorAssessments: BehaviorAssessment[] = [
   {
     title: "การสูบบุหรี่",
@@ -94,32 +88,17 @@ const behaviorAssessments: BehaviorAssessment[] = [
   },
 ];
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าเมนูแบบประเมินความเสี่ยงด้านพฤติกรรม แสดงการ์ดลิงก์ไปแต่ละแบบประเมิน
+// หน้า: เมนูเลือกแบบประเมินความเสี่ยงด้านพฤติกรรม
 export default function BehaviorAssessmentPage() {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
 
-        {/* =================================================
-            SIDEBAR
-        ================================================= */}
-
         <Sidebar />
-
-        {/* =================================================
-            MAIN CONTENT
-        ================================================= */}
 
         <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
-          {/* =================================================
-              HEADER
-          ================================================= */}
-
+          {/* ส่วนหัว: ชื่อหมวดและกระดิ่งแจ้งเตือน */}
           <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#57965c]">
@@ -140,10 +119,7 @@ export default function BehaviorAssessmentPage() {
             </div>
           </header>
 
-          {/* =================================================
-              ASSESSMENT CARDS
-          ================================================= */}
-
+          {/* การ์ดแบบประเมินพฤติกรรม + แบบประเมินที่เจ้าหน้าที่เพิ่มในหมวดนี้ */}
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {behaviorAssessments.map((assessment) => (
               <AssessmentMenuCard
@@ -154,19 +130,10 @@ export default function BehaviorAssessmentPage() {
                 tone={assessment.tone}
               />
             ))}
-            {/* แบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดนี้ */}
             <CategoryAssessmentCards routePath="/assessment-menu-behavior" />
           </div>
 
-          {/* =================================================
-              INFORMATION BANNER
-          ================================================= */}
-
-
-          {/* =================================================
-              BACK BUTTON
-          ================================================= */}
-
+          {/* ปุ่มย้อนกลับ */}
           <div className="mt-7 flex justify-end">
 
             <Link

@@ -27,26 +27,24 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/* =========================================================
-   TYPES (ตรงกับ /api/dashboard)
-========================================================= */
-
+// โครงข้อมูลผลประเมินหนึ่งรายการที่ได้จาก API dashboard
 type Assessment = {
   assessment_id: number;
   assessment_type_id: number;
   assessment_name: string;
   total_score: number | string | null;
   risk_level: string;
-  systolic?: number | string | null; // เฉพาะ Blood Pressure
-  diastolic?: number | string | null; // เฉพาะ Blood Pressure
+  systolic?: number | string | null;
+  diastolic?: number | string | null;
   assessed_at: string;
   recommendation_text?: string | null;
-  self_harm_flag?: boolean; // 9Q: ตอบข้อคิดทำร้ายตนเอง > 0
+  self_harm_flag?: boolean;
 };
 
-// ระดับผลเป็นภาษาไทย (บางแบบเก็บเป็นภาษาอังกฤษ เช่น Diabetes TDS: moderate)
+// แปลงระดับความเสี่ยงของผลประเมินเป็นข้อความภาษาไทย
 const riskTh = (a: Pick<Assessment, "assessment_name" | "risk_level">) => riskLevelThai(a.assessment_name, a.risk_level);
 
+// ข้อมูลทั้งหมดของ Dashboard: สรุปตัวเลข ผลล่าสุดของแต่ละชนิด และประวัติทั้งหมด
 type DashboardData = {
   success: boolean;
   summary: {
@@ -59,29 +57,29 @@ type DashboardData = {
   assessments: Assessment[];
 };
 
+// หมวดของแบบประเมิน (กาย/ใจ) และช่วงคะแนนพร้อมป้าย/สีบนกราฟ
 type Category = "mind" | "body";
 type Band = { from: number; to: number; label: string; color: string };
 
+// การตั้งค่าการแสดงผลของแต่ละแบบประเมิน (ชื่อไทย ไอคอน เกณฑ์ ช่วงคะแนน คำแนะนำ)
 type TypeConfig = {
   thaiName: string;
   icon: LucideIcon;
   category: Category;
-  max?: number; // คะแนนเต็ม (ถ้ามี)
-  min?: number; // ค่าต่ำสุดของกราฟ
-  chartMax?: number; // ค่าสูงสุดของกราฟ สำหรับแบบที่ไม่มีคะแนนเต็ม
+  max?: number;
+  min?: number;
+  chartMax?: number;
   unit?: string;
-  bands?: Band[]; // แถบเกณฑ์ในกราฟแนวโน้ม
-  levelFromScore?: (score: number) => Level; // ใช้แทนการอ่านจากข้อความ
+  bands?: Band[];
+  levelFromScore?: (score: number) => Level;
   tip: { title: string; text: string };
 };
 
-/* =========================================================
-   THEME
-========================================================= */
-
+// สีหลักของหน้า และลิงก์ไปหน้าเลือกแบบประเมิน
 const ACCENT = "#8E1428";
 const ASSESSMENT_HREF = "/assessment-type";
 
+// สไตล์ ป้าย ไอคอน และลำดับความรุนแรงของแต่ละระดับ (ok/mid/high/unknown)
 const LEVEL_STYLE: Record<
   Level,
   { label: string; pill: string; seg: string; text: string; soft: string; icon: LucideIcon; n: number }
@@ -124,6 +122,7 @@ const LEVEL_STYLE: Record<
   },
 };
 
+// สีพื้นของแถบช่วงคะแนนบนกราฟ
 const BAND = {
   green: "#EEF6F0",
   amber: "#FDF6E7",
@@ -133,12 +132,7 @@ const BAND = {
   blue: "#EAF0F8",
 };
 
-/* =========================================================
-   CONFIG ต่อประเภทแบบประเมิน
-   key = assessment_name แบบตัวพิมพ์เล็ก
-   (ปรับคะแนนเต็ม/เกณฑ์ให้ตรงกับแบบประเมินจริงของโปรเจค)
-========================================================= */
-
+// ตาราง config ของแบบประเมินแต่ละชนิด (key = ชื่อแบบประเมินตัวพิมพ์เล็ก)
 const TYPE_CONFIG: Record<string, TypeConfig> = {
   "phq-2": {
     thaiName: "คัดกรองภาวะซึมเศร้า",
@@ -206,7 +200,6 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     max: 35,
     unit: "kg/m²",
     bands: [
-      // ชื่อช่วงตามเอกสารอ้างอิง ตารางที่ 12
       { from: 15, to: 18.5, label: "ผอม", color: BAND.blue },
       { from: 18.5, to: 23, label: "ปกติ", color: BAND.green },
       { from: 23, to: 25, label: "น้ำหนักเกิน", color: BAND.amber },
@@ -223,7 +216,6 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     icon: HeartPulse,
     category: "body",
     unit: "mmHg",
-    // กราฟใช้ค่าความดันตัวบน เกณฑ์ตรงกับ /api/assessments/blood-pressure
     min: 80,
     chartMax: 200,
     bands: [
@@ -243,7 +235,6 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
     icon: HeartPulse,
     category: "body",
     unit: "% ความเสี่ยงใน 10 ปี",
-    // เกณฑ์ตรงกับ /api/assessments/thai-cvd
     min: 0,
     chartMax: 40,
     bands: [
@@ -269,6 +260,7 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
 };
 TYPE_CONFIG["กิจกรรมทางกาย"] = TYPE_CONFIG["physical activity"];
 
+// config สำรองสำหรับแบบประเมินที่ไม่มีใน TYPE_CONFIG (เช่นแบบที่ผู้ดูแลสร้างเอง)
 const FALLBACK_CONFIG: TypeConfig = {
   thaiName: "",
   icon: Activity,
@@ -276,27 +268,22 @@ const FALLBACK_CONFIG: TypeConfig = {
   tip: { title: "ติดตามผลต่อเนื่อง", text: "ทำแบบประเมินซ้ำเพื่อติดตามการเปลี่ยนแปลง" },
 };
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
-// หาค่าตั้งค่าการแสดงผลของแบบประเมินจากชื่อ (ไม่พบใช้ค่าสำรอง)
+// หา config การแสดงผล (ชื่อไทย ไอคอน เกณฑ์คะแนน) ตามชื่อแบบประเมิน ถ้าไม่พบใช้ค่า fallback
 const getConfig = (name?: string | null): TypeConfig =>
   TYPE_CONFIG[String(name || "").toLowerCase().trim()] ?? FALLBACK_CONFIG;
 
-// เช็กว่าเป็นแบบประเมินความดันโลหิตหรือไม่
+// ตรวจว่าเป็นผลประเมินความดันโลหิตหรือไม่
 const isBloodPressure = (a: Assessment) =>
   String(a.assessment_name || "").toLowerCase().trim() === "blood pressure";
 
-// ค่าที่ใช้แสดง/วาดกราฟ: Blood Pressure ใช้ความดันตัวบน, แบบอื่นใช้ total_score
-// คืนค่า NaN ถ้าไม่มีข้อมูล (ระวัง Number(null) = 0)
+// ดึงคะแนนเป็นตัวเลข (ความดันใช้ค่า systolic, อื่น ๆ ใช้ total_score) คืน NaN ถ้าไม่มี
 const scoreOf = (a?: Assessment | null): number => {
   if (!a) return NaN;
   const raw = isBloodPressure(a) ? a.systolic : a.total_score;
   return raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
 };
 
-// แปลงคะแนนเป็นข้อความ (จำนวนเต็มแสดงตรง ๆ ทศนิยม 2 ตำแหน่ง ไม่มีค่าแสดง "-")
+// จัดรูปแบบคะแนน: จำนวนเต็มแสดงตรง ๆ ทศนิยมแสดง 2 ตำแหน่ง ไม่มีค่าแสดง "-"
 const formatScore = (score: number | null | undefined) => {
   if (score === null || score === undefined) return "-";
   const n = Number(score);
@@ -304,7 +291,7 @@ const formatScore = (score: number | null | undefined) => {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 };
 
-// ข้อความคะแนนที่แสดงบนการ์ด: ความดันแสดงเป็น ตัวบน/ตัวล่าง แบบอื่นแสดงคะแนนรวม
+// ข้อความคะแนนสำหรับแสดงผล (ความดันแสดงเป็น systolic/diastolic)
 const displayScore = (a: Assessment) => {
   if (isBloodPressure(a)) {
     const sys = Number(a.systolic);
@@ -317,9 +304,8 @@ const displayScore = (a: Assessment) => {
   return formatScore(scoreOf(a));
 };
 
-// หาระดับความเสี่ยง (ปกติ/ระวัง/สูง) จากคะแนนตามเกณฑ์ หรือจาก risk_level ที่บันทึกไว้
+// หาระดับความเสี่ยง ok/mid/high (มีความคิดทำร้ายตนเอง = high, ใช้เกณฑ์คะแนนถ้ามี ไม่งั้นใช้ risk_level)
 const getLevel = (a: Assessment): Level => {
-  // 9Q ที่ตอบข้อคิดทำร้ายตนเอง = เสี่ยงสูงเสมอ ไม่ว่าคะแนนรวมเท่าไร
   if (a.self_harm_flag) return "high";
   const cfg = getConfig(a.assessment_name);
   if (cfg.levelFromScore && Number.isFinite(scoreOf(a))) {
@@ -328,45 +314,40 @@ const getLevel = (a: Assessment): Level => {
   return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
-// แปลงวันที่เป็นรูปแบบไทยแบบย่อ เช่น 12 ต.ค. 69
+// แปลงวันที่เป็นรูปแบบสั้นภาษาไทย เช่น 5 ม.ค. 68
 const formatShortDate = (date: string) =>
   new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "2-digit" });
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้า Dashboard: โหลดข้อมูลสรุปผลประเมินของผู้ใช้ แล้วแสดงสถานะโหลด/ผิดพลาด/เนื้อหา
+// หน้า: Dashboard สรุปผลประเมินสุขภาพล่าสุด แนวโน้ม และคำแนะนำของผู้ใช้
 export default function DashboardPage() {
   const router = useRouter();
 
+  // state ข้อมูล Dashboard สถานะโหลด/ผิดพลาด และชื่อผู้ใช้
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [userName, setUserName] = useState("");
 
+  // โหลดข้อมูล Dashboard ตอนเปิดหน้า
   useEffect(() => {
-    // ดึงข้อมูล Dashboard จาก API ตาม userId ถ้า session หมดอายุพากลับไปหน้า login
+    // ดึงข้อมูล Dashboard จาก API /api/dashboard ตาม userId ถ้า 401 ให้กลับไปหน้า login
     const loadDashboard = async () => {
       try {
         setLoading(true);
         setError("");
 
         const userId = localStorage.getItem("userId");
-        // ใช้ key เดียวกับที่หน้า login เก็บไว้ ("username")
         setUserName(localStorage.getItem("username") || "");
 
         if (!userId) {
           throw new Error("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
         }
 
-        // กระดิ่งแจ้งเตือน (NotificationBell) โหลดการแจ้งเตือนเอง
         const dashRes = await fetch(`/api/dashboard?userId=${encodeURIComponent(userId)}`, {
           method: "GET",
           cache: "no-store",
         });
 
-        // session หมดอายุ → กลับไปหน้า login
         if (dashRes.status === 401) {
           localStorage.removeItem("userId");
           router.replace("/login");
@@ -390,7 +371,7 @@ export default function DashboardPage() {
     loadDashboard();
   }, [router]);
 
-  // ไปหน้าประวัติการประเมิน โดยเลือกหมวดของแบบประเมินนั้นไว้
+  // ไปหน้าประวัติโดยกรองตามชนิดแบบประเมินที่กด
   const openResult = (assessment: Assessment) => {
     router.push(`/history?type=${encodeURIComponent(assessment.assessment_name ?? "")}`);
   };
@@ -412,11 +393,7 @@ export default function DashboardPage() {
   );
 }
 
-/* =========================================================
-   LAYOUT: แถบเมนูซ้าย + เนื้อหา
-========================================================= */
-
-// โครงหน้า: แถบเมนูด้านซ้าย + พื้นที่เนื้อหา
+// โครงหน้า Dashboard: Sidebar + พื้นที่เนื้อหา
 function PageShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen bg-[#F6F5F1] text-[#16181D] font-[family-name:var(--font-plex-thai)]">
@@ -426,11 +403,7 @@ function PageShell({ children }: { children: ReactNode }) {
   );
 }
 
-/* =========================================================
-   CONTENT
-========================================================= */
-
-// เนื้อหาหลักของ Dashboard: คำทักทาย การ์ดสรุป ผลรายแบบประเมิน กราฟ และคำแนะนำ
+// เนื้อหาหลักของ Dashboard: KPI, การ์ดผลแต่ละด้าน, กราฟแนวโน้ม และคำแนะนำ (ซ่อน/แสดงได้)
 function DashboardContent({
   data,
   userName,
@@ -444,21 +417,20 @@ function DashboardContent({
   const { summary, latestByType, assessments } = data;
   const latest = summary.latestAssessment;
 
+  // ค่าที่คำนวณสำหรับแสดงผล และสถานะเปิด/ปิดของแต่ละ section
   const okTypes = latestByType.filter((a) => getLevel(a) === "ok");
 
-  // ส่วนที่ไม่จำเป็นต้องเห็นตลอด ซ่อนไว้ก่อน กดดูได้ (จำสถานะไว้ในเบราว์เซอร์)
   const [allCardsOpen, toggleAllCards] = useToggle("dashboard.cards", false);
   const [trendOpen, toggleTrend] = useToggle("dashboard.trend", false);
   const [tipsOpen, toggleTips] = useToggle("dashboard.tips", false);
   const urgent = latestByType.some((a) => a.self_harm_flag);
 
-  // แสดงผลที่เสี่ยงก่อน ถ้าย่ออยู่จะเห็นเฉพาะ 4 ใบแรก
   const sortedTypes = [...latestByType].sort((a, b) => LEVEL_STYLE[getLevel(b)].n - LEVEL_STYLE[getLevel(a)].n);
   const visibleTypes = allCardsOpen ? sortedTypes : sortedTypes.slice(0, CARD_PREVIEW);
 
   return (
     <main className="max-w-[1200px] mx-auto px-6 pt-10 pb-16 flex flex-col gap-8">
-      {/* ---------- Greeting ---------- */}
+      {/* ส่วนหัว: คำทักทาย กระดิ่งแจ้งเตือน และปุ่มทำแบบประเมินใหม่ */}
       <section className="flex flex-wrap items-end justify-between gap-5">
         <div className="flex items-center gap-5 min-w-0">
           <div className="min-w-0">
@@ -497,7 +469,7 @@ function DashboardContent({
         </div>
       </section>
 
-      {/* ---------- KPI ---------- */}
+      {/* การ์ด KPI สรุปจำนวนการประเมิน */}
       <section className="grid gap-4 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
         <KpiCard
           label="การประเมินทั้งหมด"
@@ -529,11 +501,12 @@ function DashboardContent({
         />
       </section>
 
+      {/* ยังไม่มีผลประเมิน → หน้าว่าง ไม่งั้นแสดงการ์ดผล คำแนะนำ และแนวโน้ม */}
       {latestByType.length === 0 ? (
         <EmptyState onStart={() => router.push(ASSESSMENT_HREF)} />
       ) : (
         <>
-          {/* ---------- Assessment cards ---------- */}
+          {/* สรุปผลการประเมินล่าสุดของแต่ละด้าน (การ์ด) */}
           <section className="flex flex-col gap-4">
             <SectionHead
               eyebrow="HEALTH ASSESSMENTS"
@@ -574,9 +547,8 @@ function DashboardContent({
             </div>
           </section>
 
-          {/* ---------- Tips ---------- */}
+          {/* คำแนะนำสุขภาพ (เปิดอัตโนมัติถ้ามีกรณีเร่งด่วน) */}
           <section className="flex flex-wrap gap-4">
-            {/* มีผลพบความคิดทำร้ายตนเอง → เปิดคำแนะนำ (สายด่วน 1323) ไว้เสมอ */}
             <Recommendations
               items={latestByType}
               open={tipsOpen || urgent}
@@ -584,7 +556,7 @@ function DashboardContent({
             />
           </section>
 
-          {/* ---------- Trend (กราฟแมงมุม) ---------- */}
+          {/* กราฟแนวโน้มคะแนน (ซ่อน/แสดงได้) */}
           <section className="bg-white border border-[#E9E6DE] rounded-[20px] p-6 flex flex-col gap-4">
             <SectionHead
               eyebrow="TREND"
@@ -603,7 +575,7 @@ function DashboardContent({
   );
 }
 
-// หาผลประเมินครั้งก่อนหน้าของแบบประเมินเดียวกัน (ครั้งล่าสุดที่เก่ากว่าครั้งปัจจุบัน)
+// หาผลประเมินครั้งก่อนหน้าของแบบประเมินชนิดเดียวกัน (ล่าสุดที่เก่ากว่าครั้งปัจจุบัน)
 const findPrevious = (all: Assessment[], current: Assessment) =>
   all
     .filter(
@@ -613,11 +585,7 @@ const findPrevious = (all: Assessment[], current: Assessment) =>
     )
     .sort((a, b) => new Date(b.assessed_at).getTime() - new Date(a.assessed_at).getTime())[0];
 
-/* =========================================================
-   SMALL PIECES
-========================================================= */
-
-// หัวข้อของแต่ละส่วน มีข้อความเล็กด้านบน ชื่อหัวข้อ และส่วนเสริมด้านขวา
+// หัวข้อของแต่ละ section พร้อม eyebrow และเนื้อหาด้านขวา
 function SectionHead({ eyebrow, title, aside }: { eyebrow: string; title: string; aside?: ReactNode }) {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
@@ -630,9 +598,10 @@ function SectionHead({ eyebrow, title, aside }: { eyebrow: string; title: string
   );
 }
 
+// จำนวนการ์ดที่แสดงก่อนกด "ดูทั้งหมด"
 const CARD_PREVIEW = 4;
 
-// สถานะเปิด/ปิดของแต่ละส่วน จำไว้ใน localStorage (ใช้ไม่ได้ก็ใช้ค่าเริ่มต้น)
+// Hook: สถานะเปิด/ปิด section ที่จำค่าไว้ใน localStorage ตาม key
 function useToggle(key: string, initial: boolean) {
   const [open, setOpenState] = useState(() => {
     try {
@@ -642,7 +611,7 @@ function useToggle(key: string, initial: boolean) {
       return initial;
     }
   });
-  // เปลี่ยนสถานะเปิด/ปิด แล้วบันทึกลง localStorage
+  // ตั้งค่าเปิด/ปิดและบันทึกลง localStorage
   const setOpen = (value: boolean) => {
     setOpenState(value);
     try {
@@ -652,7 +621,7 @@ function useToggle(key: string, initial: boolean) {
   return [open, () => setOpen(!open)] as const;
 }
 
-// ปุ่มแสดง/ซ่อนส่วนเนื้อหา พร้อมไอคอนลูกศรหมุนตามสถานะ
+// ปุ่ม แสดง/ซ่อน section พร้อมลูกศรหมุนตามสถานะ
 function ToggleButton({
   open,
   onClick,
@@ -680,7 +649,7 @@ function ToggleButton({
   );
 }
 
-// การ์ดตัวเลขสรุป (KPI) พร้อมชื่อ หน่วย และไอคอน
+// การ์ดตัวเลขสรุป (KPI) พร้อมไอคอนและหน่วย
 function KpiCard({
   label,
   value,
@@ -713,33 +682,22 @@ function KpiCard({
   );
 }
 
-/* =========================================================
-   TREND: กราฟแมงมุม (SVG ล้วน)
-   - แต่ละแกน = แบบประเมิน 1 ด้าน
-   - วงจากในออกนอก = ปกติ → ควรระวัง → ควรพบผู้เชี่ยวชาญ
-   - เส้นทึบ = ผลล่าสุด, เส้นประ = ผลครั้งก่อน
-========================================================= */
-
-/* ===== กลุ่มของตัวเลือก (ตรงกับ 3 หมวดในหน้า "เข้าสู่แบบประเมิน") =====
-   แบบประเมินหลักจัดกลุ่มตามชื่อ เรียงตามลำดับในรายการ
-   แบบที่เจ้าหน้าที่สร้างเอง: ตามหมวดจาก /api/assessments/categories (หมวด 1-3 = 3 กลุ่มนี้, หมวดอื่นใช้ชื่อหมวด) */
+// กลุ่มแบบประเมินสำหรับตัวกรองกราฟแนวโน้ม (กาย/พฤติกรรม/จิต)
 const TREND_GROUPS: { key: string; label: string; categoryId: number; names: string[] }[] = [
   { key: "physical", label: "สุขภาพกาย", categoryId: 1, names: ["bmi", "blood pressure", "diabetes tds", "diabetes risk", "thai cvd"] },
   { key: "behavior", label: "พฤติกรรม", categoryId: 2, names: ["sleep", "physical activity", "diet", "alcohol", "smoking", "oral health"] },
   { key: "mental", label: "สุขภาพจิต", categoryId: 3, names: ["stress", "phq-2", "9q"] },
 ];
 
-// เลือกมุมมองกราฟ (ค่าเริ่มต้น = ทั้งหมด)
-// - "ทั้งหมด" → กราฟแมงมุมรวมทุกแบบ
-// - กดชื่อกลุ่ม → กราฟแมงมุมเฉพาะกลุ่มนั้น
-// - กดแบบประเมิน → กราฟรายละเอียดของแบบนั้นแบบเดียว
+// มุมมองกราฟแนวโน้มที่เลือก: ทั้งหมด / ตามกลุ่ม / รายแบบประเมิน
 type TrendView = { kind: "all" } | { kind: "group"; key: string } | { kind: "type"; id: number };
 
-// การ์ดแนวโน้ม: ให้เลือกดูทั้งหมด/รายกลุ่ม/รายแบบประเมิน แล้วแสดงกราฟที่เหมาะสม
+// การ์ดแนวโน้มผลประเมิน: เลือกดูทั้งหมด/ตามกลุ่ม (กาย พฤติกรรม จิต)/รายแบบประเมิน
 function TrendCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
+  // state มุมมองที่เลือก และหมวดของแบบประเมินที่ผู้ดูแลสร้างเอง
   const [view, setView] = useState<TrendView>({ kind: "all" });
-  // หมวดของแบบประเมินที่เจ้าหน้าที่สร้างเอง: assessment id → { categoryId, name }
   const [customCats, setCustomCats] = useState<Map<number, { id: number; name: string }>>(new Map());
+  // โหลดหมวดแบบประเมินจาก API categories เพื่อจัดกลุ่มแบบประเมินที่ไม่ใช่ built-in
   useEffect(() => {
     let cancelled = false;
     fetch("/api/assessments/categories", { cache: "no-store" })
@@ -757,16 +715,15 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
       cancelled = true;
     };
   }, []);
-  // ดึงผลย้อนหลังที่มีคะแนนของแบบประเมินนั้น เรียงเก่า→ใหม่ เอาแค่ 8 ครั้งล่าสุด
+  // ผลประเมินที่มีคะแนนของชนิดนี้ เรียงตามเวลา เอา 8 ครั้งล่าสุด
   const history = (typeId: number) =>
     assessments
       .filter((a) => a.assessment_type_id === typeId && Number.isFinite(scoreOf(a)))
       .sort((a, b) => new Date(a.assessed_at).getTime() - new Date(b.assessed_at).getTime())
       .slice(-8);
-  // ทุกแบบประเมินที่มีผล (กราฟแมงมุมใช้ระดับผล ไม่จำเป็นต้องมีคะแนนตัวเลข)
   const types = items;
 
-  // จัดกลุ่มตามหมวด (เรียงตามลำดับใน TREND_GROUPS) ที่เหลือเป็นหมวดของเจ้าหน้าที่หรือ "อื่น ๆ"
+  // จัดแบบประเมินเข้ากลุ่ม (built-in ตามชื่อ, แบบสร้างเองตามหมวด) แล้วเรียงในกลุ่ม
   const groups: { key: string; label: string; items: Assessment[] }[] = TREND_GROUPS.map((g) => ({ key: g.key, label: g.label, items: [] as Assessment[] }));
   for (const a of types) {
     const name = String(a.assessment_name ?? "").toLowerCase().trim();
@@ -783,9 +740,8 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
     const g = groups.find((x) => x.key === key) ?? (groups.push({ key, label, items: [] }), groups[groups.length - 1]);
     g.items.push(a);
   }
-  // แบบประเมินหลักเรียงตามลำดับที่กำหนด แบบที่เจ้าหน้าที่สร้างต่อท้าย
   for (const [i, g] of TREND_GROUPS.entries()) {
-    // ลำดับของแบบประเมินในกลุ่มตามรายการที่กำหนด (ไม่อยู่ในรายการต่อท้าย)
+    // ลำดับการเรียงภายในกลุ่มตามรายชื่อที่กำหนดใน TREND_GROUPS
     const rank = (a: Assessment) => {
       const n = g.names.indexOf(a.assessment_name.toLowerCase().trim());
       return n < 0 ? g.names.length : n;
@@ -794,7 +750,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
   }
   const visibleGroups = groups.filter((g) => g.items.length > 0);
 
-  // แบบประเมินที่อยู่ในมุมมองปัจจุบัน (ถ้าแบบ/กลุ่มที่เลือกหายไป กลับไปทั้งหมด)
+  // เลือกรายการที่จะแสดงตามมุมมองปัจจุบัน
   const chosen =
     view.kind === "type"
       ? types.filter((a) => a.assessment_type_id === view.id)
@@ -804,7 +760,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
   const shown = chosen.length > 0 ? chosen : types;
   const isAll = view.kind === "all" || chosen.length === 0;
 
-  // คลาส CSS ของปุ่มตัวเลือก (เลือกอยู่ = พื้นเข้ม)
+  // คลาส CSS ของปุ่ม chip ตัวกรอง ตามสถานะที่เลือกอยู่
   const chipCls = (on: boolean) =>
     `min-h-9 rounded-full border px-4 text-sm font-semibold transition ${
       on
@@ -814,6 +770,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
 
   return (
     <div className="flex flex-col gap-5">
+      {/* แถบตัวกรอง: ดูทั้งหมด / ตามกลุ่ม / รายแบบประเมิน */}
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -831,7 +788,6 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
             const groupOn = view.kind === "group" && view.key === g.key;
             return (
               <div key={g.key} className="flex flex-col gap-2 sm:flex-row sm:items-start">
-                {/* กดชื่อกลุ่ม = ดูกราฟรวมเฉพาะกลุ่มนี้ */}
                 <button
                   type="button"
                   aria-pressed={groupOn}
@@ -865,6 +821,7 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
         </div>
       </div>
 
+      {/* กราฟ: เลือกแบบเดียว → แนวโน้มรายแบบ, ไม่งั้น → เรดาร์รวม */}
       {view.kind === "type" && chosen.length === 1 ? (
         history(chosen[0].assessment_type_id).length > 0 ? (
           <TypeTrend key={chosen[0].assessment_type_id} list={history(chosen[0].assessment_type_id)} />
@@ -881,17 +838,19 @@ function TrendCard({ items, assessments }: { items: Assessment[]; assessments: A
   );
 }
 
+// คำตอบและคะแนนรายข้อจาก API /api/history/answers
 type AnswerScore = { questionId: number; question: string; answer: string; score: number | null; maxScore: number | null };
 
-// แบบประเมินเดียว: ถ้ามีคะแนนรายข้อตั้งแต่ 3 ข้อ แสดงกราฟแมงมุมรายข้อ ไม่อย่างนั้นใช้กราฟเส้นตามเวลา
+// แนวโน้มรายแบบประเมิน: เทียบคะแนนรายข้อครั้งล่าสุดกับครั้งก่อน (ข้อมูลไม่พอจะใช้กราฟประวัติแทน)
 function TypeTrend({ list }: { list: Assessment[] }) {
   const latest = list[list.length - 1];
   const previous = list.length > 1 ? list[list.length - 2] : undefined;
   const [answers, setAnswers] = useState<{ latest: AnswerScore[]; previous: AnswerScore[] } | null>(null);
 
+  // โหลดคำตอบรายข้อของครั้งล่าสุดและครั้งก่อนพร้อมกัน
   useEffect(() => {
     let cancelled = false;
-    // โหลดคำตอบและคะแนนรายข้อของการประเมินตาม id (ไม่มี id คืนรายการว่าง)
+    // ดึงคำตอบและคะแนนรายข้อของผลประเมินจาก API /api/history/answers
     const load = (id?: number) =>
       id
         ? fetch(`/api/history/answers?assessmentId=${id}`, { cache: "no-store" })
@@ -910,10 +869,11 @@ function TypeTrend({ list }: { list: Assessment[] }) {
     return <p className="py-16 text-center text-sm text-[#5E6470]">กำลังโหลด...</p>;
   }
 
+  // เลือกเฉพาะข้อที่มีคะแนน ถ้าน้อยกว่า 3 ข้อใช้กราฟประวัติ/เส้นแทน
   const scored = answers.latest.filter((r) => r.score !== null && r.maxScore !== null && r.maxScore > 0);
-  // ไม่มีคะแนนรายข้อพอ → ใช้แมงมุมตามครั้งที่ประเมิน (ต้องมีอย่างน้อย 3 ครั้ง) ไม่งั้นใช้กราฟเส้น
   if (scored.length < 3) return list.length >= 3 ? <HistoryRadar list={list} /> : <ScoreTrend list={list} />;
 
+  // เตรียมข้อมูลเทียบครั้งก่อน และส่วนต่างคะแนน
   const prevById = new Map(answers.previous.map((r) => [r.questionId, r]));
   const cfg = getConfig(latest.assessment_name);
   const scores = list.map((a) => scoreOf(a));
@@ -921,6 +881,7 @@ function TypeTrend({ list }: { list: Assessment[] }) {
 
   return (
     <div className="flex flex-col gap-5">
+      {/* คะแนนล่าสุด ระดับ และการเปลี่ยนแปลง */}
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
         <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(latest)}</span>
         <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
@@ -932,6 +893,7 @@ function TypeTrend({ list }: { list: Assessment[] }) {
 
       <QuestionRadar rows={scored} prevById={previous ? prevById : null} />
 
+      {/* รายการคำถาม คำตอบ และคะแนนรายข้อเทียบครั้งก่อน */}
       <ol className="grid gap-x-8 sm:grid-cols-2 text-sm">
         {scored.map((r, i) => {
           const prev = prevById.get(r.questionId);
@@ -956,31 +918,33 @@ function TypeTrend({ list }: { list: Assessment[] }) {
   );
 }
 
-// กราฟแมงมุมตามครั้งที่ประเมิน: แต่ละแฉก = 1 ครั้ง (เก่า → ใหม่ ตามเข็มนาฬิกา)
-// วงพื้นหลัง = ช่วงเกณฑ์ของแบบประเมินนั้น ระยะจากกลาง = คะแนน
+// กราฟเรดาร์แสดงคะแนนหลายครั้งของแบบประเมินเดียว (แต่ละแกน = หนึ่งครั้ง) พร้อมแถบเกณฑ์
 function HistoryRadar({ list }: { list: Assessment[] }) {
+  // เตรียมช่วงคะแนน (min–max) และส่วนต่างจากครั้งก่อน
   const latest = list[list.length - 1];
   const cfg = getConfig(latest.assessment_name);
   const scores = list.map((a) => scoreOf(a));
   const min = cfg.min ?? 0;
   const max = cfg.chartMax ?? cfg.max ?? (Math.max(...scores) * 1.25 || 1);
   const range = max - min || 1;
-  // แปลงคะแนนเป็นสัดส่วน 0–1 ตามช่วงต่ำสุด–สูงสุดของกราฟ
+  // แปลงคะแนนเป็นสัดส่วน 0–1 ตามช่วง min–max ของแบบประเมิน
   const ratio = (v: number) => Math.min(1, Math.max(0, (v - min) / range));
   const delta = Math.round((scores[scores.length - 1] - scores[scores.length - 2]) * 100) / 100;
 
+  // คำนวณเรขาคณิตของกราฟเรดาร์และจุดคะแนนแต่ละครั้ง
   const n = list.length;
   // มุมของแกนที่ i (เริ่มจากด้านบน วนตามเข็มนาฬิกา)
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
-  // พิกัด x,y บนแกนที่ i ที่ระยะ r จากจุดกลาง
+  // พิกัด x,y บนแกนที่ i ที่รัศมีสัดส่วน r
   const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
-  // สร้างจุดของวงรูปหลายเหลี่ยมที่ระยะ r สำหรับวาดเส้นพื้นหลัง
+  // สร้างจุด polygon ของวงแหวนพื้นหลังที่รัศมี r
   const ring = (r: number) => list.map((_, i) => point(i, r).join(",")).join(" ");
   const pts = list.map((a, i) => point(i, ratio(scoreOf(a))));
   const bands = [...(cfg.bands ?? [])].sort((a, b) => b.to - a.to);
 
   return (
     <div className="flex flex-col gap-5">
+      {/* คะแนนล่าสุด ระดับ และการเปลี่ยนแปลง */}
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
         <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(latest)}</span>
         <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
@@ -991,6 +955,7 @@ function HistoryRadar({ list }: { list: Assessment[] }) {
       </div>
 
       <div className="flex flex-col items-center gap-3">
+        {/* กราฟเรดาร์: แถบเกณฑ์ เส้นแกน polygon คะแนน จุด และป้ายวันที่ */}
         <svg
           viewBox="-170 -140 340 280"
           className="w-full max-w-[520px] h-auto"
@@ -1050,6 +1015,7 @@ function HistoryRadar({ list }: { list: Assessment[] }) {
           })}
         </svg>
 
+        {/* คำอธิบายสีของแถบเกณฑ์ */}
         <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#4A4F59]">
           {bands
             .slice()
@@ -1067,16 +1033,16 @@ function HistoryRadar({ list }: { list: Assessment[] }) {
   );
 }
 
-// กราฟแมงมุมรายข้อ: ระยะจากกลาง = คะแนนข้อนั้นเทียบคะแนนเต็มของข้อ
+// กราฟเรดาร์คะแนนรายข้อของครั้งล่าสุด ซ้อนกับครั้งก่อนหน้า
 function QuestionRadar({ rows, prevById }: { rows: AnswerScore[]; prevById: Map<number, AnswerScore> | null }) {
   const n = rows.length;
-  // มุมของแกนที่ i (เริ่มจากด้านบน วนตามเข็มนาฬิกา)
+  // มุมของแกนข้อที่ i
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
-  // พิกัด x,y บนแกนที่ i ที่ระยะ r จากจุดกลาง
+  // พิกัด x,y บนแกนที่ i ที่รัศมีสัดส่วน r
   const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
-  // สร้างจุดของวงรูปหลายเหลี่ยมที่ระยะ r สำหรับวาดเส้นพื้นหลัง
+  // สร้างจุด polygon ของวงแหวนพื้นหลังที่รัศมี r
   const ring = (r: number) => rows.map((_, i) => point(i, r).join(",")).join(" ");
-  // สัดส่วนคะแนนข้อนั้นเทียบคะแนนเต็ม (0–1) ไม่มีคะแนนให้เป็น 0
+  // สัดส่วนคะแนนต่อคะแนนเต็มของข้อนั้น (0–1)
   const ratio = (r?: AnswerScore) => (r && r.score !== null && r.maxScore ? Math.min(1, Math.max(0, r.score / r.maxScore)) : 0);
 
   const current = rows.map((r, i) => point(i, ratio(r)));
@@ -1085,6 +1051,7 @@ function QuestionRadar({ rows, prevById }: { rows: AnswerScore[]; prevById: Map<
 
   return (
     <div className="flex flex-col items-center gap-3">
+      {/* กราฟเรดาร์รายข้อ: เส้นประ = ครั้งก่อน, พื้นทึบ = ล่าสุด */}
       <svg
         viewBox="-140 -130 280 260"
         className="w-full max-w-[440px] h-auto"
@@ -1121,6 +1088,7 @@ function QuestionRadar({ rows, prevById }: { rows: AnswerScore[]; prevById: Map<
           );
         })}
       </svg>
+      {/* คำอธิบายกราฟ */}
       <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#4A4F59]">
         <span>ยิ่งออกไปทางขอบ = คะแนนข้อนั้นยิ่งสูง</span>
         <span className="flex items-center gap-1.5">
@@ -1138,8 +1106,9 @@ function QuestionRadar({ rows, prevById }: { rows: AnswerScore[]; prevById: Map<
   );
 }
 
-// กราฟเส้นคะแนนย้อนหลังของแบบประเมินเดียว พร้อมแถบเกณฑ์
+// กราฟเส้นแนวโน้มคะแนนรวมแต่ละครั้ง (ใช้เมื่อข้อมูลน้อยกว่า 3 ครั้ง)
 function ScoreTrend({ list }: { list: Assessment[] }) {
+  // เตรียมช่วงคะแนน แปลงเป็นพิกัด % บนกราฟ และสร้าง path เส้น/จุด
   const cfg = getConfig(list[0].assessment_name);
   const scores = list.map((a) => scoreOf(a));
   const min = cfg.min ?? 0;
@@ -1154,18 +1123,21 @@ function ScoreTrend({ list }: { list: Assessment[] }) {
   const linePath = pts.map((p, i) => `${i ? "L" : "M"}${p.x} ${p.y}`).join(" ");
   const dotPath = pts.map((p) => `M${p.x} ${p.y}h0`).join(" ");
 
+  // ส่วนต่างคะแนนครั้งล่าสุดกับครั้งก่อน
   const last = scores[scores.length - 1];
   const prev = scores.length > 1 ? scores[scores.length - 2] : null;
   const delta = prev === null ? null : Math.round((last - prev) * 100) / 100;
 
   return (
     <div className="flex flex-col gap-4">
+      {/* คะแนนล่าสุดและการเปลี่ยนแปลง */}
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
         <span className="font-[family-name:var(--font-anuphan)] text-[34px] font-bold">{displayScore(list[list.length - 1])}</span>
         <span className="text-[#5E6470]">{cfg.unit ?? (cfg.max ? `คะแนน (เต็ม ${cfg.max})` : "คะแนน")}</span>
         <DeltaPill delta={delta} />
       </div>
 
+      {/* กราฟเส้น: แถบเกณฑ์พื้นหลัง เส้นคะแนน และป้ายคะแนน/วันที่ของแต่ละจุด */}
       <div className="relative h-60 mt-9 mb-7">
         {(cfg.bands ?? []).map((b) => (
           <div
@@ -1209,6 +1181,7 @@ function ScoreTrend({ list }: { list: Assessment[] }) {
         ))}
       </div>
 
+      {/* แจ้งเตือนเมื่อมีข้อมูลครั้งเดียว */}
       {list.length < 2 && (
         <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-[#4A4F59] text-sm">
           <Info size={18} />
@@ -1219,13 +1192,12 @@ function ScoreTrend({ list }: { list: Assessment[] }) {
   );
 }
 
-// ป้ายแสดงคะแนนเพิ่ม/ลดจากครั้งก่อน (เพิ่ม = แดง, ลด = เขียว)
+// ป้ายแสดงการเปลี่ยนแปลงคะแนนจากครั้งก่อน (เพิ่ม/ลด/คงที่)
 function DeltaPill({ delta }: { delta: number | null }) {
   if (delta === null || !Number.isFinite(delta))
     return <span className="px-2.5 py-1 rounded-full text-[13px] font-semibold bg-[#F3F1EC] text-[#4A4F59]">ข้อมูล 1 ครั้ง</span>;
   if (delta === 0)
     return <span className="px-2.5 py-1 rounded-full text-[13px] font-semibold bg-[#F3F1EC] text-[#4A4F59]">คงที่จากครั้งก่อน</span>;
-  // ใช้สีแดงเมื่อคะแนนเพิ่ม เพราะแบบประเมินส่วนใหญ่ คะแนนสูง = เสี่ยงมาก
   const up = delta > 0;
   return (
     <span
@@ -1238,6 +1210,7 @@ function DeltaPill({ delta }: { delta: number | null }) {
   );
 }
 
+// รัศมีกราฟเรดาร์ สีจุดตามระดับ และโซนสีพื้นหลังของเรดาร์รวม
 const RADAR_R = 100;
 const LEVEL_COLOR: Record<Level, string> = { ok: "#2F8A4F", mid: "#D08A14", high: "#B4233A", unknown: "#9AA0A8" };
 const ZONES: { level: Level; color: string }[] = [
@@ -1246,14 +1219,16 @@ const ZONES: { level: Level; color: string }[] = [
   { level: "ok", color: BAND.green },
 ];
 
-// วางจุดไว้กลางช่วงของระดับนั้น (ปกติ 0–⅓, ควรระวัง ⅓–⅔, ควรพบผู้เชี่ยวชาญ ⅔–1)
+// แปลงระดับความเสี่ยงเป็นรัศมีบนกราฟเรดาร์รวม
 const radiusOf = (level: Level) => (LEVEL_STYLE[level].n * 2 - 1) / 6;
 
-// กราฟแมงมุมรวม: แต่ละแกนคือแบบประเมิน แสดงระดับความเสี่ยงล่าสุดเทียบครั้งก่อน
+// กราฟเรดาร์รวมระดับความเสี่ยงทุกด้าน เทียบกับครั้งก่อน (ต้องมีอย่างน้อย 3 ด้าน)
 function RadarCard({ items, assessments }: { items: Assessment[]; assessments: Assessment[] }) {
+  // แยกด้านที่มีเกณฑ์ระดับ (ใช้เป็นแกน) กับด้านที่ยังไม่มีเกณฑ์
   const axes = items.filter((a) => getLevel(a) !== "unknown");
   const unrated = items.filter((a) => getLevel(a) === "unknown");
 
+  // น้อยกว่า 3 ด้านวาดเรดาร์ไม่ได้ → แสดงข้อความแนะนำแทน
   if (axes.length < 3) {
     return (
       <div className="flex items-center gap-2.5 px-3.5 py-3 rounded-xl bg-[#F3F1EC] text-sm text-[#4A4F59]">
@@ -1264,30 +1239,30 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
   }
 
   const n = axes.length;
-  // มุมของแกนที่ i (เริ่มจากด้านบน วนตามเข็มนาฬิกา)
+  // มุมของแกนด้านที่ i
   const angle = (i: number) => -Math.PI / 2 + (i * 2 * Math.PI) / n;
-  // พิกัด x,y บนแกนที่ i ที่ระยะ r จากจุดกลาง
+  // พิกัด x,y บนแกนที่ i ที่รัศมีสัดส่วน r
   const point = (i: number, r: number) => [Math.cos(angle(i)) * r * RADAR_R, Math.sin(angle(i)) * r * RADAR_R];
-  // สร้างจุดของวงรูปหลายเหลี่ยมที่ระยะ r สำหรับวาดเส้นพื้นหลัง
+  // สร้างจุด polygon ของวงแหวนพื้นหลังที่รัศมี r
   const ring = (r: number) => axes.map((_, i) => point(i, r).join(",")).join(" ");
 
+  // จุดของผลล่าสุด และ polygon ของผลครั้งก่อน
   const current = axes.map((a, i) => ({ a, level: getLevel(a), xy: point(i, radiusOf(getLevel(a))) }));
   const prevs = axes.map((a) => findPrevious(assessments, a));
   const hasPrev = prevs.some(Boolean);
-  // ด้านที่ไม่มีผลครั้งก่อน ใช้ผลล่าสุดแทน เพื่อให้เส้นประยังต่อกันครบ
   const prevPoly = prevs
     .map((p, i) => point(i, radiusOf(p ? getLevel(p) : current[i].level)).join(","))
     .join(" ");
 
   return (
     <div className="flex flex-col items-center gap-4">
+      {/* กราฟเรดาร์รวม: โซนสีระดับ เส้นครั้งก่อน polygon ล่าสุด จุด และชื่อแต่ละด้าน */}
       <svg
         viewBox="-230 -150 460 300"
         className="w-full max-w-[640px] h-auto"
         role="img"
         aria-label={`กราฟแมงมุมระดับความเสี่ยง: ${current.map((c) => `${thName(c.a.assessment_name)} ${LEVEL_STYLE[c.level].label}`).join(", ")}`}
       >
-        {/* พื้นหลังแต่ละช่วง */}
         {ZONES.map((z) => (
           <polygon key={z.level} points={ring(LEVEL_STYLE[z.level].n / 3)} fill={z.color} stroke="#E4DFD4" strokeWidth={1} />
         ))}
@@ -1313,7 +1288,6 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
           </circle>
         ))}
 
-        {/* ชื่อแกน + ระดับปัจจุบัน */}
         {current.map((c, i) => {
           const [x, y] = point(i, 1.14);
           const cos = Math.cos(angle(i));
@@ -1332,6 +1306,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
         })}
       </svg>
 
+      {/* คำอธิบายสีระดับและเส้นกราฟ */}
       <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#4A4F59]">
         {(["ok", "mid", "high"] as Level[]).map((l) => (
           <span key={l} className="flex items-center gap-1.5">
@@ -1351,6 +1326,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
         )}
       </div>
 
+      {/* รายชื่อด้านที่ไม่ได้แสดงในกราฟ */}
       {unrated.length > 0 && (
         <p className="text-xs text-[#5E6470]">
           ไม่แสดงในกราฟ (ยังไม่มีเกณฑ์แบ่งระดับ): {unrated.map((a) => thName(a.assessment_name)).join(", ")}
@@ -1360,11 +1336,7 @@ function RadarCard({ items, assessments }: { items: Assessment[]; assessments: A
   );
 }
 
-/* =========================================================
-   ASSESSMENT CARD
-========================================================= */
-
-// การ์ดผลล่าสุดของแบบประเมินหนึ่ง: ระดับ คะแนน และส่วนต่างจากครั้งก่อน กดเพื่อดูประวัติ
+// การ์ดผลประเมินล่าสุดของแต่ละด้าน: คะแนน ระดับ แถบ progress และการเปลี่ยนแปลงจากครั้งก่อน
 function AssessmentCard({
   assessment: a,
   previous,
@@ -1374,6 +1346,7 @@ function AssessmentCard({
   previous?: Assessment;
   onOpen: () => void;
 }) {
+  // ค่าที่ใช้แสดงในการ์ด: config ระดับ สไตล์ คะแนน ส่วนต่าง และ % ของแถบ progress
   const cfg = getConfig(a.assessment_name);
   const level = getLevel(a);
   const s = LEVEL_STYLE[level];
@@ -1400,6 +1373,7 @@ function AssessmentCard({
         <p className="text-[13px] text-[#5E6470]">{formatShortDate(a.assessed_at)}</p>
       </div>
 
+      {/* คะแนน และการเปลี่ยนแปลงจากครั้งก่อน (หรือชื่อระดับถ้าไม่เปลี่ยน) */}
       <div className="flex w-full items-baseline gap-1.5">
         <span className={`font-[family-name:var(--font-anuphan)] text-[34px] font-bold ${s.text}`}>{displayScore(a)}</span>
         <span className="text-[#5E6470]">{cfg.max ? `/ ${cfg.max}` : cfg.unit ?? ""}</span>
@@ -1425,15 +1399,11 @@ function AssessmentCard({
   );
 }
 
-/* =========================================================
-   RECOMMENDATIONS
-========================================================= */
-
-// กล่องคำแนะนำ: เลือกแบบที่เสี่ยงสูงสุด 4 อันดับ (ข้อคิดทำร้ายตนเองขึ้นก่อน) มาแสดงคำแนะนำ
+// สร้างคำแนะนำจากด้านที่เสี่ยง (ให้ความสำคัญกรณีทำร้ายตนเองก่อน) และด้านที่ทำได้ดี
 function Recommendations({ items, open, onToggle }: { items: Assessment[]; open: boolean; onToggle?: () => void }) {
+  // แยกด้านที่ต้องใส่ใจ (เรียงทำร้ายตนเอง → ความรุนแรง) กับด้านที่ปกติ
   const needAttention = items
     .filter((a) => getLevel(a) === "high" || getLevel(a) === "mid")
-    // ข้อคิดทำร้ายตนเองขึ้นก่อนเสมอ
     .sort(
       (a, b) =>
         Number(!!b.self_harm_flag) - Number(!!a.self_harm_flag) ||
@@ -1441,6 +1411,7 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
     );
   const goodOnes = items.filter((a) => getLevel(a) === "ok");
 
+  // สร้างคำแนะนำไม่เกิน 4 ข้อ (กรณีทำร้ายตนเองใช้ข้อความสายด่วน 1323)
   const tips = needAttention.slice(0, 4).map((a) => {
     const cfg = getConfig(a.assessment_name);
     if (a.self_harm_flag) {
@@ -1459,11 +1430,11 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
       level: getLevel(a),
       source: `จาก ${thName(a.assessment_name)}`,
       title: cfg.tip.title,
-      // ใช้คำแนะนำจากฐานข้อมูลก่อน ถ้าไม่มีค่อยใช้ข้อความสำรอง
       text: a.recommendation_text?.trim() || cfg.tip.text,
     };
   });
 
+  // ถ้ายังไม่ครบ 4 ข้อ เพิ่มคำชมสำหรับด้านที่อยู่ในเกณฑ์ปกติ
   if (tips.length < 4 && goodOnes.length > 0) {
     tips.push({
       key: -1,
@@ -1488,6 +1459,7 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
           )
         }
       />
+      {/* รายการการ์ดคำแนะนำ (แสดงเมื่อเปิด) */}
       {open && (
         <div id="recommendation-list" className="grid gap-3 grid-cols-[repeat(auto-fit,minmax(240px,1fr))]">
           {tips.map((t) => (
@@ -1506,10 +1478,6 @@ function Recommendations({ items, open, onToggle }: { items: Assessment[]; open:
   );
 }
 
-/* =========================================================
-   STATES
-========================================================= */
-
 // หน้าจอระหว่างกำลังโหลด Dashboard
 function LoadingState() {
   return (
@@ -1522,7 +1490,7 @@ function LoadingState() {
   );
 }
 
-// หน้าจอแจ้งโหลดข้อมูลไม่สำเร็จ พร้อมปุ่มลองอีกครั้ง
+// หน้าจอแจ้งโหลดข้อมูลไม่สำเร็จ พร้อมปุ่มลองใหม่
 function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <main className="min-h-screen p-8">
@@ -1538,7 +1506,7 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
-// กล่องแจ้งว่ายังไม่มีผลประเมิน พร้อมปุ่มเริ่มทำแบบประเมิน
+// หน้าจอเมื่อยังไม่มีผลประเมิน พร้อมปุ่มเริ่มทำแบบประเมิน
 function EmptyState({ onStart }: { onStart: () => void }) {
   return (
     <div className="bg-white border border-[#E9E6DE] rounded-[20px] p-12 text-center">

@@ -12,19 +12,17 @@ import RecommendationLayout, {
   type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้าและลิงก์กลับไปทำแบบประเมินใหม่
 const TONE = "green";
 const EDIT_HREF = "/assessment_smoking";
 
-// คะแนนเต็ม (0 ต่ำ / 1-4 ปานกลาง / 5-8 สูง ตาม API)
+// คะแนนเต็มของแบบประเมินการสูบบุหรี่
 const MAX_SCORE = 8;
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-// คำตอบข้อ 2 (ตลอดชีวิตที่ผ่านมาคุณเคยสูบบุหรี่หรือไม่) ที่แปลว่าไม่เคยสูบ
+// ข้อความตัวเลือก "ไม่เคยสูบ" ในข้อ 2 ใช้ตัดสินว่าจะแสดงช่องทางช่วยเลิกบุหรี่หรือไม่
 const NEVER_SMOKED = "ไม่สูบ";
 
+// คำตอบรายข้อของผู้ใช้
 type Answer = {
   question_id: number;
   question_text: string;
@@ -34,6 +32,7 @@ type Answer = {
   score: number | string | null;
 };
 
+// แถวผลประเมินจากตาราง assessments (คะแนน ระดับ คำแนะนำ)
 type Assessment = {
   assessment_id: number;
   user_id: number;
@@ -45,6 +44,7 @@ type Assessment = {
   recommendation_text: string | null;
 };
 
+// รูปแบบ response ของ API ผลประเมิน
 type RecommendationResponse = {
   success: boolean;
   assessment?: Assessment;
@@ -52,11 +52,7 @@ type RecommendationResponse = {
   message?: string;
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าผลและคำแนะนำการสูบบุหรี่: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลและคำแนะนำการประเมินการสูบบุหรี่ ครอบด้วย Suspense
 export default function SmokingRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -65,23 +61,22 @@ export default function SmokingRecommendationPage() {
   );
 }
 
-// เนื้อหาหน้าผลการสูบบุหรี่: โหลดผลและคำตอบตาม assessmentId แล้วแสดงคำแนะนำ
+// เนื้อหาหน้า: แสดงคะแนน ระดับความเสี่ยงการสูบบุหรี่ และคำแนะนำตาม assessmentId
+// แสดงวงคะแนน (เต็ม 8) เกณฑ์ 3 ระดับ และสายด่วนเลิกบุหรี่ 1600 ถ้าเคยสูบหรือคะแนน ≥1
 function SmokingRecommendationContent() {
   const searchParams = useSearchParams();
 
   const assessmentId = searchParams.get("assessmentId");
 
+  // state ของหน้า: ผลประเมิน คำตอบ สถานะโหลด และ error
   const [assessment, setAssessment] = useState<Assessment | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  /* =======================================================
-     LOAD RESULT
-  ======================================================= */
-
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
-    // โหลดผลประเมินการสูบบุหรี่และคำตอบตาม assessmentId จาก API
+    // ดึงผลประเมินจาก /api/assessments/smoking (401 → ลบ userId แล้วไปหน้า login)
     const loadResult = async () => {
       if (!assessmentId) {
         setError("ไม่พบ assessmentId");
@@ -101,7 +96,6 @@ function SmokingRecommendationContent() {
           },
         );
 
-        // session หมดอายุ → กลับไปหน้า login
         if (response.status === 401) {
           localStorage.removeItem("userId");
           window.location.replace("/login");
@@ -130,15 +124,13 @@ function SmokingRecommendationContent() {
     void loadResult();
   }, [assessmentId]);
 
-  /* =======================================================
-     RISK
-  ======================================================= */
-
+  // แปลง risk_level เป็นข้อความและสีสำหรับแสดงผล
   const riskInfo = useMemo(
     () => getRiskInfo(assessment?.risk_level),
     [assessment?.risk_level],
   );
 
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -150,15 +142,11 @@ function SmokingRecommendationContent() {
   const score = Number(assessment.total_score ?? 0);
   const t = RECOMMENDATION_TONES[TONE];
 
-  // สายด่วนเลิกบุหรี่: แสดงเมื่อเคยสูบ (ข้อ 2 ตลอดชีวิต) หรือความเสี่ยงปานกลางขึ้นไป (คะแนน ≥ 1)
-  // ไม่เคยสูบเลยตลอดชีวิตและเสี่ยงต่ำ → ไม่แสดง
+  // ตัดสินว่าจะแสดงช่องทางช่วยเลิกบุหรี่ (คะแนน ≥1 หรือข้อ 2 ไม่ได้ตอบว่าไม่สูบ)
   const lifetime = answers.find((a) => a.display_order === 2)?.choice_text?.trim();
   const showQuitHelp = score >= 1 || (lifetime !== undefined && lifetime !== NEVER_SMOKED);
 
-  /* =======================================================
-     MAIN
-  ======================================================= */
-
+  // ส่วนแสดงผล: วงคะแนน ระดับ และคำแนะนำ (ใช้คำแนะนำสำรองถ้า API ไม่มี)
   return (
     <RecommendationLayout
       tone={TONE}
@@ -186,10 +174,8 @@ function SmokingRecommendationContent() {
       editHref={EDIT_HREF}
       menuHref="/assessment-menu-behavior"
     >
-      {/* =================================================
-          เกณฑ์การแปลผล
-      ================================================== */}
 
+      {/* เกณฑ์การแปลผล 3 ระดับ ไฮไลต์ระดับของผู้ใช้ */}
       <RecommendationSection
         icon={<ClipboardList size={27} className={t.eyebrow} />}
         title="เกณฑ์การแปลผล"
@@ -206,10 +192,7 @@ function SmokingRecommendationContent() {
         </div>
       </RecommendationSection>
 
-      {/* =================================================
-          สายด่วนเลิกบุหรี่
-      ================================================== */}
-
+      {/* ช่องทางช่วยเลิกบุหรี่: สายด่วน 1600 */}
       {showQuitHelp && (
         <RecommendationSection
           icon={<Phone size={27} className={t.eyebrow} />}
@@ -234,11 +217,7 @@ function SmokingRecommendationContent() {
   );
 }
 
-/* =========================================================
-   RISK INFO
-========================================================= */
-
-// แปลงระดับความเสี่ยง (ไทย/อังกฤษ) เป็นป้ายข้อความภาษาไทยและสี
+// แปลง risk_level (ไทย/อังกฤษ) เป็นข้อความระดับความเสี่ยงและสี
 function getRiskInfo(
   riskLevel: string | null | undefined,
 ): { label: string; color: RiskColor } {
@@ -264,11 +243,7 @@ function getRiskInfo(
   return { label: "ความเสี่ยงต่ำ", color: "green" };
 }
 
-/* =========================================================
-   DEFAULT RECOMMENDATION
-========================================================= */
-
-// คืนข้อความคำแนะนำเริ่มต้นตามระดับความเสี่ยง (ใช้เมื่อไม่มีคำแนะนำจากระบบ)
+// คำแนะนำสำรองตามระดับความเสี่ยง ใช้เมื่อ API ไม่ส่งคำแนะนำมา
 function getDefaultRecommendation(riskLevel: string | null | undefined) {
   const level = String(riskLevel ?? "").toLowerCase();
 
@@ -291,10 +266,7 @@ function getDefaultRecommendation(riskLevel: string | null | undefined) {
   return "ควรรักษาพฤติกรรมที่ดีและหลีกเลี่ยงการเริ่มสูบบุหรี่หรือกลับไปสูบบุหรี่";
 }
 
-/* =========================================================
-   RISK BOX (สีตามความหมายของระดับความเสี่ยง)
-========================================================= */
-
+// คลาสสีของกล่องระดับความเสี่ยง แยกแบบปกติ/แบบที่ไฮไลต์
 const RISK_BOX_STYLES = {
   green: {
     normal: "border-[#e0eee0] bg-[#f7fbf5] text-[#57965c]",
@@ -310,7 +282,7 @@ const RISK_BOX_STYLES = {
   },
 };
 
-// กล่องแสดงช่วงคะแนนและระดับความเสี่ยง ไฮไลต์เมื่อตรงกับผลของผู้ใช้
+// กล่องแสดงช่วงคะแนนและระดับความเสี่ยงหนึ่งระดับ (ไฮไลต์ถ้าเป็นระดับของผู้ใช้)
 function RiskBox({
   range,
   title,

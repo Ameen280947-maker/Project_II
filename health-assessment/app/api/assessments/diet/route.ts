@@ -16,23 +16,18 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =====================================================
-   CONSTANT
-===================================================== */
-
+// รหัสและชื่อแบบประเมินพฤติกรรมการกินในตาราง assessment_types
 const ASSESSMENT_TYPE_ID = 10;
 const ASSESSMENT_NAME = "Diet";
 
-/* =====================================================
-   TYPES
-===================================================== */
-
+// ตัวเลือกคำตอบหนึ่งข้อ
 type Choice = {
   choice_id: number;
   choice_text: string;
   option_score: number;
 };
 
+// คำถามหนึ่งข้อพร้อมตัวเลือก
 type Question = {
   question_id: number;
   question_text: string;
@@ -40,10 +35,7 @@ type Question = {
   choices: Choice[];
 };
 
-/* =====================================================
-   DEFAULT QUESTIONS (FALLBACK)
-===================================================== */
-
+// ชุดคำถามสำรอง ใช้เมื่อดึงคำถามจาก DB ไม่ได้
 const DEFAULT_QUESTIONS: Question[] = [
   {
     question_id: 1,
@@ -146,11 +138,7 @@ const DEFAULT_QUESTIONS: Question[] = [
   },
 ];
 
-/* =====================================================
-   DOMAIN RISK LEVEL MAPPINGS (MATCHING DB recommendation TABLE)
-===================================================== */
-
-// แปลงคะแนนการกินผักเป็น key คำแนะนำและระดับ
+// แปลคะแนนการกินผักเป็น key คำแนะนำและระดับ
 function getVegetableRisk(score: number): { key: string; level: string } {
   if (score >= 4) return { key: "ผัก-ปริมาณสูงมาก", level: "สูงมาก" };
   if (score === 3) return { key: "ผัก-ปริมาณสูง", level: "สูง" };
@@ -158,7 +146,7 @@ function getVegetableRisk(score: number): { key: string; level: string } {
   return { key: "ผัก-ปริมาณน้อย", level: "น้อย" };
 }
 
-// แปลงคะแนนการกินหวานเป็น key คำแนะนำและระดับ
+// แปลคะแนนพฤติกรรมกินหวานเป็น key คำแนะนำและระดับความเสี่ยง
 function getSugarRisk(score: number): { key: string; level: string } {
   if (score >= 11) return { key: "น้ำตาล-ปริมาณน้อย", level: "ต่ำ" };
   if (score >= 8) return { key: "น้ำตาล-ระดับปานกลาง", level: "ปานกลาง" };
@@ -166,7 +154,7 @@ function getSugarRisk(score: number): { key: string; level: string } {
   return { key: "น้ำตาล-ระดับสูงมาก", level: "สูงมาก" };
 }
 
-// แปลงคะแนนการกินไขมันเป็น key คำแนะนำและระดับ
+// แปลคะแนนพฤติกรรมกินไขมันเป็น key คำแนะนำและระดับความเสี่ยง
 function getFatRisk(score: number): { key: string; level: string } {
   if (score >= 4) return { key: "ไขมัน-ปริมาณน้อย", level: "ต่ำ" };
   if (score === 3) return { key: "ไขมัน-ระดับปานกลาง", level: "ปานกลาง" };
@@ -174,7 +162,7 @@ function getFatRisk(score: number): { key: string; level: string } {
   return { key: "ไขมัน-ระดับสูงมาก", level: "สูงมาก" };
 }
 
-// แปลงคะแนนการกินเค็ม (โซเดียม) เป็น key คำแนะนำและระดับ
+// แปลคะแนนพฤติกรรมกินเค็ม (โซเดียม) เป็น key คำแนะนำและระดับความเสี่ยง
 function getSodiumRisk(score: number): { key: string; level: string } {
   if (score >= 15) return { key: "โซเดียม-ปริมาณน้อย", level: "ต่ำ" };
   if (score >= 9) return { key: "โซเดียม-ระดับปานกลาง", level: "ปานกลาง" };
@@ -182,11 +170,7 @@ function getSodiumRisk(score: number): { key: string; level: string } {
   return { key: "โซเดียม-ระดับสูงมาก", level: "สูงมาก" };
 }
 
-/* =====================================================
-   FETCH RECOMMENDATIONS FROM DATABASE
-===================================================== */
-
-// assessmentId: ดูผลย้อนหลัง ใช้คำแนะนำฉบับที่ใช้อยู่ตอนทำแบบประเมินครั้งนั้น (ไม่ส่ง = ฉบับปัจจุบัน)
+// ดึงคำแนะนำด้านอาหารจากตาราง recommendation ตาม key ความเสี่ยง แล้วรวมเป็นข้อความเดียว
 async function fetchDietRecommendationsFromDB(
   keys: string[],
   assessmentId: number | null = null
@@ -224,6 +208,7 @@ async function fetchDietRecommendationsFromDB(
       });
     });
 
+    // เรียงข้อความคำแนะนำตามลำดับ key แล้วรวมเป็นข้อความเดียว
     const orderedTexts = keys
       .map((key) => recommendationMap.get(key)?.text)
       .filter((t): t is string => Boolean(t));
@@ -250,19 +235,12 @@ async function fetchDietRecommendationsFromDB(
   }
 }
 
-/* =====================================================
-   GET
-   1) GET /api/assessments/diet -> ดึงรายการคำถาม
-   2) GET /api/assessments/diet?assessmentId=123 -> ดึงผลการประเมิน
-===================================================== */
-
+// API: คืนชุดคำถามพฤติกรรมการกินอาหาร หรือผลประเมินที่บันทึกไว้ตาม assessmentId
 export async function GET(request: NextRequest) {
   try {
     const assessmentIdParam = request.nextUrl.searchParams.get("assessmentId");
 
-    /* -------------------------------------------------
-       CASE 1: ดึงผลการประเมินจาก assessmentId
-    -------------------------------------------------- */
+    // มี assessmentId → ตรวจสิทธิ์แล้วคืนผลประเมินที่บันทึกไว้
     if (assessmentIdParam) {
       const auth = requireUser(request);
       if (!auth.ok) return auth.response;
@@ -279,7 +257,6 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // 1) ดึง Assessment
       const assessmentResult = await pool.query(
         `
         SELECT
@@ -311,7 +288,7 @@ export async function GET(request: NextRequest) {
 
       const assessmentRow = assessmentResult.rows[0];
 
-      // 2) ดึง Answers
+      // ดึงคำตอบรายข้อ แล้วรวมคะแนนแยกหมวด ผัก/หวาน/มัน/เค็ม
       const answersResult = await pool.query(
         `
         SELECT
@@ -335,7 +312,6 @@ export async function GET(request: NextRequest) {
 
       const answers = answersResult.rows;
 
-      // 3) คำนวณคะแนนแต่ละ Domain
       let vegetableScore = 0;
       let sugarScore = 0;
       let fatScore = 0;
@@ -356,12 +332,12 @@ export async function GET(request: NextRequest) {
         }
       });
 
+      // แปลคะแนนแต่ละหมวดเป็นระดับ ดึงคำแนะนำ แล้วคืนผล
       const vegRisk = getVegetableRisk(vegetableScore);
       const sugarRisk = getSugarRisk(sugarScore);
       const fatRisk = getFatRisk(fatScore);
       const sodiumRisk = getSodiumRisk(sodiumScore);
 
-      // 4) ดึงคำแนะนำสุขภาพจากฐานข้อมูล (ฉบับที่ใช้อยู่ตอนทำแบบประเมินครั้งนี้)
       const dbRec = await fetchDietRecommendationsFromDB(
         [vegRisk.key, sugarRisk.key, fatRisk.key, sodiumRisk.key],
         assessmentId
@@ -392,9 +368,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    /* -------------------------------------------------
-       CASE 2: ดึงรายการคำถามสำหรับทำแบบประเมิน
-    -------------------------------------------------- */
+    // ไม่มี assessmentId → ดึงคำถามและตัวเลือกจาก DB (ไม่มีให้ใช้ชุดสำรอง)
     const questionsResult = await pool.query(
       `
       SELECT
@@ -443,7 +417,6 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Fallback ถ้าใน DB ยังไม่มีข้อมูลคำถาม
     return NextResponse.json({
       success: true,
       assessment_type_id: ASSESSMENT_TYPE_ID,
@@ -451,6 +424,7 @@ export async function GET(request: NextRequest) {
       questions: DEFAULT_QUESTIONS,
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/diet", error);
     console.error("GET DIET ASSESSMENT ERROR:", error);
     return NextResponse.json(
@@ -463,28 +437,21 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* =====================================================
-   POST
-   บันทึกผลการประเมิน Diet
-===================================================== */
-
+// API: คำนวณคะแนนผัก/หวาน/มัน/เค็มจากคำตอบ หาระดับความเสี่ยงและคำแนะนำ แล้วบันทึกผลลงฐานข้อมูล
 export async function POST(request: NextRequest) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน ความยินยอม และคำตอบ
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
   const auth = requireUser(request, body.user_id ?? body.userId);
   if (!auth.ok) return auth.response;
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(10);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(auth.userId);
   if (noConsent) return noConsent;
   const userId = auth.userId;
 
-  // รูปแบบคำตอบ: { [question_id]: choice_id }
   const answers = body.answers;
 
   if (
@@ -503,11 +470,7 @@ export async function POST(request: NextRequest) {
       return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
-    /* -----------------------------------------------
-       CALCULATE SCORES & VALIDATE
-       จับคู่ด้วย choice_id ของคำถามนั้นเท่านั้น (เดิมจับด้วยเลขคะแนนได้ด้วย)
-       คะแนนดึงจาก question_choices และต้องตอบครบทุกข้อ
-    ------------------------------------------------ */
+    // ตรวจคำตอบกับตัวเลือกใน DB แล้วรวมคะแนนแยกหมวด
     const resolved = resolveChoiceAnswers(
       await loadActiveChoices(client, ASSESSMENT_TYPE_ID),
       Object.entries(answers as Record<string, unknown>).map(
@@ -522,6 +485,7 @@ export async function POST(request: NextRequest) {
       return badRequest(resolved.message);
     }
 
+    // รวมคะแนนแยกหมวด แล้วหาระดับของแต่ละหมวด ระดับรวม (แย่ที่สุด) และคำแนะนำ
     const totalScore = resolved.total;
     const answerRows = resolved.picked.map((choice) => ({
       question_id: choice.question_id,
@@ -531,13 +495,6 @@ export async function POST(request: NextRequest) {
       score: choice.score,
     }));
 
-    /* -----------------------------------------------
-       DOMAIN SCORES
-       Q1 = ผัก
-       Q2-Q4 = น้ำตาล
-       Q5 = ไขมัน
-       Q6-Q9 = โซเดียม
-    ------------------------------------------------ */
     let vegetableScore = 0;
     let sugarScore = 0;
     let fatScore = 0;
@@ -561,11 +518,6 @@ export async function POST(request: NextRequest) {
     const fatRisk = getFatRisk(fatScore);
     const sodiumRisk = getSodiumRisk(sodiumScore);
 
-    /*
-      เอกสารอ้างอิง (ตารางที่ 24) แปลผลแยก 4 ด้าน และใช้สีเขียว/เหลือง/ส้ม/แดง
-      ผักต้องกลับทิศ: ผัก "สูงมาก" = เขียว ส่วน "น้อย" = แดง
-      ผลรวมที่บันทึกใช้ด้านที่แย่ที่สุด (0 = เขียว ... 3 = แดง)
-    */
     const VEG_TIER: Record<string, number> = { สูงมาก: 0, สูง: 1, ปานกลาง: 2, น้อย: 3 };
     const RISK_TIER: Record<string, number> = { ต่ำ: 0, ปานกลาง: 1, สูง: 2, สูงมาก: 3 };
 
@@ -583,9 +535,6 @@ export async function POST(request: NextRequest) {
       "ควรปรับพฤติกรรมมาก",
     ][worstTier];
 
-    /* -----------------------------------------------
-       FETCH RECOMMENDATION FROM DB (MATCHING RISK KEYS)
-    ------------------------------------------------ */
     const dbRec = await fetchDietRecommendationsFromDB([
       vegRisk.key,
       sugarRisk.key,
@@ -593,12 +542,9 @@ export async function POST(request: NextRequest) {
       sodiumRisk.key,
     ]);
 
-    /* -----------------------------------------------
-       START TRANSACTION
-    ------------------------------------------------ */
+    // บันทึกผลลง assessment และคำตอบลง assessment_answers ใน transaction
     await client.query("BEGIN");
 
-    // 1) INSERT INTO assessment
     const insertAssessmentResult = await client.query(
       `
       INSERT INTO assessment (
@@ -617,7 +563,6 @@ export async function POST(request: NextRequest) {
 
     const newAssessmentId = insertAssessmentResult.rows[0].assessment_id;
 
-    // 2) INSERT INTO assessment_answers
     for (const ans of answerRows) {
       await client.query(
         `
@@ -635,9 +580,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // commit ผูกเวอร์ชันแบบประเมิน แล้วคืนผลลัพธ์
     await client.query("COMMIT");
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId, typeId: ASSESSMENT_TYPE_ID, assessmentId: newAssessmentId });
 
     return NextResponse.json({
@@ -654,6 +599,7 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
+    // จัดการ error → บันทึก log, rollback และคืน 500
     void logSystemError("POST /api/assessments/diet", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST DIET ASSESSMENT ERROR:", error);

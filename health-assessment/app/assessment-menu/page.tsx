@@ -14,6 +14,7 @@ import NotificationBell from "@/app/components/NotificationBell";
 import AssessmentMenuCard, { type CardTone } from "@/app/components/AssessmentMenuCard";
 import CategoryAssessmentCards from "@/app/components/CategoryAssessmentCards";
 
+// รายการการ์ดแบบประเมินโรคไม่ติดต่อเรื้อรัง (CVD เบาหวาน ความดัน BMI)
 const assessmentCards: { title: string; icon: typeof Heart; tone: CardTone; href: string }[] = [
   {
     title: "แบบประเมินความเสี่ยงโรคหัวใจและหลอดเลือดในระยะ 10 ปีข้างหน้า",
@@ -41,25 +42,17 @@ const assessmentCards: { title: string; icon: typeof Heart; tone: CardTone; href
   },
 ];
 
-// หน้าเมนูแบบประเมินโรคไม่ติดต่อเรื้อรัง (CVD, เบาหวาน, ความดัน, น้ำหนัก)
+// หน้า: เมนูเลือกแบบประเมินความเสี่ยงโรค NCDs
 export default function AssessmentMenuPage() {
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
 
-        {/* =====================================================
-            SIDEBAR กลาง
-        ====================================================== */}
-
         <Sidebar />
-
-        {/* =====================================================
-            MAIN CONTENT
-        ====================================================== */}
 
         <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
-          {/* Header */}
+          {/* ส่วนหัว: ชื่อหมวดและกระดิ่งแจ้งเตือน */}
           <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#b91c2b]">
@@ -80,22 +73,15 @@ export default function AssessmentMenuPage() {
             </div>
           </header>
 
-          {/* =================================================
-              ASSESSMENT CARDS
-          ================================================== */}
-
+          {/* การ์ดแบบประเมิน NCDs + แบบประเมินเพิ่มเติมในหมวด */}
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {assessmentCards.map((card) => (
               <AssessmentMenuCard key={card.href} title={card.title} href={card.href} icon={card.icon} tone={card.tone} />
             ))}
-            {/* แบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดนี้ */}
             <CategoryAssessmentCards routePath="/assessment-menu" />
           </div>
 
-          {/* =================================================
-              BACK BUTTON
-          ================================================== */}
-
+          {/* ปุ่มย้อนกลับ */}
           <div className="mt-8 flex justify-end">
 
             <Link

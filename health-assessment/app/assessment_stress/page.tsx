@@ -15,16 +15,14 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ตัวเลือกคำตอบหนึ่งรายการ พร้อมคะแนน
 type Option = {
     id: number;
     optionText: string;
     score: number;
 };
 
+// คำถามหนึ่งข้อ พร้อมเลขข้อและตัวเลือก
 type Question = {
     id: number;
     questionNo: number;
@@ -32,14 +30,11 @@ type Question = {
     options: Option[];
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าแบบประเมินความเครียด ST-5: แสดงคำถาม 5 ข้อและส่งคำตอบไปคำนวณผล
+// หน้า: แบบประเมินความเครียด (ST-5) 5 ข้อ
 export default function StressAssessmentPage() {
     const router = useRouter();
 
+    // state ของหน้า: คำถาม คำตอบ สถานะโหลด/ส่ง และ error
     const [questions, setQuestions] =
         useState<Question[]>([]);
 
@@ -57,12 +52,9 @@ export default function StressAssessmentPage() {
     const [error, setError] =
         useState("");
 
-    /* =======================================================
-       LOAD QUESTIONS
-    ======================================================= */
-
+    // โหลดคำถามตอนเปิดหน้า
     useEffect(() => {
-        // โหลดคำถามแบบประเมินความเครียดจาก API
+        // โหลดคำถามจาก GET /api/assessments/stress
         const loadQuestions =
             async () => {
                 try {
@@ -106,11 +98,7 @@ export default function StressAssessmentPage() {
         loadQuestions();
     }, []);
 
-    /* =======================================================
-       SELECT ANSWER
-    ======================================================= */
-
-    // บันทึกตัวเลือกที่ผู้ใช้เลือกของข้อนั้น และล้างข้อความแจ้งเตือน
+    // บันทึกตัวเลือกที่เลือกของแต่ละข้อลง state และล้าง error
     const handleAnswerChange = (
         questionId: number,
         optionId: number,
@@ -123,11 +111,7 @@ export default function StressAssessmentPage() {
         setError("");
     };
 
-    /* =======================================================
-       GET USER ID
-    ======================================================= */
-
-    // หา userId จาก localStorage (ลองหลาย key และรองรับทั้งตัวเลขและ JSON)
+    // หา userId จาก localStorage โดยลองหลาย key และรองรับทั้งตัวเลขและ JSON object
     const getUserId = () => {
         const possibleKeys = [
             "userId",
@@ -192,17 +176,12 @@ export default function StressAssessmentPage() {
         return null;
     };
 
-    /* =======================================================
-       SUBMIT
-    ======================================================= */
-
-    // ตรวจว่าตอบครบ 5 ข้อ สร้างข้อมูลคำตอบพร้อมคะแนน แล้ว POST และพาไปหน้าคำแนะนำ
+    // ตรวจว่าตอบครบ 5 ข้อ ส่ง POST /api/assessments/stress แล้วพาไปหน้าผลลัพธ์
     const handleSubmit =
         async () => {
             setError("");
 
-            /* ตรวจสอบตอบครบ */
-
+            // ตรวจว่ามีคำถามครบ 5 ข้อ ตอบครบ และมี userId
             if (
                 questions.length !== 5
             ) {
@@ -235,8 +214,7 @@ export default function StressAssessmentPage() {
                 return;
             }
 
-            /* สร้าง answers */
-
+            // แปลงคำตอบเป็น payload (optionId ข้อความคำตอบ และคะแนน)
             const answerPayload =
                 questions.map(
                     (question) => {
@@ -269,6 +247,7 @@ export default function StressAssessmentPage() {
                     },
                 );
 
+            // ส่งไปบันทึกที่ API แล้วไปหน้าคำแนะนำตาม assessment_id
             try {
                 setSubmitting(true);
 
@@ -304,11 +283,6 @@ export default function StressAssessmentPage() {
                     );
                 }
 
-                /* สำคัญ:
-                   ใช้ assessment_id
-                   ที่ Backend สร้างจริง
-                */
-
                 const assessmentId =
                     result.assessment_id;
 
@@ -334,10 +308,7 @@ export default function StressAssessmentPage() {
             }
         };
 
-    /* =======================================================
-       LOADING
-    ======================================================= */
-
+    // หน้าระหว่างโหลดคำถาม
     if (loading) {
         return (
             <main className="min-h-screen bg-[#fbf9f9]">
@@ -358,10 +329,6 @@ export default function StressAssessmentPage() {
         );
     }
 
-    /* =======================================================
-       PAGE
-    ======================================================= */
-
     return (
         <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
             <div className="flex min-h-screen">
@@ -370,8 +337,7 @@ export default function StressAssessmentPage() {
 
                 <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
-                    {/* HEADER */}
-
+                    {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ST-5 ความยินยอม และปุ่มย้อนกลับ */}
                     <header className="flex items-start justify-between gap-4">
                       <div className="min-w-0">
                         <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#2f4fa0]">
@@ -390,15 +356,12 @@ export default function StressAssessmentPage() {
                         </p>
                       </div>
 
-                      {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
                       <HealthConsentNotice />
                       <AssessmentBackLink href="/assessment-menu-mental-health" />
                     </header>
-                    {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
                     <AssessmentSourceNote typeId={12} className="mt-3" />
 
-                    {/* INFO */}
-
+                    {/* กล่องคำแนะนำในการทำแบบประเมิน */}
                     <div className="mt-7 rounded-[24px] border border-[#c8d3ec] bg-[#f3f6fc] p-5 sm:p-6">
                         <div className="flex items-start gap-4">
 
@@ -424,8 +387,7 @@ export default function StressAssessmentPage() {
                         </div>
                     </div>
 
-                    {/* QUESTIONS */}
-
+                    {/* รายการคำถามทั้ง 5 ข้อ แต่ละข้อมีตัวเลือกแบบ radio */}
                     <div className="mt-7 space-y-5">
 
                         {questions.map(
@@ -532,16 +494,13 @@ export default function StressAssessmentPage() {
 
                     </div>
 
-                    {/* ERROR */}
-
                     {error && (
                         <div className="mt-6 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-600">
                             {error}
                         </div>
                     )}
 
-                    {/* BUTTON */}
-
+                    {/* ปุ่มย้อนกลับ และปุ่มส่งเพื่อดูผล */}
                     <div className="mt-7 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
 
                         <Link
