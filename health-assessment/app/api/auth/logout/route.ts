@@ -3,12 +3,7 @@ import { clearSessionCookie, roleFromRequest } from "@/lib/session";
 
 export const runtime = "nodejs";
 
-/* =========================================================
-   POST /api/auth/logout?role=user|staff|admin
-   ลบ session cookie ของ role นั้นเท่านั้น (ค่าเริ่มต้น user)
-   role อื่นที่เปิดอยู่ในแท็บอื่นยังใช้งานต่อได้
-========================================================= */
-
+// API: ออกจากระบบโดยลบ session cookie ตามบทบาทของคำขอ
 export async function POST(request: NextRequest) {
   const response = NextResponse.json({
     success: true,

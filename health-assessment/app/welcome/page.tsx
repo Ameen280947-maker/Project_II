@@ -11,6 +11,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
+// ไอคอนสุขภาพที่ลอยรอบวงกลมฝั่งขวา พร้อมตำแหน่งของแต่ละไอคอน
 const healthItems = [
   {
     icon: ShieldCheck,
@@ -38,11 +39,11 @@ const healthItems = [
   },
 ];
 
-// หน้าต้อนรับ แนะนำระบบพร้อมปุ่มไปหน้าเข้าสู่ระบบและสมัครสมาชิก
+// หน้า: ต้อนรับ แนะนำระบบประเมินความเสี่ยงสุขภาพ พร้อมปุ่มไปเข้าสู่ระบบ/สมัครสมาชิก
 export default function WelcomePage() {
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#fbf7f7] text-[#2f3037]">
-      {/* พื้นหลังตกแต่ง */}
+      {/* วงกลมและจุดตกแต่งพื้นหลัง */}
       <div className="pointer-events-none absolute -right-48 -top-48 h-[520px] w-[520px] rounded-full bg-[#f4dfe2]/60 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-72 -left-40 h-[650px] w-[800px] rounded-full bg-[#f1dadd]/55 blur-3xl" />
 
@@ -56,7 +57,7 @@ export default function WelcomePage() {
       </div>
 
       <section className="relative mx-auto grid min-h-screen max-w-[1500px] items-center gap-12 px-6 py-10 sm:px-10 lg:grid-cols-2 lg:px-16 xl:px-24">
-        {/* ฝั่งข้อความ */}
+        {/* ฝั่งซ้าย: โลโก้ หัวข้อ คำอธิบาย และปุ่มเข้าสู่ระบบ/สมัครสมาชิก */}
         <div className="relative z-10">
           <div className="mb-12 flex items-center gap-4">
             <div className="grid h-16 w-16 place-items-center rounded-[22px] bg-gradient-to-br from-[#b91c2b] to-[#8a1420] text-white shadow-[0_14px_35px_rgba(138,20,32,0.25)]">
@@ -102,6 +103,7 @@ export default function WelcomePage() {
             เพื่อเริ่มต้นดูแลตัวเองตั้งแต่วันนี้
           </p>
 
+          {/* ปุ่มเข้าสู่ระบบ และสมัครสมาชิก */}
           <div className="mt-10 flex max-w-[520px] flex-col gap-4 sm:flex-row">
             <Link
               href="/login"
@@ -127,7 +129,7 @@ export default function WelcomePage() {
           </p>
         </div>
 
-        {/* ฝั่งภาพประกอบ */}
+        {/* ฝั่งขวา (จอใหญ่): ภาพวงกลมหัวใจและไอคอนสุขภาพรอบ ๆ */}
         <div className="relative hidden min-h-[610px] items-center justify-center lg:flex">
           <div className="absolute h-[540px] w-[540px] rounded-full border border-dashed border-[#ddb5ba]" />
           <div className="absolute h-[430px] w-[430px] rounded-full border border-[#ead9db]" />

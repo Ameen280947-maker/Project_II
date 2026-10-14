@@ -12,12 +12,14 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
+// ตัวเลือกคำตอบของคำถามการนอน (ข้อความและคะแนน)
 type SleepOption = {
     id: number;
     optionText: string;
     score: number;
 };
 
+// คำถามแบบประเมินการนอนพร้อมตัวเลือก
 type SleepQuestion = {
     id: number;
     questionNo: number;
@@ -25,6 +27,7 @@ type SleepQuestion = {
     options: SleepOption[];
 };
 
+// คำตอบที่ผู้ใช้เลือกในแต่ละข้อ (ส่งไปบันทึกที่ API)
 type Answer = {
     questionId: number;
     optionId: number;
@@ -32,10 +35,11 @@ type Answer = {
     score: number;
 };
 
-// หน้าแบบประเมินการนอนหลับ: แสดงคำถามทีละข้อ แล้วส่งคำตอบไปบันทึกผล
+// หน้า: แบบประเมินการนอนหลับ ตอบทีละข้อแล้วส่งผล
 export default function SleepAssessmentPage() {
     const router = useRouter();
 
+    // state ของหน้า: คำถาม ข้อปัจจุบัน คำตอบ สถานะโหลด/บันทึก
     const [questions, setQuestions] = useState<
         SleepQuestion[]
     >([]);
@@ -51,12 +55,9 @@ export default function SleepAssessmentPage() {
 
     const [saving, setSaving] = useState(false);
 
-    // =====================================================
-    // โหลดคำถามจาก Database
-    // =====================================================
-
+    // โหลดคำถามตอนเปิดหน้า
     useEffect(() => {
-        // โหลดคำถามแบบประเมินการนอนจาก API
+        // ดึงคำถามแบบประเมินการนอนจาก GET /api/assessments/sleep
         async function loadQuestions() {
             try {
                 setLoading(true);
@@ -103,10 +104,7 @@ export default function SleepAssessmentPage() {
         loadQuestions();
     }, []);
 
-    // =====================================================
-    // คำตอบของข้อปัจจุบัน
-    // =====================================================
-
+    // คำถามปัจจุบันและคำตอบที่เลือกไว้ของข้อนี้
     const question =
         questions[currentQuestion];
 
@@ -117,10 +115,7 @@ export default function SleepAssessmentPage() {
                 answer.questionId === question.id
         );
 
-    // =====================================================
-    // เลือกคำตอบ
-    // =====================================================
-
+    // บันทึกตัวเลือกที่ผู้ใช้เลือกสำหรับคำถามปัจจุบัน (แทนคำตอบเดิมของข้อนั้น)
     function handleSelectOption(
         option: SleepOption
     ) {
@@ -143,10 +138,7 @@ export default function SleepAssessmentPage() {
         });
     }
 
-    // =====================================================
-    // ข้อต่อไป
-    // =====================================================
-
+    // ไปข้อถัดไปเมื่อตอบแล้ว ถ้าเป็นข้อสุดท้ายให้ส่งผล
     function handleNext() {
         if (!question) return;
 
@@ -177,11 +169,7 @@ export default function SleepAssessmentPage() {
         }
     }
 
-    // =====================================================
-    // Submit
-    // =====================================================
-
-    // ตรวจว่าตอบครบทุกข้อ แล้ว POST ผลการนอนและพาไปหน้าคำแนะนำ
+    // ส่งคำตอบทั้งหมดไป POST /api/assessments/sleep แล้วไปหน้าคำแนะนำการนอน
     async function handleSubmit() {
         if (
             !questions.length ||
@@ -230,10 +218,6 @@ export default function SleepAssessmentPage() {
                 );
             }
 
-            // =================================================
-            // ไปหน้าคำแนะนำ
-            // =================================================
-
             router.push(
                 `/recommendation_sleep?recordId=${data.recordId}`
             );
@@ -253,10 +237,7 @@ export default function SleepAssessmentPage() {
         }
     }
 
-    // =====================================================
-    // Loading
-    // =====================================================
-
+    // หน้าจอกำลังโหลด / ไม่พบคำถาม
     if (loading) {
         return (
             <main className="flex min-h-screen items-center justify-center bg-[#FCFBFA]">
@@ -273,10 +254,6 @@ export default function SleepAssessmentPage() {
             </main>
         );
     }
-
-    // =====================================================
-    // ไม่พบคำถาม
-    // =====================================================
 
     if (!questions.length) {
         return (
@@ -312,10 +289,7 @@ export default function SleepAssessmentPage() {
 
             <div className="mx-auto max-w-5xl px-6 py-12">
 
-                {/* =================================================
-            Header
-        ================================================= */}
-
+                {/* หัวข้อหน้า + ประกาศความยินยอม + ลิงก์ย้อนกลับ */}
                 <div className="mb-8 flex items-start justify-between gap-4">
                     <div className="min-w-0">
 
@@ -328,20 +302,15 @@ export default function SleepAssessmentPage() {
                     </h1>
                     </div>
 
-                    {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
                     <HealthConsentNotice />
                     <AssessmentBackLink href="/assessment-menu-behavior" />
 
                 </div>
 
-                {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
                 <AssessmentSourceNote typeId={9} className="mb-6" />
 
 
-                {/* =================================================
-            Progress
-        ================================================= */}
-
+                {/* แถบความคืบหน้า (ข้อที่ / ทั้งหมด) */}
                 <div className="mb-6 rounded-[24px] border border-[#E8E6E4] bg-white p-5">
 
                     <div className="mb-3 flex items-center justify-between">
@@ -374,10 +343,7 @@ export default function SleepAssessmentPage() {
                 </div>
 
 
-                {/* =================================================
-            Assessment Header
-        ================================================= */}
-
+                {/* การ์ดหัวข้อหมวดการนอนหลับ */}
                 <div className="mb-7 rounded-[28px] border border-[#E7E7E2] bg-white p-7">
 
                     <div className="flex items-center gap-5">
@@ -408,10 +374,7 @@ export default function SleepAssessmentPage() {
                 </div>
 
 
-                {/* =================================================
-            Question
-        ================================================= */}
-
+                {/* การ์ดคำถามปัจจุบัน: ตัวเลือกคำตอบ และปุ่มถัดไป/เสร็จสิ้น */}
                 <div className="rounded-[28px] border border-[#E8E6E4] bg-white p-7">
 
                     <div className="mb-7 flex items-start gap-4">
@@ -429,10 +392,7 @@ export default function SleepAssessmentPage() {
                     </div>
 
 
-                    {/* =================================================
-              Options
-          ================================================= */}
-
+                    {/* รายการตัวเลือกคำตอบ (ไฮไลต์ตัวที่เลือก) */}
                     <div className="space-y-3">
 
                         {question.options.map(
@@ -457,8 +417,6 @@ export default function SleepAssessmentPage() {
                                             }`}
                                     >
 
-                                        {/* Radio */}
-
                                         <span
                                             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 ${isSelected
                                                 ? "border-[#5b3ea6]"
@@ -473,8 +431,6 @@ export default function SleepAssessmentPage() {
                                         </span>
 
 
-                                        {/* Text */}
-
                                         <span
                                             className={`flex-1 text-base leading-6 ${isSelected
                                                 ? "font-semibold text-[#3E7042]"
@@ -484,8 +440,6 @@ export default function SleepAssessmentPage() {
                                             {option.optionText}
                                         </span>
 
-
-                                        {/* Check */}
 
                                         {isSelected && (
                                             <Check
@@ -502,10 +456,7 @@ export default function SleepAssessmentPage() {
                     </div>
 
 
-                    {/* =================================================
-              Buttons
-          ================================================= */}
-
+                    {/* ปุ่มไปข้อถัดไป / ส่งผลเมื่อเป็นข้อสุดท้าย */}
                     <div className="mt-8 flex gap-3">
 
                         <button

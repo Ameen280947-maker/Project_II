@@ -19,9 +19,10 @@ import Sidebar from "@/app/components/Sidebar";
 import NotificationBell from "@/app/components/NotificationBell";
 import type { CalculatedNotification } from "@/lib/notificationRules";
 
-// หน้าการแจ้งเตือน: แสดงกำหนดประเมินซ้ำของแต่ละแบบประเมิน กรองตามหมวดและสถานะได้
+// หน้า: รายการแจ้งเตือนนัดประเมินซ้ำทั้งหมด กรองตามหมวดและสถานะได้
 export default function NotificationsPage() {
   const router = useRouter();
+  // state ของหน้า: รายการแจ้งเตือน สถานะโหลด/ผิดพลาด ตัวกรอง และการแสดงเกณฑ์
   const [notifications, setNotifications] = useState<CalculatedNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -29,7 +30,7 @@ export default function NotificationsPage() {
   const [statusFilter, setStatusFilter] = useState<"all" | "due" | "upcoming" | "scheduled">("all");
   const [showGuidelines, setShowGuidelines] = useState(false);
 
-  // ดึงรายการแจ้งเตือนของผู้ใช้จาก API
+  // ดึงรายการแจ้งเตือนของผู้ใช้จาก API /api/notifications
   const fetchNotifications = async () => {
     try {
       setLoading(true);
@@ -59,11 +60,12 @@ export default function NotificationsPage() {
     }
   };
 
+  // โหลดแจ้งเตือนตอนเปิดหน้า
   useEffect(() => {
     fetchNotifications();
   }, []);
 
-  // ทำเครื่องหมายว่าอ่านการแจ้งเตือนทั้งหมดแล้ว (ทั้งในฐานข้อมูลและบนหน้าจอ)
+  // PATCH /api/notifications ทำเครื่องหมายว่าอ่านแล้วทั้งหมด
   const markAllRead = async () => {
     try {
       const userId = localStorage.getItem("userId");
@@ -81,7 +83,7 @@ export default function NotificationsPage() {
     }
   };
 
-  // Filter
+  // ค่าที่คำนวณสำหรับแสดงผล: รายการที่ผ่านตัวกรอง และจำนวนแต่ละสถานะ
   const filteredNotifications = notifications.filter((item) => {
     if (categoryFilter !== "all" && item.category !== categoryFilter) return false;
     if (statusFilter === "due" && !(item.status === "overdue" || item.status === "due_today")) {
@@ -99,7 +101,7 @@ export default function NotificationsPage() {
   const upcomingCount = notifications.filter((n) => n.status === "upcoming").length;
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  // แปลงวันที่เป็นรูปแบบไทย (ไม่มีวันที่แสดง "-")
+  // แปลงวันที่เป็นรูปแบบภาษาไทย ถ้าไม่มีค่าแสดง "-"
   const formatDate = (dateStr?: string | null) => {
     if (!dateStr) return "-";
     return new Date(dateStr).toLocaleDateString("th-TH", {
@@ -112,13 +114,11 @@ export default function NotificationsPage() {
   return (
     <main className="min-h-screen bg-[#faf9f7] text-[#2f3037]">
       <div className="flex min-h-screen">
-        {/* Sidebar */}
         <Sidebar />
 
-        {/* Content */}
         <section className="min-w-0 flex-1 px-5 py-6 sm:px-8 lg:px-10">
           <div className="max-w-6xl mx-auto">
-            {/* Top Bar with Bell */}
+            {/* ส่วนหัว: ชื่อหน้า กระดิ่ง และปุ่มรีเฟรช */}
             <div className="flex items-center justify-between gap-4 mb-6">
               <div>
                 <p className="text-xs font-bold tracking-widest text-[#6c9470] uppercase">
@@ -142,9 +142,8 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {/* Quick Stats Grid */}
+            {/* การ์ดสรุป: ถึงกำหนด ใกล้ถึง ที่ติดตาม และยังไม่อ่าน */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-              {/* Due / Overdue */}
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -160,7 +159,6 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              {/* Upcoming */}
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -174,7 +172,6 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              {/* Total Active Assessments */}
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -190,7 +187,6 @@ export default function NotificationsPage() {
                 </div>
               </div>
 
-              {/* Unread */}
               <div className="bg-white border border-gray-100 rounded-3xl p-5">
                 <div className="flex items-center justify-between">
                   <div>
@@ -216,7 +212,7 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {/* เกณฑ์ติดตามแต่ละโรค (พับไว้ กดดูได้) */}
+            {/* กล่องเกณฑ์ความถี่ในการประเมินซ้ำของแต่ละโรค (เปิด/ปิดได้) */}
             <section className="mb-6 bg-gradient-to-r from-[#edf5ff] to-[#f4f8ff] border border-blue-100 rounded-3xl p-5">
               <button
                 type="button"
@@ -270,9 +266,8 @@ export default function NotificationsPage() {
               )}
             </section>
 
-            {/* Filter Tabs */}
+            {/* แถบตัวกรอง: หมวดโรค และสถานะ */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-              {/* Category Filter */}
               <div className="flex items-center gap-1.5 bg-white border border-gray-200 p-1.5 rounded-2xl shadow-sm">
                 <button
                   type="button"
@@ -320,7 +315,6 @@ export default function NotificationsPage() {
                 </button>
               </div>
 
-              {/* Status Filter */}
               <div className="flex items-center gap-1.5 bg-white border border-gray-200 p-1.5 rounded-2xl shadow-sm text-sm font-medium text-gray-600">
                 <Filter size={14} className="text-gray-400 ml-2" />
                 <button
@@ -357,7 +351,7 @@ export default function NotificationsPage() {
               </div>
             </div>
 
-            {/* Notifications Cards Grid */}
+            {/* เนื้อหาหลัก: กำลังโหลด / ผิดพลาด / ว่าง / รายการแจ้งเตือนแบ่งตามกลุ่มสถานะ */}
             {loading ? (
               <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-sm">
                 <div className="w-10 h-10 border-4 border-gray-200 border-t-[#b91c2b] rounded-full animate-spin mx-auto mb-4" />
@@ -426,7 +420,7 @@ export default function NotificationsPage() {
   );
 }
 
-// จัดกลุ่มตามความเร่งด่วน: ต้องทำตอนนี้ → ใกล้ถึงกำหนด → ตามรอบปกติ
+// กลุ่มสำหรับแบ่งรายการแจ้งเตือนตามสถานะ (ถึงกำหนด / ใกล้ถึง / ยังไม่ถึง)
 const GROUPS: {
   key: string;
   title: string;
@@ -457,7 +451,7 @@ const GROUPS: {
   },
 ];
 
-// แถวสรุปของแต่ละแบบประเมิน กด "รายละเอียด" เพื่อดูคำแนะนำและรอบการติดตาม
+// แถวแจ้งเตือนหนึ่งรายการ แสดงสถานะ วันครบกำหนด และขยายดูรายละเอียดได้
 function NotificationRow({
   item,
   formatDate,
@@ -465,6 +459,7 @@ function NotificationRow({
   item: CalculatedNotification;
   formatDate: (date?: string | null) => string;
 }) {
+  // state เปิดรายละเอียด และสถานะของรายการนี้
   const [open, setOpen] = useState(false);
   const isDue = item.status === "overdue" || item.status === "due_today";
   const isUpcoming = item.status === "upcoming";
@@ -472,6 +467,7 @@ function NotificationRow({
 
   return (
     <li className="px-5 py-4">
+      {/* แถวหลัก: สถานะ ชื่อแบบประเมิน ผลล่าสุด วันกำหนด และปุ่มรายละเอียด/ประเมิน */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
         <div className="min-w-0 flex-[1_1_280px]">
           <div className="flex flex-wrap items-center gap-2">
@@ -514,6 +510,7 @@ function NotificationRow({
         </div>
       </div>
 
+      {/* รายละเอียดเพิ่มเติม: ข้อความ รอบประเมิน และวันที่ทำล่าสุด */}
       {open && (
         <div id={detailId} className="mt-3 p-4 rounded-2xl bg-gray-50 text-sm">
           <p className="text-gray-700 leading-relaxed">{item.message}</p>
@@ -535,9 +532,10 @@ function NotificationRow({
   );
 }
 
-// ตารางเกณฑ์ระยะเวลาติดตามประเมินซ้ำตามมาตรฐานทางการแพทย์
+// สีจุดหน้าระดับความเสี่ยงในตารางเกณฑ์
 const RISK_DOT = { high: "bg-red-500", mid: "bg-orange-400", low: "bg-green-500" } as const;
 
+// ตารางเกณฑ์รอบการประเมินซ้ำของแต่ละโรค/พฤติกรรมตามระดับความเสี่ยง
 const GUIDELINES: {
   disease: string;
   rows: { risk: keyof typeof RISK_DOT; level: string; interval: string; goal: string }[];

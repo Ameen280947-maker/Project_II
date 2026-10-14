@@ -1,31 +1,23 @@
 import nodemailer from "nodemailer";
 
-/* =========================================================
-   ส่งอีเมลผ่าน Gmail SMTP (ฟรี)
-
-   ต้องตั้งใน .env.local
-   - GMAIL_USER          อีเมล Gmail ที่ใช้ส่ง
-   - GMAIL_APP_PASSWORD  App Password 16 ตัวของบัญชีนั้น
-                         (ไม่ใช่รหัสผ่าน Gmail ปกติ)
-========================================================= */
-
+// อายุของรหัส OTP (นาที)
 export const OTP_VALID_MINUTES = 10;
 
-// เช็คว่าตั้งค่า GMAIL_USER และ GMAIL_APP_PASSWORD ไว้ครบหรือยัง
+// ตรวจว่าตั้งค่า GMAIL_USER และ GMAIL_APP_PASSWORD สำหรับส่งอีเมลแล้วหรือยัง
 export function isMailerConfigured() {
   return Boolean(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 }
 
+// ตัวส่งอีเมลที่สร้างไว้แล้ว (สร้างครั้งแรกที่ใช้)
 let transporter: ReturnType<typeof nodemailer.createTransport> | null = null;
 
-// สร้างตัวส่งอีเมล Gmail ครั้งแรกแล้วเก็บไว้ใช้ซ้ำ
+// สร้าง (ครั้งเดียว) และคืนตัวส่งอีเมล nodemailer ผ่าน Gmail
 function getTransporter() {
   if (!transporter) {
     transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
         user: process.env.GMAIL_USER,
-        // App Password ที่ Google แสดงมีช่องว่างคั่น ตัดออกให้ก่อน
         pass: process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, ""),
       },
     });
@@ -33,13 +25,13 @@ function getTransporter() {
   return transporter;
 }
 
-/* ---------- อีเมล OTP สำหรับตั้งรหัสผ่านใหม่ ---------- */
-
+// ส่งอีเมลรหัส OTP สำหรับตั้งรหัสผ่านใหม่ (ทั้งแบบข้อความและ HTML)
 export async function sendOtpEmail(to: string, otp: string) {
   if (!isMailerConfigured()) {
     throw new Error("ยังไม่ได้ตั้งค่า GMAIL_USER / GMAIL_APP_PASSWORD ใน .env.local");
   }
 
+  // เนื้อหาอีเมล: หัวเรื่อง ข้อความธรรมดา และ HTML
   const subject = `รหัส OTP สำหรับตั้งรหัสผ่านใหม่: ${otp}`;
 
   const text = [
@@ -68,6 +60,7 @@ export async function sendOtpEmail(to: string, otp: string) {
     </div>
   `;
 
+  // ส่งอีเมลผ่าน Gmail
   await getTransporter().sendMail({
     from: `"Health Risk Assessment" <${process.env.GMAIL_USER}>`,
     to,

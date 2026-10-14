@@ -16,10 +16,7 @@ import {
   UserPlus,
 } from "lucide-react";
 
-/* ============================================================
-   TYPES
-============================================================ */
-
+// รูปแบบ response จาก API /api/auth/login (รวมข้อมูลผู้ใช้และ role)
 type LoginResponse = {
   success?: boolean;
   message?: string;
@@ -35,6 +32,7 @@ type LoginResponse = {
   };
 };
 
+// รูปแบบ response จาก API โปรไฟล์ ใช้ตรวจว่าผู้ใช้กรอกข้อมูลสุขภาพแล้วหรือยัง
 type ProfileCheckResponse = {
   success: boolean;
   message?: string;
@@ -53,14 +51,11 @@ type ProfileCheckResponse = {
   } | null;
 };
 
-/* ============================================================
-   PAGE
-============================================================ */
-
-// หน้าเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่าน
+// หน้า: เข้าสู่ระบบด้วยชื่อผู้ใช้/อีเมลและรหัสผ่าน
 export default function LoginPage() {
   const router = useRouter();
 
+  // state ของฟอร์ม: ชื่อผู้ใช้ รหัสผ่าน การแสดงรหัส ข้อความผิดพลาด และสถานะโหลด
   const [username, setUsername] =
     useState("");
 
@@ -78,11 +73,7 @@ export default function LoginPage() {
   const [loading, setLoading] =
     useState(false);
 
-  /* =========================================================
-     LOGIN
-  ========================================================= */
-
-  // ส่งชื่อผู้ใช้และรหัสผ่านไปล็อกอิน เก็บข้อมูลผู้ใช้ แล้วพาไปหน้าตาม role (admin/staff/user)
+  // POST /api/auth/login เก็บข้อมูลผู้ใช้ลง localStorage แล้วพาไปหน้าตาม role (admin/staff/user)
   const handleSubmit = async (
     event: React.FormEvent<HTMLFormElement>,
   ) => {
@@ -90,6 +81,7 @@ export default function LoginPage() {
 
     setError("");
 
+    // ตรวจว่ากรอกครบ
     const normalizedUsername =
       username.trim();
 
@@ -107,6 +99,7 @@ export default function LoginPage() {
     try {
       setLoading(true);
 
+      // ส่งข้อมูลเข้าสู่ระบบไปที่ API แล้วตรวจผลลัพธ์
       const response =
         await fetch(
           "/api/auth/login",
@@ -137,7 +130,7 @@ export default function LoginPage() {
       ) {
         setError(
           data.message ??
-            "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+          "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
         );
 
         return;
@@ -159,20 +152,9 @@ export default function LoginPage() {
         user,
       );
 
-      /* =====================================================
-         ROLE
-      ===================================================== */
-
+      // เก็บข้อมูลผู้ใช้ลง localStorage ตาม role (staff แยก key, admin ไม่เก็บ)
       const roleName =
         user.role_name;
-
-      /* =====================================================
-         SAVE USER
-         เก็บแยกตาม role เพื่อให้เปิดคนละ role ได้ในคนละแท็บ
-         - admin: ไม่เก็บอะไร (ตรวจสิทธิ์จาก cookie session_admin)
-         - staff: เก็บใน staffUserId / staffUsername ไม่ทับค่าของผู้ใช้
-         - user : เก็บชื่อเดิม (userId, username, ...) ที่หน้าผู้ใช้ทุกหน้าใช้อยู่
-      ===================================================== */
 
       if (
         roleName === "staff"
@@ -212,8 +194,8 @@ export default function LoginPage() {
           "roleId",
           user.role_id !== null
             ? String(
-                user.role_id,
-              )
+              user.role_id,
+            )
             : "",
         );
 
@@ -230,8 +212,7 @@ export default function LoginPage() {
         );
       }
 
-      /* ADMIN */
-
+      // พาไปหน้าตาม role: admin → /admin, staff → /staff
       if (
         roleName ===
         "system_admin"
@@ -243,8 +224,6 @@ export default function LoginPage() {
         return;
       }
 
-      /* STAFF */
-
       if (
         roleName === "staff"
       ) {
@@ -255,15 +234,11 @@ export default function LoginPage() {
         return;
       }
 
-      /* USER */
-
       if (
         roleName === "user"
       ) {
-        /* =================================================
-           LOGIN API ส่ง hasProfile มาแล้ว
-        ================================================= */
 
+        // ผู้ใช้ทั่วไป: ถ้า API บอก hasProfile มาแล้ว ใช้ค่านั้นเลือกหน้าแบบประเมินหรือโปรไฟล์
         if (
           typeof user.hasProfile ===
           "boolean"
@@ -274,8 +249,6 @@ export default function LoginPage() {
               user.hasProfile,
             ),
           );
-
-          /* สมาชิกเก่า */
 
           if (
             user.hasProfile
@@ -291,8 +264,6 @@ export default function LoginPage() {
             return;
           }
 
-          /* สมาชิกใหม่ */
-
           console.log(
             "NO PROFILE -> PROFILE PAGE",
           );
@@ -304,11 +275,7 @@ export default function LoginPage() {
           return;
         }
 
-        /* =================================================
-           FALLBACK
-           ตรวจ Profile จาก API
-        ================================================= */
-
+        // ไม่มี hasProfile → ตรวจโปรไฟล์จาก API /api/profile แล้วเลือกหน้าปลายทาง
         try {
           const profileResponse =
             await fetch(
@@ -331,7 +298,7 @@ export default function LoginPage() {
           ) {
             throw new Error(
               profileData.message ??
-                "ไม่สามารถตรวจสอบข้อมูลสุขภาพได้",
+              "ไม่สามารถตรวจสอบข้อมูลสุขภาพได้",
             );
           }
 
@@ -347,8 +314,6 @@ export default function LoginPage() {
             ),
           );
 
-          /* สมาชิกเก่า */
-
           if (
             hasProfile
           ) {
@@ -363,8 +328,6 @@ export default function LoginPage() {
             return;
           }
 
-          /* สมาชิกใหม่ */
-
           console.log(
             "NO PROFILE -> PROFILE PAGE",
           );
@@ -375,7 +338,7 @@ export default function LoginPage() {
 
           return;
         } catch (
-          profileError
+        profileError
         ) {
           console.error(
             "CHECK PROFILE ERROR:",
@@ -397,13 +360,14 @@ export default function LoginPage() {
         "ไม่พบสิทธิ์การใช้งานของบัญชีนี้",
       );
     } catch (
-      loginError
+    loginError
     ) {
       console.error(
         "LOGIN FRONTEND ERROR:",
         loginError,
       );
 
+      // จัดการ error การเชื่อมต่อ
       setError(
         "ไม่สามารถเชื่อมต่อกับระบบได้ กรุณาลองใหม่อีกครั้ง",
       );
@@ -412,14 +376,8 @@ export default function LoginPage() {
     }
   };
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#fbf7f7]">
-
-      {/* BACKGROUND */}
 
       <div
         className="pointer-events-none absolute -left-40 -top-32 h-[420px] w-[620px] rounded-full opacity-70"
@@ -439,8 +397,7 @@ export default function LoginPage() {
 
       <div className="relative mx-auto flex min-h-screen max-w-[1440px] flex-col items-center gap-10 px-6 py-10 lg:flex-row lg:items-center lg:justify-center lg:gap-16 lg:px-16">
 
-        {/* LEFT */}
-
+        {/* ฝั่งซ้าย: ข้อความต้อนรับและจุดเด่นของระบบ */}
         <div className="relative flex w-full max-w-xl flex-col items-center justify-center py-10 text-center lg:w-1/2">
 
           <span className="absolute left-[10%] top-[16%] hidden h-1.5 w-1.5 rounded-full bg-[#d7a6ab] lg:block" />
@@ -482,8 +439,7 @@ export default function LoginPage() {
             เพื่ออนาคตที่ดีกว่า
           </p>
 
-          {/* FEATURES */}
-
+          {/* การ์ดจุดเด่น 3 ข้อ */}
           <div className="mt-10 grid w-full grid-cols-1 gap-6 sm:grid-cols-3 sm:gap-4">
 
             <Feature
@@ -514,8 +470,7 @@ export default function LoginPage() {
 
         </div>
 
-        {/* RIGHT */}
-
+        {/* ฝั่งขวา: การ์ดฟอร์มเข้าสู่ระบบ */}
         <div className="w-full max-w-md rounded-[28px] bg-white p-8 shadow-[0_25px_60px_rgba(139,20,32,0.10)] sm:p-10">
 
           <div className="flex flex-col items-center text-center">
@@ -543,12 +498,11 @@ export default function LoginPage() {
 
           </div>
 
+          {/* ฟอร์ม: ชื่อผู้ใช้ รหัสผ่าน ข้อความผิดพลาด ปุ่มเข้าสู่ระบบ และลิงก์สมัครสมาชิก */}
           <form
             className="mt-8 flex flex-col gap-5"
             onSubmit={handleSubmit}
           >
-
-            {/* USERNAME */}
 
             <div>
 
@@ -588,8 +542,6 @@ export default function LoginPage() {
               </div>
 
             </div>
-
-            {/* PASSWORD */}
 
             <div>
 
@@ -649,8 +601,6 @@ export default function LoginPage() {
 
             </div>
 
-            {/* ERROR */}
-
             {error && (
               <div className="rounded-2xl border border-[#f3cdd1] bg-[#fff3f4] px-4 py-3">
                 <p className="text-center text-sm font-medium text-[#B91C2B]">
@@ -659,18 +609,14 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* FORGOT */}
-
             <div className="flex justify-end">
               <Link
                 href="/forgot-password"
                 className="text-sm font-medium text-[#B91C2B] hover:underline"
               >
-                ลืมรหัสผ่าน?
+                ลืมรหัสผ่าน
               </Link>
             </div>
-
-            {/* LOGIN */}
 
             <button
               type="submit"
@@ -687,8 +633,7 @@ export default function LoginPage() {
                 )}
             </button>
 
-            {/* DIVIDER */}
-
+            {/* ทางเลือกสมัครสมาชิกใหม่ */}
             <div className="my-1 flex items-center gap-3">
               <span className="h-px flex-1 bg-[#ece7e7]" />
 
@@ -698,8 +643,6 @@ export default function LoginPage() {
 
               <span className="h-px flex-1 bg-[#ece7e7]" />
             </div>
-
-            {/* REGISTER */}
 
             <Link
               href="/register"
@@ -719,11 +662,7 @@ export default function LoginPage() {
   );
 }
 
-/* ============================================================
-   FEATURE
-============================================================ */
-
-// กล่องแนะนำจุดเด่นของระบบ: ไอคอน หัวข้อ และคำอธิบาย
+// แสดงจุดเด่นของระบบหนึ่งข้อ (ไอคอน หัวข้อ คำอธิบาย) ในหน้า login
 function Feature({
   icon,
   title,

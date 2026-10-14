@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { listPublicCategories } from "@/lib/assessmentCategoriesDb";
 import { logSystemError } from "@/lib/errorLogger";
 
-/* =========================================================
-   /api/assessments/categories  (ไม่ต้องเข้าสู่ระบบ เหมือน GET /api/assessments/custom)
-   GET          → { categories: [...หมวด + แบบประเมินที่เปิดใช้งาน], uncategorized: [...] }
-   GET ?id=<id> → { category } ของหมวดเดียว (ไม่มีจริง / หมวดที่ staff สร้างแต่ไม่มีแบบประเมินที่เปิดใช้งาน = 404)
-   - แสดงเฉพาะแบบประเมินที่เปิดใช้งาน หมวดที่ staff สร้างแต่ยังว่างจะไม่ถูกส่งออกไป
-========================================================= */
-
+// API: คืนหมวดหมู่แบบประเมินที่เปิดใช้งานทั้งหมด หรือเฉพาะหมวดเดียวถ้าระบุ id
 export async function GET(request: NextRequest) {
   const idParam = new URL(request.url).searchParams.get("id");
   try {

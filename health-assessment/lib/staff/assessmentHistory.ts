@@ -1,11 +1,6 @@
 import type { SnapLevel, SnapQuestion, Snapshot } from "./assessmentVersions";
 
-/* =========================================================
-   ประวัติการแก้ไขแบบประเมิน: เทียบเนื้อหาแต่ละครั้งที่เผยแพร่กับครั้งก่อนหน้า
-   - จับคู่คำถาม / ตัวเลือก / ระดับด้วย id (ไม่มี id → ใช้ข้อความ/ชื่อระดับ)
-   - คืนรายการสิ่งที่เปลี่ยน พร้อมค่าเดิม (before) และค่าใหม่ (after) เพื่อดูข้อมูลเดิมย้อนหลังได้
-========================================================= */
-
+// ชนิดการเปลี่ยนแปลง และรายการจุดที่เปลี่ยน (หมวด หัวข้อ ค่าเดิม ค่าใหม่)
 export type ChangeKind = "add" | "remove" | "change";
 export type Change = {
   section: "ข้อมูลทั่วไป" | "คำถามและคะแนน" | "เกณฑ์ผลและคำแนะนำ";
@@ -15,14 +10,14 @@ export type Change = {
   after?: string;
 };
 
-// แปลงค่าเป็นข้อความตัดช่องว่าง (null/undefined = "")
+// แปลงค่าเป็นข้อความตัดช่องว่าง (null/undefined เป็นค่าว่าง)
 const clean = (v: unknown) => (v === null || v === undefined ? "" : String(v).trim());
-// ข้อความสำหรับแสดงผล ถ้าว่างใช้คำแทน เช่น "(ว่าง)"
+// ข้อความสำหรับแสดงผล ถ้าว่างแสดงเป็น "(ว่าง)"
 const shown = (v: unknown, empty = "(ว่าง)") => clean(v) || empty;
-// ข้อความช่วงคะแนนของระดับผล เช่น "0–4" (ไม่มีช่วง = "คำนวณในระบบ")
+// แสดงช่วงคะแนนของระดับผล หรือ "คำนวณในระบบ" ถ้าไม่มีเกณฑ์
 const range = (l: SnapLevel) => (l.min === null && l.max === null ? "คำนวณในระบบ" : `${l.min ?? "–"}–${l.max ?? "–"}`);
 
-// จับคู่รายการเก่า/ใหม่: id ก่อน แล้วค่อยใช้ key สำรอง
+// จับคู่รายการเก่ากับใหม่ด้วย id (หรือ key สำรอง) เพื่อหาว่าอะไรเพิ่ม/ลบ/แก้
 function pair<T extends { id?: number }>(prev: T[], next: T[], key: (x: T) => string) {
   const used = new Set<T>();
   const pairs: { a?: T; b?: T }[] = [];
@@ -37,27 +32,27 @@ function pair<T extends { id?: number }>(prev: T[], next: T[], key: (x: T) => st
   return pairs;
 }
 
-// ถ้าค่าเดิมกับค่าใหม่ต่างกัน เพิ่มรายการ "change" ลงในผลลัพธ์
+// เพิ่มรายการ "แก้ไข" ลงผลลัพธ์ถ้าค่าเดิมกับค่าใหม่ต่างกัน
 function field(out: Change[], section: Change["section"], title: string, before: unknown, after: unknown) {
   if (clean(before) !== clean(after)) out.push({ section, kind: "change", title, before: shown(before), after: shown(after) });
 }
 
-// ข้อความสรุปคำถามพร้อมตัวเลือกและคะแนน ใช้แสดงตอนเพิ่ม/ลบคำถาม
+// สรุปคำถามพร้อมตัวเลือกและคะแนนเป็นข้อความบรรทัดเดียว
 function questionText(q: SnapQuestion) {
   const choices = q.choices.map((c) => `${c.text} (${c.score})`).join(" / ");
   return choices ? `${q.text} — ${choices}` : q.text;
 }
 
-// เทียบ snapshot สองเวอร์ชัน คืนรายการสิ่งที่เพิ่ม/ลบ/แก้ไข แยกตามส่วนของแบบประเมิน
+// เปรียบเทียบ snapshot สองเวอร์ชันของแบบประเมิน แล้วคืนรายการจุดที่เปลี่ยน (ข้อมูลทั่วไป คำถาม เกณฑ์ผล)
 export function diffSnapshots(prev: Snapshot, next: Snapshot): Change[] {
   const out: Change[] = [];
 
-  /* ---------- ข้อมูลทั่วไป ---------- */
+  // เทียบข้อมูลทั่วไป
   field(out, "ข้อมูลทั่วไป", "ชื่อแบบประเมิน", prev.name, next.name);
   field(out, "ข้อมูลทั่วไป", "คำอธิบายสั้นที่ผู้ใช้เห็น", prev.description, next.description);
   field(out, "ข้อมูลทั่วไป", "แหล่งอ้างอิงของแบบประเมิน", prev.source, next.source);
 
-  /* ---------- คำถาม ตัวเลือก คะแนน ---------- */
+  // เทียบคำถามและตัวเลือก (เพิ่ม/ลบ/แก้)
   const qs = pair(prev.questions, next.questions, (q) => clean(q.text));
   qs.forEach(({ a, b }) => {
     const no = b ? next.questions.indexOf(b) + 1 : prev.questions.indexOf(a!) + 1;
@@ -74,7 +69,7 @@ export function diffSnapshots(prev: Snapshot, next: Snapshot): Change[] {
     });
   });
 
-  /* ---------- เกณฑ์ผลและคำแนะนำ ---------- */
+  // เทียบระดับผล ช่วงคะแนน และคำแนะนำ
   const S = "เกณฑ์ผลและคำแนะนำ" as const;
   pair(prev.levels, next.levels, (l) => clean(l.riskLevel)).forEach(({ a, b }) => {
     if (!a) return out.push({ section: S, kind: "add", title: `เพิ่มระดับ "${b!.riskLevel}"`, after: `คะแนน ${range(b!)} · ${shown(b!.text, "ยังไม่มีคำแนะนำ")}` });

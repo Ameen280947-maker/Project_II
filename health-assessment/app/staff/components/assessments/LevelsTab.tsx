@@ -19,14 +19,7 @@ import {
   type EQuestion,
 } from "./shared";
 
-/* =========================================================
-   แท็บ "เกณฑ์ผลและคำแนะนำ"
-   - แบบประเมินทั่วไป: แก้ชื่อระดับ ช่วงคะแนน เพิ่ม/ลบระดับได้
-   - แบบประเมินหลัก: ชื่อระดับและเกณฑ์ตัดคะแนนคำนวณในโค้ด แก้ได้เฉพาะคำแนะนำ
-     (ข้อความ รอบประเมินซ้ำ สายด่วน แหล่งอ้างอิง)
-   ความรุนแรงกำหนดโดยระบบเสมอ (แสดงให้เห็นอย่างเดียว)
-========================================================= */
-
+// ข้อความคำแนะนำฉบับก่อนหน้าของระดับผลหนึ่ง (จาก API ?history=)
 type HistoryRow = {
   id: number;
   riskLevel: string;
@@ -40,14 +33,15 @@ type HistoryRow = {
   by: string | null;
 };
 
-// ความรุนแรงที่ใช้แสดง: แบบทั่วไปคิดจากลำดับช่วงคะแนน (น้อย → มาก)
+// คำนวณระดับความรุนแรงของแต่ละระดับผล (แบบทั่วไปคิดจากลำดับช่วงคะแนน)
 function severities(levels: ELevel[], generic: boolean): Record<string, Severity> {
   if (!generic) return Object.fromEntries(levels.map((l) => [l.key, l.severity as Severity]));
   const order = [...levels].sort((a, b) => (a.min ?? 0) - (b.min ?? 0));
   return Object.fromEntries(order.map((l, i) => [l.key, severityForRank(i, order.length)]));
 }
 
-// แท็บเกณฑ์ผล: เลือกระดับ แก้ช่วงคะแนน/คำแนะนำ เพิ่ม/ลบระดับ และเตือนช่วงไม่ต่อกัน
+// แท็บเกณฑ์แปลผล: แสดงการ์ดระดับผล ตรวจช่วงคะแนนที่ขาด/ไม่ครอบคลุม และฟอร์มแก้ระดับที่เลือก
+// รับ levels/questions และ onChange สำหรับอัปเดตร่าง (generic = แบบประเมินที่แก้ช่วงคะแนนได้)
 export default function LevelsTab({
   label,
   generic,
@@ -63,20 +57,22 @@ export default function LevelsTab({
   levelMeta: Detail["levelMeta"];
   onChange: (levels: ELevel[]) => void;
 }) {
+  // ระดับที่เลือกอยู่ (เริ่มที่ระดับที่ยังไม่มีคำแนะนำ) และความรุนแรงของแต่ละระดับ
   const [selKey, setSelKey] = useState<string | null>(() => (levels.find(isMissing) ?? levels[0])?.key ?? null);
   const sev = severities(levels, generic);
   const level = levels.find((l) => l.key === selKey) ?? levels[0];
 
-  // แก้ไขข้อมูลระดับผลตาม key
+  // อัปเดตค่าบางฟิลด์ของระดับผลตาม key
   const set = (key: string, patch: Partial<ELevel>) => onChange(levels.map((l) => (l.key === key ? { ...l, ...patch } : l)));
 
+  // ตรวจช่วงคะแนน: ครบทุกระดับไหม มีช่องว่างไหม และครอบคลุมคะแนนที่เป็นไปได้ไหม
   const range = possibleRange(questions);
   const complete = levels.every((l) => l.min !== null && l.max !== null && l.min <= l.max);
   const sorted = [...levels].sort((a, b) => (a.min ?? 0) - (b.min ?? 0));
   const gapAt = complete ? sorted.findIndex((l, i) => i > 0 && l.min !== sorted[i - 1].max! + 1) : -1;
   const covers = complete && sorted.length > 0 && sorted[0].min! <= range.min && sorted[sorted.length - 1].max! >= range.max;
 
-  // แบ่งช่วงคะแนนให้อัตโนมัติเท่า ๆ กัน (ตามลำดับที่แสดง)
+  // แบ่งช่วงคะแนนที่เป็นไปได้ให้ทุกระดับเท่า ๆ กันอัตโนมัติ
   const autoSplit = () => {
     const n = levels.length;
     const span = range.max - range.min + 1;
@@ -89,7 +85,7 @@ export default function LevelsTab({
     );
   };
 
-  // เพิ่มระดับใหม่ต่อจากช่วงคะแนนสูงสุด แล้วเลือกระดับนั้น
+  // เพิ่มระดับผลใหม่ต่อท้ายช่วงคะแนนเดิมแล้วเลือกระดับนั้น
   const addLevel = () => {
     const last = sorted[sorted.length - 1];
     const start = last?.max !== null && last?.max !== undefined ? last.max + 1 : range.min;
@@ -98,7 +94,7 @@ export default function LevelsTab({
     setSelKey(l.key);
   };
 
-  // ลบระดับผล (ถามยืนยัน) แล้วเลือกระดับแรกแทน
+  // ยืนยันแล้วลบระดับผลออก (มีผลจริงเมื่อเผยแพร่)
   const removeLevel = (key: string) => {
     if (!confirm("ลบระดับผลนี้? (มีผลเมื่อเผยแพร่)")) return;
     const next = levels.filter((l) => l.key !== key);
@@ -108,6 +104,7 @@ export default function LevelsTab({
 
   return (
     <div className="mt-4 flex flex-col gap-4">
+      {/* แถบช่วงคะแนนที่เป็นไปได้ / คำอธิบายสำหรับแบบประเมินสูตรเฉพาะ */}
       {generic ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-staff-soft px-4 py-3 text-sm">
           <span>
@@ -123,7 +120,7 @@ export default function LevelsTab({
         </p>
       )}
 
-      {/* การ์ดระดับผล */}
+      {/* การ์ดเลือกระดับผล และปุ่มเพิ่มระดับ */}
       <div className="grid grid-cols-1 gap-3 min-[420px]:grid-cols-2 md:grid-cols-3 2xl:grid-cols-4">
         {levels.map((l) => {
           const on = l.key === level?.key;
@@ -164,6 +161,7 @@ export default function LevelsTab({
         )}
       </div>
 
+      {/* คำเตือนช่วงคะแนนไม่ต่อกัน / ไม่ครอบคลุม / ยังไม่มีเกณฑ์ */}
       {generic && complete && gapAt > 0 && (
         <p className="text-sm font-semibold text-risk-crit">
           ช่วงคะแนนไม่ต่อกัน: หลัง &quot;{sorted[gapAt - 1].riskLevel}&quot; (ถึง {sorted[gapAt - 1].max}) ระดับถัดไปควรเริ่มที่ {sorted[gapAt - 1].max! + 1}
@@ -176,6 +174,7 @@ export default function LevelsTab({
       )}
       {generic && levels.length === 0 && <p className="text-sm text-staff-muted">ยังไม่มีเกณฑ์แปลผล กด “เพิ่มระดับ” อย่างน้อย 2 ระดับ</p>}
 
+      {/* ฟอร์มแก้ไขระดับที่เลือก */}
       {level && (
         <LevelForm
           key={level.key}
@@ -193,14 +192,10 @@ export default function LevelsTab({
   );
 }
 
-/* =========================================================
-   ฟอร์มของระดับที่เลือก + ตัวอย่างหน้าผลที่ผู้ใช้เห็น
-========================================================= */
-
-// แปลงข้อความเป็นจำนวนเต็ม ถ้าว่างคืน null
+// แปลงข้อความในช่องตัวเลขเป็นจำนวนเต็ม หรือ null ถ้าเว้นว่าง
 const numOrNull = (v: string) => (v.trim() === "" ? null : Math.trunc(Number(v)));
 
-// ฟอร์มแก้ไขระดับที่เลือก: ชื่อ ช่วงคะแนน คำแนะนำ รอบประเมินซ้ำ สายด่วน และประวัติ
+// ฟอร์มแก้ไขระดับผลหนึ่งระดับ (ชื่อ ช่วงคะแนน คำแนะนำ รอบประเมินซ้ำ สายด่วน แหล่งอ้างอิง)
 function LevelForm({
   label,
   level,
@@ -220,10 +215,11 @@ function LevelForm({
   onChange: (p: Partial<ELevel>) => void;
   onRemove: () => void;
 }) {
+  // state ประวัติคำแนะนำฉบับก่อน (null = ยังไม่เปิดดู)
   const [history, setHistory] = useState<HistoryRow[] | null>(null);
   const [histError, setHistError] = useState("");
 
-  // เปิด/ซ่อนประวัติข้อความคำแนะนำของระดับนี้ (โหลดจาก API)
+  // เปิด/ปิดประวัติคำแนะนำฉบับก่อนหน้าของระดับนี้ (โหลดจาก API ?history=)
   const toggleHistory = () => {
     if (history) return setHistory(null);
     if (!level.id) return;
@@ -253,6 +249,7 @@ function LevelForm({
           </label>
         )}
 
+        {/* ช่องคะแนนต่ำสุด/สูงสุด และความรุนแรง */}
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <label className={labelCls}>
             คะแนนต่ำสุด
@@ -291,6 +288,7 @@ function LevelForm({
           {generic ? "ความรุนแรงคิดจากลำดับช่วงคะแนน (คะแนนน้อย = ปกติ, คะแนนมาก = เสี่ยงสูง)" : "เกณฑ์คะแนนและความรุนแรงของแบบประเมินนี้คำนวณในโค้ดของระบบ"}
         </p>
 
+        {/* ข้อความคำแนะนำพร้อมตัวนับตัวอักษร */}
         <label className={`${labelCls} mt-4`}>
           ข้อความคำแนะนำ
           <textarea
@@ -305,6 +303,7 @@ function LevelForm({
           {level.text.length} ตัวอักษร · แนะนำไม่เกิน {MAX_HINT} ตัวอักษรเพื่อให้อ่านง่ายบนมือถือ
         </p>
 
+        {/* รอบประเมินซ้ำ สายด่วน และแหล่งอ้างอิง */}
         <div className="mt-4 grid gap-3 sm:grid-cols-3">
           <label className={labelCls}>
             รอบประเมินซ้ำ (วัน)
@@ -335,6 +334,7 @@ function LevelForm({
           </label>
         </div>
 
+        {/* ข้อมูลการแก้ไขล่าสุด และรายการประวัติคำแนะนำ */}
         <p className="mt-4 border-t border-staff-line pt-3 text-xs text-staff-muted">
           {!level.id ? (
             "ระดับใหม่ · จะถูกสร้างเมื่อเผยแพร่"
@@ -381,12 +381,13 @@ function LevelForm({
         )}
       </div>
 
+      {/* ตัวอย่างหน้าผลที่ผู้ใช้เห็น */}
       <ResultPreview label={label} level={level} severity={severity} />
     </div>
   );
 }
 
-// ตัวอย่างหน้าผลแบบมือถือที่ผู้ใช้จะเห็นสำหรับระดับนี้
+// ตัวอย่างหน้าผลประเมินบนมือถือที่ผู้ใช้จะเห็นสำหรับระดับนี้
 function ResultPreview({ label, level, severity }: { label: string; level: ELevel; severity: Severity }) {
   return (
     <div className="w-full 2xl:w-[300px] 2xl:shrink-0">
@@ -405,6 +406,7 @@ function ResultPreview({ label, level, severity }: { label: string; level: ELeve
               </span>
             </div>
           </div>
+          {/* ข้อความคำแนะนำ หรือคำเตือนว่ายังไม่มี + สายด่วน/รอบประเมินซ้ำ */}
           {level.text.trim() ? (
             <p className="mt-4 whitespace-pre-wrap break-words rounded-2xl bg-[#faf8f8] p-3 text-sm leading-relaxed text-[#2f3037]">{level.text}</p>
           ) : (

@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 
-// แบบประเมินThai CVD (assessment_type_id = 3) แจ้งผู้ใช้เมื่อ staff ปิดแบบประเมินนี้อยู่
+// เลย์เอาต์: ห่อหน้าประเมินความเสี่ยงโรคหัวใจ (Thai CVD) และแสดงประกาศเมื่อแบบประเมินถูกปิด
 export default function AssessmentCvdLayout({ children }: { children: ReactNode }) {
   return (
     <>

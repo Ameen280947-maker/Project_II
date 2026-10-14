@@ -13,21 +13,20 @@ import RecommendationLayout, {
   type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้าและลิงก์กลับไปทำแบบประเมินใหม่
 const TONE = "pink";
 const EDIT_HREF = "/assessment_diet";
 
-/* คะแนนรวมเต็ม: ผลรวมคะแนนสูงสุดของ 9 ข้อในฐานข้อมูล (ยิ่งสูงยิ่งดี) */
+// คะแนนรวมเต็มของแบบประเมินพฤติกรรมการกิน
 const MAX_SCORE = 34;
 
-/* =====================================================
-   TYPES
-===================================================== */
-
+// ผลของแต่ละด้านอาหาร (คะแนนและระดับ)
 type DomainResult = {
   score: number;
   level: string;
 };
 
+// รูปแบบ response ของ API: ผลรวม + ผลแยก 4 ด้าน (ผัก น้ำตาล ไขมัน โซเดียม)
 type ResultResponse = {
   success: boolean;
 
@@ -49,10 +48,7 @@ type ResultResponse = {
   message?: string;
 };
 
-/* =====================================================
-   สีผลรวม: ใช้ด้านที่แย่ที่สุด (ตารางที่ 24)
-===================================================== */
-
+// สีของระดับผลรวมพฤติกรรมการกิน
 const OVERALL_COLOR: Record<string, RiskColor> = {
   พฤติกรรมเหมาะสม: "green",
   ควรใส่ใจ: "yellow",
@@ -60,11 +56,7 @@ const OVERALL_COLOR: Record<string, RiskColor> = {
   ควรปรับพฤติกรรมมาก: "red",
 };
 
-/* =====================================================
-   PAGE
-===================================================== */
-
-// หน้าผลและคำแนะนำพฤติกรรมการกิน: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลและคำแนะนำพฤติกรรมการกิน ครอบด้วย Suspense
 export default function DietRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -73,12 +65,14 @@ export default function DietRecommendationPage() {
   );
 }
 
-// เนื้อหาหน้าผลอาหาร: โหลดผลตาม assessmentId แล้วแสดงผลแยกตามหมวดอาหาร
+// เนื้อหาหน้า: แสดงผลแยกด้าน (หวาน มัน เค็ม ผัก) และคำแนะนำตาม assessmentId
+// แสดงวงคะแนนรวม (เต็ม 34) ระดับผลรวม คำแนะนำ และการ์ดผล 4 ด้าน
 function DietRecommendationContent() {
   const searchParams = useSearchParams();
 
   const assessmentId = searchParams.get("assessmentId");
 
+  // state ของหน้า: ข้อมูลผล สถานะโหลด และ error
   const [data, setData] =
     useState<ResultResponse | null>(null);
 
@@ -88,17 +82,13 @@ function DietRecommendationContent() {
   const [error, setError] =
     useState("");
 
-  /* =====================================================
-     LOAD RESULT
-  ===================================================== */
-
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
     if (!assessmentId) {
-      // ไม่ setState ตรง ๆ ในส่วน synchronous ของ effect
       return;
     }
 
-    // โหลดผลประเมินพฤติกรรมการกินตาม assessmentId จาก API
+    // ดึงผลประเมินจาก /api/assessments/diet (401 → ลบ userId แล้วไปหน้า login)
     const loadResult = async () => {
       try {
         setLoading(true);
@@ -112,7 +102,6 @@ function DietRecommendationContent() {
           },
         );
 
-        // session หมดอายุ → กลับไปหน้า login
         if (response.status === 401) {
           localStorage.removeItem("userId");
           window.location.replace("/login");
@@ -149,10 +138,7 @@ function DietRecommendationContent() {
     void loadResult();
   }, [assessmentId]);
 
-  /* =====================================================
-     NO ASSESSMENT ID / LOADING / ERROR
-  ===================================================== */
-
+  // สถานะไม่มี assessmentId / กำลังโหลด / error
   if (!assessmentId) {
     return <RecommendationError tone={TONE} message="ไม่พบ Assessment ID" editHref={EDIT_HREF} />;
   }
@@ -171,18 +157,11 @@ function DietRecommendationContent() {
     );
   }
 
-  /* =====================================================
-     DATA
-  ===================================================== */
-
   const assessment = data.assessment;
   const domains = data.domains;
   const totalScore = Number(assessment.total_score);
 
-  /* =====================================================
-     RENDER
-  ===================================================== */
-
+  // ส่วนแสดงผล: วงคะแนนรวม ระดับ และคำแนะนำ
   return (
     <RecommendationLayout
       tone={TONE}
@@ -208,6 +187,7 @@ function DietRecommendationContent() {
       editHref={EDIT_HREF}
       menuHref="/assessment-menu-behavior"
     >
+      {/* การ์ดผลแยกตามด้าน: ผัก น้ำตาล ไขมัน โซเดียม */}
       {domains && (
         <RecommendationSection
           icon={<Salad size={27} className={RECOMMENDATION_TONES[TONE].eyebrow} />}
@@ -225,11 +205,7 @@ function DietRecommendationContent() {
   );
 }
 
-/* =====================================================
-   DOMAIN CARD
-===================================================== */
-
-// การ์ดแสดงผลของหมวดอาหารหนึ่งหมวด พร้อมไอคอนและระดับ
+// การ์ดผลรายด้านอาหาร: คะแนนและระดับ พร้อมสีตามความเสี่ยง (ผักกลับด้านสี)
 function DomainCard({
   title,
   icon,
@@ -241,12 +217,6 @@ function DomainCard({
 }) {
 
   const level = result.level;
-
-  /*
-   * สีตามตารางที่ 24 ของเอกสารอ้างอิง (0 = เขียว ... 3 = แดง)
-   * ผัก: สูงมาก เขียว / สูง เหลือง / ปานกลาง ส้ม / น้อย แดง
-   * ด้านอื่น: ต่ำ เขียว / ปานกลาง เหลือง / สูง ส้ม / สูงมาก แดง
-   */
 
   const tier =
     title === "ผัก"
@@ -279,11 +249,7 @@ function DomainCard({
   );
 }
 
-/* =====================================================
-   LABEL
-===================================================== */
-
-// สร้างข้อความป้ายระดับ (หมวดผักใช้คำว่า "ปริมาณ" นอกนั้นใช้ "ระดับ")
+// สร้างข้อความระดับของด้าน ("ปริมาณ..." สำหรับผัก, "ระดับ..." สำหรับด้านอื่น)
 function getDomainLabel(
   title: string,
   level: string,

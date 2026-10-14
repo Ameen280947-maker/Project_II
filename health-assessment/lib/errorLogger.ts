@@ -1,29 +1,17 @@
 import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/adminSchema";
 
-/* =========================================================
-   บันทึกข้อผิดพลาดลงตาราง system_error_logs
-   เรียกใน catch ของ API ได้เลย เช่น
-
-     } catch (error) {
-       console.error("LOGIN API ERROR:", error);
-       await logSystemError("POST /api/auth/login", error);
-       ...
-     }
-
-   ฟังก์ชันนี้จะไม่ throw ต่อ (ถ้าบันทึกไม่ได้ก็แค่ console.error)
-   จึงไม่ทำให้ API เดิมพังเพิ่ม
-========================================================= */
-
+// ระดับความรุนแรงของ log
 export type ErrorLevel = "error" | "warning" | "info";
 
-// บันทึกข้อผิดพลาดลงตาราง system_error_logs (ไม่ throw ต่อแม้บันทึกไม่สำเร็จ)
+// บันทึกข้อผิดพลาดของระบบลงตาราง system_error_logs (ถ้าบันทึกไม่ได้จะแค่ log ใน console)
 export async function logSystemError(
   source: string,
   error: unknown,
   level: ErrorLevel = "error",
 ): Promise<void> {
   try {
+    // แปลง error เป็นข้อความและ stack
     const message =
       error instanceof Error
         ? error.message
@@ -33,6 +21,7 @@ export async function logSystemError(
 
     const stack = error instanceof Error ? (error.stack ?? null) : null;
 
+    // บันทึกลง DB (ตัดความยาวไม่ให้เกินคอลัมน์)
     await ensureAdminTables();
 
     await pool.query(

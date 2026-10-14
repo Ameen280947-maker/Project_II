@@ -15,21 +15,14 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// แถวคำถามจากตาราง questions
 type QuestionRow = {
   question_id: number;
   question_text: string;
   display_order: number;
 };
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
-// คืนค่าตัวเลขตัวแรกที่หาได้จาก key ที่กำหนดใน profile (ไม่พบ = null)
+// หาค่าตัวเลขจากโปรไฟล์ตามชื่อ key ที่เป็นไปได้ตัวแรกที่มีค่า คืน null ถ้าไม่พบ
 function getNumber(
   profile: Record<string, unknown>,
   keys: string[],
@@ -53,7 +46,7 @@ function getNumber(
   return null;
 }
 
-// คืนค่าข้อความตัวแรกที่ไม่ว่างจาก key ที่กำหนดใน profile (ไม่พบ = null)
+// หาค่าข้อความจากโปรไฟล์ตามชื่อ key ที่เป็นไปได้ตัวแรกที่มีค่า คืน null ถ้าไม่พบ
 function getString(
   profile: Record<string, unknown>,
   keys: string[],
@@ -73,11 +66,7 @@ function getString(
   return null;
 }
 
-/* =========================================================
-   AGE FROM BIRTH YEAR
-========================================================= */
-
-// คำนวณอายุจากปีเกิด (รองรับ พ.ศ.) คืน null ถ้าอายุไม่อยู่ในช่วง 0-120
+// คำนวณอายุจากปีเกิด (รองรับปี พ.ศ.) คืน null ถ้าอายุไม่สมเหตุสมผล
 function calculateAgeFromBirthYear(
   birthYear: number,
 ): number | null {
@@ -86,7 +75,6 @@ function calculateAgeFromBirthYear(
 
   let year = birthYear;
 
-  // พ.ศ. -> ค.ศ.
   if (year > 2400) {
     year -= 543;
   }
@@ -105,16 +93,12 @@ function calculateAgeFromBirthYear(
   return age;
 }
 
-/* =========================================================
-   EXTRACT PROFILE
-========================================================= */
-
-// ดึงอายุ เพศ ส่วนสูง น้ำหนัก รอบเอว และความดันจาก profile (รองรับชื่อ key หลายแบบ)
+// ดึงอายุ เพศ ส่วนสูง น้ำหนัก รอบเอว และความดันจากข้อมูล health_profile ของผู้ใช้
 function extractHealthProfile(
   profile: Record<string, unknown>,
 ) {
-  /* AGE */
 
+  // อายุ: ใช้ค่า age ถ้ามี ไม่งั้นคำนวณจากปีเกิด
   let age = getNumber(
     profile,
     [
@@ -142,8 +126,7 @@ function extractHealthProfile(
     }
   }
 
-  /* GENDER */
-
+  // เพศ: แปลงค่าหลายรูปแบบ (ไทย/อังกฤษ) เป็น male/female
   let gender =
     getString(
       profile,
@@ -172,8 +155,7 @@ function extractHealthProfile(
     }
   }
 
-  /* HEIGHT */
-
+  // ค่าร่างกาย: ส่วนสูง น้ำหนัก รอบเอว และความดัน
   const heightCm =
     getNumber(
       profile,
@@ -183,8 +165,6 @@ function extractHealthProfile(
         "heightCm",
       ],
     );
-
-  /* WEIGHT */
 
   const weightKg =
     getNumber(
@@ -196,8 +176,6 @@ function extractHealthProfile(
       ],
     );
 
-  /* WAIST */
-
   const waistCm =
     getNumber(
       profile,
@@ -208,8 +186,6 @@ function extractHealthProfile(
         "waist_circumference",
       ],
     );
-
-  /* BP */
 
   const systolic =
     getNumber(
@@ -244,11 +220,7 @@ function extractHealthProfile(
   };
 }
 
-/* =========================================================
-   CALCULATE DIABETES RISK
-========================================================= */
-
-// คำนวณ BMI และ % ความเสี่ยงเบาหวาน แล้วจัดระดับ (low/moderate/high/very_high)
+// คำนวณคะแนนความเสี่ยงเบาหวานจากอายุ เพศ BMI รอบเอว ความดัน และประวัติครอบครัว
 function calculateDiabetesRisk(
   age: number,
   gender: "male" | "female",
@@ -259,8 +231,8 @@ function calculateDiabetesRisk(
   diastolic: number,
   familyDiabetes: boolean,
 ) {
-  /* BMI */
 
+  // คำนวณ BMI
   const heightMeter =
     heightCm / 100;
 
@@ -269,8 +241,7 @@ function calculateDiabetesRisk(
     (heightMeter *
       heightMeter);
 
-  /* AGE */
-
+  // คะแนนตามปัจจัยเสี่ยงแต่ละตัว: อายุ เพศ BMI รอบเอว ความดัน ประวัติครอบครัว
   let ageProbability: number;
 
   if (age < 45) {
@@ -284,8 +255,6 @@ function calculateDiabetesRisk(
       0.6043599;
   }
 
-  /* GENDER */
-
   const genderScore =
     gender === "male"
       ? 2
@@ -293,8 +262,6 @@ function calculateDiabetesRisk(
 
   const genderProbability =
     0.4422573;
-
-  /* BMI */
 
   let bmiScore: number;
   let bmiProbability: number;
@@ -312,8 +279,6 @@ function calculateDiabetesRisk(
       1.235097;
   }
 
-  /* WAIST */
-
   const waistHigh =
     gender === "male"
       ? waistCm >= 90
@@ -327,8 +292,6 @@ function calculateDiabetesRisk(
       ? 0.5567118
       : 0;
 
-  /* BLOOD PRESSURE */
-
   const bpHigh =
     systolic >= 140 ||
     diastolic >= 90;
@@ -341,16 +304,13 @@ function calculateDiabetesRisk(
       ? 0.6409517
       : 0;
 
-  /* FAMILY */
-
   const familyScore =
     familyDiabetes ? 1 : 0;
 
   const familyProbability =
     1.081356;
 
-  /* C1-C6 */
-
+  // รวมค่าสัมประสิทธิ์ตามสมการ logistic แล้วแปลงเป็นโอกาสเสี่ยง (%)
   const c1 =
     ageProbability;
 
@@ -374,8 +334,6 @@ function calculateDiabetesRisk(
     familyScore *
     familyProbability;
 
-  /* SUM */
-
   const sum =
     c1 +
     c2 +
@@ -383,8 +341,6 @@ function calculateDiabetesRisk(
     c4 +
     c5 +
     c6;
-
-  /* LOGISTIC */
 
   const x =
     sum - 3.580397;
@@ -408,8 +364,7 @@ function calculateDiabetesRisk(
       ),
     );
 
-  /* RISK LEVEL */
-
+  // แปลเปอร์เซ็นต์ความเสี่ยงเป็นระดับ แล้วคืนผลทั้งหมด
   let riskLevel: string;
 
   if (riskPercent < 5) {
@@ -435,10 +390,6 @@ function calculateDiabetesRisk(
   };
 }
 
-/*
-  ตาราง recommendation เก็บระดับเป็นภาษาไทยตามเอกสารอ้างอิง (ตารางที่ 7)
-  ส่วน risk_level ใน assessment ยังเก็บเป็นคีย์อังกฤษเพราะหน้าเว็บใช้อยู่
-*/
 const RECOMMENDATION_LEVEL: Record<string, string> = {
   low: "เสี่ยงน้อย",
   moderate: "เสี่ยงปานกลาง",
@@ -446,11 +397,7 @@ const RECOMMENDATION_LEVEL: Record<string, string> = {
   very_high: "เสี่ยงสูงมาก",
 };
 
-/* =========================================================
-   GET
-========================================================= */
-
-// GET: คืนผลประเมินเบาหวานของผู้ใช้ตาม assessmentId (ข้อมูลสุขภาพ คำตอบ คำแนะนำ)
+// API: ดึงผลประเมินความเสี่ยงเบาหวานตาม assessmentId พร้อมคำตอบ ข้อมูลสุขภาพ และคำแนะนำ
 export async function GET(
   request: Request,
 ) {
@@ -458,6 +405,7 @@ export async function GET(
   if (!auth.ok) return auth.response;
 
   try {
+    // ตรวจ assessmentId จาก query string
     const url =
       new URL(request.url);
 
@@ -486,10 +434,7 @@ export async function GET(
       );
     }
 
-    /* =====================================================
-       ASSESSMENT
-    ===================================================== */
-
+    // ดึงผลประเมินเบาหวานของผู้ใช้พร้อมคำแนะนำ
     const assessmentResult =
       await pool.query<{
         assessment_id: number;
@@ -569,15 +514,7 @@ export async function GET(
     const assessment =
       assessmentResult.rows[0];
 
-    /* =====================================================
-       ANSWERS
-       POST บันทึกค่าที่ใช้คำนวณไว้ใน assessment_answers
-       ตาม display_order:
-       1 อายุ, 2 เพศ (male/female), 3 ส่วนสูง, 4 น้ำหนัก,
-       5 รอบเอว, 6 SBP, 7 DBP, 8 ประวัติครอบครัว (มี/ไม่มี)
-       ผลเก่าต้องแสดงค่าตอนประเมิน ไม่ใช่ค่าใน health_profile ปัจจุบัน
-    ===================================================== */
-
+    // ดึงคำตอบรายข้อ และตัวช่วยอ่านคำตอบ/โปรไฟล์
     const answersResult =
       await pool.query<{
         question_id: number;
@@ -614,6 +551,7 @@ export async function GET(
         [assessmentId],
       );
 
+    // หาคำตอบแบบข้อความของคำถามตามลำดับข้อ คืน null ถ้าว่าง
     const answerText = (displayOrder: number) => {
       const value = answersResult.rows.find(
         (answer) =>
@@ -627,19 +565,17 @@ export async function GET(
         : value.trim();
     };
 
+    // หาคำตอบของคำถามตามลำดับข้อแล้วแปลงเป็นตัวเลข
     const answerNumber = (displayOrder: number) => {
       const value = Number(answerText(displayOrder) ?? NaN);
       return Number.isFinite(value) ? value : null;
     };
 
-    /* =====================================================
-       PROFILE (สำรอง ใช้เฉพาะค่าที่ไม่มีในคำตอบ)
-    ===================================================== */
-
     let profileCache:
       | ReturnType<typeof extractHealthProfile>
       | null = null;
 
+    // โหลดข้อมูล health_profile ของผู้ใช้ครั้งเดียวแล้วเก็บ cache ไว้ใช้ซ้ำ
     const getProfile = async () => {
       if (!profileCache) {
         const profileResult =
@@ -673,6 +609,7 @@ export async function GET(
       return profileCache;
     };
 
+    // ใช้ค่าที่บันทึกในคำตอบก่อน ถ้าไม่มีค่อยใช้จาก health_profile
     const savedGender = answerText(2);
 
     const age =
@@ -692,14 +629,8 @@ export async function GET(
     const finalDbp =
       answerNumber(7) ?? (await getProfile()).diastolic;
 
-    /* FAMILY */
-
     const familyDiabetes =
       answerText(8) === "มี";
-
-    /* =====================================================
-       RESPONSE
-    ===================================================== */
 
     return NextResponse.json({
       success: true,
@@ -781,6 +712,7 @@ export async function GET(
         answersResult.rows,
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/diabetes", error);
     console.error(
       "GET DIABETES ERROR:",
@@ -800,14 +732,11 @@ export async function GET(
   }
 }
 
-/* =========================================================
-   POST
-========================================================= */
-
-// POST: คำนวณความเสี่ยงเบาหวานจากโปรไฟล์และคำตอบ แล้วบันทึกผลประเมิน
+// API: รับข้อมูลแบบประเมินเบาหวาน คำนวณคะแนนความเสี่ยง แล้วบันทึกผลและคำตอบลงฐานข้อมูล
 export async function POST(
   request: Request,
 ) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน และความยินยอม
   const body =
     await readJsonObject(request);
 
@@ -817,11 +746,6 @@ export async function POST(
     );
   }
 
-  /* =====================================================
-     USER
-     ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
-  ===================================================== */
-
   const auth = requireUser(
     request,
     body.userId ?? body.user_id,
@@ -829,19 +753,14 @@ export async function POST(
 
   if (!auth.ok) return auth.response;
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(4);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(auth.userId);
   if (noConsent) return noConsent;
 
   const userId = auth.userId;
 
-  /* =====================================================
-     FAMILY
-  ===================================================== */
-
+  // ตรวจข้อมูลที่ส่งมา: ประวัติครอบครัว และค่าความดัน SBP/DBP
   if (
     typeof body.family_diabetes !==
     "boolean"
@@ -853,12 +772,6 @@ export async function POST(
 
   const familyDiabetes =
     body.family_diabetes;
-
-  /* =====================================================
-     BP
-     รับจากหน้า assessment (จำนวนเต็ม mmHg)
-     SBP 60-250, DBP 30-150 และตัวบนต้องสูงกว่าตัวล่าง
-  ===================================================== */
 
   const submittedSbp =
     toIntInRange(body.sbp, 60, 250);
@@ -899,11 +812,7 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       PROFILE
-       ข้อมูลไม่ครบ = ผู้ใช้ต้องไปกรอกก่อน (400 ไม่ใช่ 500)
-    ===================================================== */
-
+    // ดึง health_profile ของผู้ใช้ แล้วตรวจว่ามีข้อมูลร่างกายครบ
     const profileResult =
       await client.query<{
         profile: Record<
@@ -987,20 +896,13 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       USE BP FROM PAGE
-    ===================================================== */
-
     const systolic =
       submittedSbp;
 
     const diastolic =
       submittedDbp;
 
-    /* =====================================================
-       ASSESSMENT TYPE
-    ===================================================== */
-
+    // หา assessment_type_id และคำถามของแบบประเมินเบาหวานใน DB
     const typeResult =
       await client.query<{
         assessment_type_id: number;
@@ -1033,10 +935,6 @@ export async function POST(
       typeResult.rows[0]
         .assessment_type_id;
 
-    /* =====================================================
-       QUESTIONS
-    ===================================================== */
-
     const questionResult =
       await client.query<QuestionRow>(
         `
@@ -1067,10 +965,7 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       CALCULATE
-    ===================================================== */
-
+    // คำนวณคะแนนความเสี่ยงเบาหวาน และหาคำแนะนำตามระดับ
     const result =
       calculateDiabetesRisk(
         age,
@@ -1082,10 +977,6 @@ export async function POST(
         diastolic,
         familyDiabetes,
       );
-
-    /* =====================================================
-       RECOMMENDATION
-    ===================================================== */
 
     const recommendationResult =
       await client.query<{
@@ -1120,10 +1011,7 @@ export async function POST(
       recommendationResult.rows[0] ??
       null;
 
-    /* =====================================================
-       INSERT ASSESSMENT
-    ===================================================== */
-
+    // บันทึกผลลง assessment (ใน transaction)
     await client.query("BEGIN");
 
     const assessmentResult =
@@ -1168,11 +1056,7 @@ export async function POST(
       assessmentResult.rows[0]
         .assessment_id;
 
-    /* =====================================================
-       INSERT ANSWER
-    ===================================================== */
-
-    // บันทึกคำตอบหนึ่งข้อ (หาคำถามจากลำดับข้อ) ลง assessment_answers
+    // บันทึกคำตอบหนึ่งข้อ (หาคำถามจากลำดับข้อ) ลงตาราง assessment_answers
     async function insertAnswer(
       displayOrder: number,
       value: string,
@@ -1218,10 +1102,7 @@ export async function POST(
       );
     }
 
-    /* =====================================================
-       SAVE 8 ANSWERS
-    ===================================================== */
-
+    // บันทึกคำตอบทุกข้อ (อายุ เพศ ส่วนสูง น้ำหนัก รอบเอว ความดัน ประวัติครอบครัว)
     await insertAnswer(
       1,
       String(
@@ -1272,18 +1153,10 @@ export async function POST(
         : "ไม่มี",
     );
 
-    /* =====================================================
-       COMMIT
-    ===================================================== */
-
+    // commit ผูกเวอร์ชันแบบประเมิน แล้วคืนผลลัพธ์
     await client.query("COMMIT");
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId: userId, typeId: assessmentTypeId, assessmentId: assessmentId });
-
-    /* =====================================================
-       RESPONSE
-    ===================================================== */
 
     return NextResponse.json(
       {
@@ -1342,6 +1215,7 @@ export async function POST(
       },
     );
   } catch (error) {
+    // จัดการ error → บันทึก log, rollback และคืน 500
     void logSystemError("POST /api/assessments/diabetes", error);
     try {
       await client.query(

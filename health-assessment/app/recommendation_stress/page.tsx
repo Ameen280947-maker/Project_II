@@ -12,15 +12,13 @@ import RecommendationLayout, {
     type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้า ใช้กับคอมโพเนนต์แสดงผลประเมิน
 const TONE = "blue";
 
-// คะแนนเต็มแบบประเมิน ST-5
+// คะแนนเต็มของแบบประเมินความเครียด ST-5
 const MAX_SCORE = 15;
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ผลประเมินความเครียดจาก API พร้อมคำแนะนำตามระดับ
 type AssessmentData = {
     id: number;
     score: number;
@@ -38,10 +36,7 @@ type AssessmentData = {
     };
 };
 
-/* =========================================================
-   สีป้ายระดับความเครียด
-========================================================= */
-
+// แปลงระดับความเครียด (ข้อความไทย) เป็นสีสำหรับแสดงผล
 function getRiskColor(level: string): RiskColor {
     if (level === "เครียดน้อย") return "green";
     if (level === "เครียดปานกลาง") return "yellow";
@@ -49,17 +44,15 @@ function getRiskColor(level: string): RiskColor {
     return "red";
 }
 
-/* =========================================================
-   CONTENT
-========================================================= */
-
-// เนื้อหาหน้าผลความเครียด: โหลดผลตาม assessmentId แล้วแสดงระดับและคำแนะนำ
+// เนื้อหาหน้า: แสดงคะแนนความเครียด ระดับความเครียด และคำแนะนำตาม assessmentId
+// คะแนน ≥8 แสดงกล่องเตือนให้พบแพทย์ (≥10 ต้องพบทันที) พร้อมปุ่มโทรสายด่วน 1323
 function StressRecommendationContent() {
     const searchParams = useSearchParams();
     const router = useRouter();
 
     const assessmentId = searchParams.get("assessmentId");
 
+    // state ของหน้า: ผลประเมิน สถานะโหลด และ error
     const [data, setData] =
         useState<AssessmentData | null>(null);
 
@@ -69,12 +62,9 @@ function StressRecommendationContent() {
     const [error, setError] =
         useState("");
 
-    /* =======================================================
-       LOAD RESULT
-    ======================================================= */
-
+    // โหลดผลประเมินจาก API ตอนเปิดหน้า
     useEffect(() => {
-        // โหลดผลประเมินความเครียดตาม assessmentId จาก API
+        // ดึงผลประเมินจาก /api/assessments/stress (401 → ลบ userId แล้วไปหน้า login)
         const loadResult = async () => {
             if (!assessmentId) {
                 setError("ไม่พบ assessmentId");
@@ -93,7 +83,6 @@ function StressRecommendationContent() {
                     },
                 );
 
-                // session หมดอายุ → กลับไปหน้า login
                 if (response.status === 401) {
                     localStorage.removeItem("userId");
                     router.replace("/login");
@@ -129,6 +118,7 @@ function StressRecommendationContent() {
         loadResult();
     }, [assessmentId, router]);
 
+    // สถานะกำลังโหลด / error
     if (loading) {
         return <RecommendationLoading tone={TONE} />;
     }
@@ -143,12 +133,7 @@ function StressRecommendationContent() {
         );
     }
 
-    /* =======================================================
-       ช่องทางช่วยเหลือ (ตามเกณฑ์ ST-5 กรมสุขภาพจิต)
-       8-9  เครียดมาก     → ควรพบแพทย์ภายใน 2 สัปดาห์
-       10-15 เครียดมากที่สุด → ต้องพบแพทย์ทันที
-    ======================================================= */
-
+    // ค่าที่คำนวณสำหรับแสดงผล (ต้องพบแพทย์เมื่อ ≥8, รุนแรงเมื่อ ≥10, รายการคำแนะนำ)
     const score = Number(data.score);
     const needsHelp = score >= 8;
     const isSevere = score >= 10;
@@ -156,10 +141,7 @@ function StressRecommendationContent() {
     const t = RECOMMENDATION_TONES[TONE];
     const adviceList = data.recommendation?.recommendations ?? [];
 
-    /* =======================================================
-       PAGE
-    ======================================================= */
-
+    // ส่วนแสดงผล: วงคะแนน ระดับความเครียด และคำอธิบาย
     return (
         <RecommendationLayout
             tone={TONE}
@@ -186,10 +168,8 @@ function StressRecommendationContent() {
             menuHref="/assessment-menu-mental-health"
             disclaimer="ผลการประเมินนี้เป็นการคัดกรองเบื้องต้น ไม่ใช่การวินิจฉัยทางการแพทย์ หากมีความเครียดสูงหรือมีอาการที่ส่งผลกระทบต่อการใช้ชีวิต ควรปรึกษาผู้เชี่ยวชาญด้านสุขภาพ"
         >
-            {/* =================================================
-               HELP BOX (คะแนน 8 ขึ้นไป) — สีแดงตามความหมายฉุกเฉิน
-            ================================================= */}
 
+            {/* กล่องเตือนให้พบแพทย์ + ปุ่มโทร 1323 (คะแนน ≥8) */}
             {needsHelp && (
                 <div className="mt-8 rounded-[25px] border border-[#f4c9c2] bg-[#fff0ed] px-6 py-5">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
@@ -226,10 +206,7 @@ function StressRecommendationContent() {
                 </div>
             )}
 
-            {/* =================================================
-               แนวทางจัดการความเครียด (รายการจากฐานข้อมูล)
-            ================================================= */}
-
+            {/* รายการคำแนะนำตามระดับความเครียด */}
             <RecommendationSection
                 icon={
                     <div className={`grid h-11 w-11 place-items-center rounded-full ${t.iconSoft}`}>
@@ -268,11 +245,7 @@ function StressRecommendationContent() {
     );
 }
 
-/* =========================================================
-   PAGE
-   Suspense Boundary สำหรับ useSearchParams()
-========================================================= */
-
+// หน้า: ผลประเมินความเครียด ครอบด้วย Suspense
 export default function StressRecommendationPage() {
     return (
         <Suspense fallback={<RecommendationLoading tone={TONE} />}>

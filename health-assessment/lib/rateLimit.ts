@@ -1,18 +1,10 @@
-/* =========================================================
-   Rate limit แบบง่าย (นับใน memory ด้วย Map)
-
-   ข้อจำกัด (ยอมรับได้สำหรับโปรเจกต์นี้):
-   - ค่าจะหายเมื่อรีสตาร์ต server
-   - นับแยกต่อ process ถ้า deploy หลาย instance แต่ละตัวนับของตัวเอง
-   ถ้าต้องการให้แม่นยำ ควรย้ายไปเก็บใน DB หรือ Redis
-========================================================= */
-
+// ตัวนับของ key หนึ่ง: จำนวนครั้ง และเวลาที่จะรีเซ็ต
 type Bucket = {
   count: number;
-  resetAt: number; // ms
+  resetAt: number;
 };
 
-// ตัวนับจำนวนครั้งต่อ key ในช่วงเวลาคงที่ (fixed window) เก็บใน memory
+// ตัวจำกัดจำนวนครั้งแบบ fixed window (เก็บในหน่วยความจำ) เช่น จำกัดการขอ OTP
 export class FixedWindowCounter {
   private buckets = new Map<string, Bucket>();
 
@@ -21,7 +13,7 @@ export class FixedWindowCounter {
     private readonly windowMs: number,
   ) {}
 
-  // คืน bucket ของ key ที่ยังไม่หมดเวลา (หมดเวลาแล้วจะลบทิ้งและคืน null)
+  // คืน bucket ปัจจุบันของ key ถ้ายังไม่หมดเวลา (หมดแล้วลบทิ้งและคืน null)
   private current(key: string, now = Date.now()) {
     const bucket = this.buckets.get(key);
     if (!bucket || bucket.resetAt <= now) {
@@ -31,13 +23,13 @@ export class FixedWindowCounter {
     return bucket;
   }
 
-  /** ครบโควตาแล้วหรือยัง (ไม่เพิ่มจำนวน) */
+  // ตรวจว่า key นี้ใช้ครบจำนวนครั้งที่กำหนดในช่วงเวลานี้แล้วหรือยัง
   isLimited(key: string) {
     const bucket = this.current(key);
     return bucket !== null && bucket.count >= this.limit;
   }
 
-  /** เพิ่มจำนวน 1 ครั้ง คืนค่าจำนวนล่าสุดในรอบนี้ */
+  // นับเพิ่มหนึ่งครั้งให้ key (เริ่มช่วงเวลาใหม่ถ้ายังไม่มี) แล้วคืนจำนวนครั้งล่าสุด
   hit(key: string) {
     const now = Date.now();
     this.prune(now);
@@ -52,12 +44,12 @@ export class FixedWindowCounter {
     return 1;
   }
 
-  // ล้างตัวนับของ key นี้ (เริ่มนับใหม่)
+  // ล้างตัวนับของ key
   reset(key: string) {
     this.buckets.delete(key);
   }
 
-  // ล้างรายการที่หมดเวลาแล้ว กัน Map โตไม่หยุด
+  // ลบ bucket ที่หมดเวลาแล้วเมื่อมีจำนวนมากเกิน 1000 เพื่อไม่ให้หน่วยความจำโต
   private prune(now: number) {
     if (this.buckets.size < 1000) return;
     for (const [key, bucket] of this.buckets) {
@@ -66,9 +58,7 @@ export class FixedWindowCounter {
   }
 }
 
-/* ---------- ตัวนับที่ใช้ร่วมกันระหว่าง route ---------- */
-
-// เก็บไว้ที่ globalThis เพื่อไม่ให้รีเซ็ตตอน dev server โหลดโมดูลใหม่
+// เก็บตัวจำกัดไว้ใน global ให้คงอยู่ข้าม hot reload
 declare global {
   var otpRateLimits:
     | {
@@ -78,10 +68,8 @@ declare global {
     | undefined;
 }
 
-// ตัวนับ rate limit ของระบบ OTP (ขอ OTP / กรอก OTP ผิด) ใช้ร่วมกันทุก route
+// ขอ OTP ได้ 3 ครั้ง/15 นาที และกรอก OTP ผิดได้ 5 ครั้ง/10 นาที
 export const otpRateLimits = (globalThis.otpRateLimits ??= {
-  // ขอ OTP ได้สูงสุด 3 ครั้ง / อีเมล / 15 นาที
   forgotPassword: new FixedWindowCounter(3, 15 * 60 * 1000),
-  // กรอก OTP ผิดได้สูงสุด 5 ครั้ง / อีเมล / 10 นาที
   verifyOtpFailures: new FixedWindowCounter(5, 10 * 60 * 1000),
 });

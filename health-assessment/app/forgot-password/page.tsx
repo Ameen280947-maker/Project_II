@@ -11,15 +11,17 @@ import {
 } from "lucide-react";
 import { FormEvent, useState } from "react";
 
+// รูปแบบ response จาก API /api/auth/forgot-password
 type ForgotPasswordResponse = {
   success: boolean;
   message?: string;
 };
 
-// หน้าลืมรหัสผ่าน: กรอกอีเมลเพื่อรับรหัส OTP
+// หน้า: ลืมรหัสผ่าน กรอกอีเมลเพื่อขอรหัส OTP สำหรับตั้งรหัสผ่านใหม่
 export default function ForgotPasswordPage() {
   const router = useRouter();
 
+  // state ของฟอร์ม: อีเมลที่กรอก อีเมลที่ส่งสำเร็จ สถานะโหลด ข้อความผิดพลาด/สำเร็จ
   const [email, setEmail] = useState("");
   const [submittedEmail, setSubmittedEmail] = useState("");
 
@@ -28,11 +30,7 @@ export default function ForgotPasswordPage() {
   const [success, setSuccess] = useState(false);
   const [message, setMessage] = useState("");
 
-  /* =========================================================
-     SUBMIT EMAIL
-  ========================================================= */
-
-  // ตรวจรูปแบบอีเมลแล้วขอส่งรหัส OTP ไปที่อีเมลนั้น
+  // ตรวจรูปแบบอีเมลแล้ว POST /api/auth/forgot-password เพื่อขอ OTP แสดงผลสำเร็จ/ผิดพลาด
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
@@ -43,11 +41,10 @@ export default function ForgotPasswordPage() {
       setError("");
       setMessage("");
 
+      // ตรวจข้อมูลอีเมล (ไม่ว่างและรูปแบบถูกต้อง)
       const normalizedEmail = email
         .trim()
         .toLowerCase();
-
-      /* ================= Validation ================= */
 
       if (!normalizedEmail) {
         throw new Error(
@@ -68,10 +65,7 @@ export default function ForgotPasswordPage() {
         );
       }
 
-      /* =====================================================
-         POST /api/auth/forgot-password
-      ===================================================== */
-
+      // ส่งคำขอ OTP ไปที่ API
       const response = await fetch(
         "/api/auth/forgot-password",
         {
@@ -101,13 +95,7 @@ export default function ForgotPasswordPage() {
         );
       }
 
-      /* =====================================================
-         สำเร็จ
-
-         เก็บ email ที่ส่ง OTP ไปแล้ว
-         เพื่อใช้ส่งต่อไปหน้า verify-otp
-      ===================================================== */
-
+      // สำเร็จ → จำอีเมลและสลับไปหน้าแจ้งผล
       setSubmittedEmail(
         normalizedEmail,
       );
@@ -134,10 +122,7 @@ export default function ForgotPasswordPage() {
     }
   };
 
-  /* =========================================================
-     ไปหน้า Verify OTP
-  ========================================================= */
-
+  // ไปหน้า /verify-otp พร้อมส่งอีเมลที่ขอ OTP ไว้ทาง query
   const goToVerifyOtp = () => {
     if (!submittedEmail) {
       setError(
@@ -156,10 +141,7 @@ export default function ForgotPasswordPage() {
     );
   };
 
-  /* =========================================================
-     ใช้อีเมลอื่น
-  ========================================================= */
-
+  // ล้างฟอร์มและสถานะ เพื่อกรอกอีเมลอื่นใหม่
   const useAnotherEmail = () => {
     setSuccess(false);
     setMessage("");
@@ -168,17 +150,9 @@ export default function ForgotPasswordPage() {
     setEmail("");
   };
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
   return (
     <main className="min-h-screen overflow-hidden bg-[#fbf9f9] text-[#2f3037]">
       <div className="relative flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
-
-        {/* =====================================================
-            Background Decoration
-        ===================================================== */}
 
         <div className="pointer-events-none absolute left-[-120px] top-[-120px] h-[350px] w-[350px] rounded-full bg-[#fff0f2] blur-3xl" />
 
@@ -188,19 +162,10 @@ export default function ForgotPasswordPage() {
 
         <div className="pointer-events-none absolute bottom-[20%] right-[18%] h-2 w-2 rounded-full bg-[#d88c98]" />
 
-        {/* =====================================================
-            Main Container
-        ===================================================== */}
-
         <div className="relative z-10 grid w-full max-w-[1050px] overflow-hidden rounded-[36px] border border-[#eee5e6] bg-white shadow-[0_30px_80px_rgba(70,35,40,0.08)] lg:grid-cols-[1fr_520px]">
 
-          {/* =================================================
-              LEFT SIDE
-          ================================================== */}
-
+          {/* แผงซ้าย (จอใหญ่): ข้อความแนะนำและขั้นตอนรีเซ็ตรหัสผ่าน 3 ขั้น */}
           <section className="hidden bg-gradient-to-br from-[#fffafa] via-white to-[#fff2f4] p-12 lg:flex lg:flex-col lg:justify-center">
-
-            {/* Logo */}
 
             <div className="grid h-20 w-20 place-items-center rounded-[25px] bg-white text-[#b91c2b] shadow-[0_15px_35px_rgba(185,28,43,0.12)]">
               <HeartPulse
@@ -226,8 +191,6 @@ export default function ForgotPasswordPage() {
               ระบบจะตรวจสอบบัญชีและส่งขั้นตอนสำหรับตั้งรหัสผ่านใหม่ให้คุณ
             </p>
 
-            {/* Steps */}
-
             <div className="mt-10 space-y-5">
 
               <Step
@@ -252,13 +215,8 @@ export default function ForgotPasswordPage() {
 
           </section>
 
-          {/* =================================================
-              RIGHT SIDE
-          ================================================== */}
-
+          {/* แผงขวา: ฟอร์มกรอกอีเมล หรือหน้าส่งสำเร็จ */}
           <section className="flex min-h-[620px] flex-col justify-center p-7 sm:p-10 lg:p-12">
-
-            {/* Back */}
 
             <Link
               href="/login"
@@ -271,10 +229,7 @@ export default function ForgotPasswordPage() {
               กลับไปหน้าเข้าสู่ระบบ
             </Link>
 
-            {/* =================================================
-                SUCCESS STATE
-            ================================================== */}
-
+            {/* ส่งสำเร็จ → แสดงอีเมลและปุ่มไปกรอก OTP, ยังไม่ส่ง → แสดงฟอร์ม */}
             {success ? (
               <div className="text-center">
 
@@ -305,12 +260,6 @@ export default function ForgotPasswordPage() {
 
                 </div>
 
-                {/* =================================================
-                    สำคัญ:
-                    จากเดิมกลับ /login
-                    เปลี่ยนเป็น /verify-otp
-                ================================================== */}
-
                 <button
                   type="button"
                   onClick={goToVerifyOtp}
@@ -335,9 +284,6 @@ export default function ForgotPasswordPage() {
 
               </div>
             ) : (
-              /* =================================================
-                  FORM STATE
-              ================================================== */
 
               <>
 
@@ -357,14 +303,13 @@ export default function ForgotPasswordPage() {
                   เพื่อดำเนินการตั้งรหัสผ่านใหม่
                 </p>
 
+                {/* ฟอร์มกรอกอีเมล ข้อความผิดพลาด และปุ่มส่ง */}
                 <form
                   onSubmit={
                     handleSubmit
                   }
                   className="mt-9"
                 >
-
-                  {/* ================= Email ================= */}
 
                   <label className="block">
 
@@ -406,15 +351,11 @@ export default function ForgotPasswordPage() {
 
                   </label>
 
-                  {/* ================= Error ================= */}
-
                   {error && (
                     <div className="mt-5 rounded-2xl border border-[#f2d3d7] bg-[#fff0f2] px-4 py-3 text-sm font-medium text-[#b91c2b]">
                       {error}
                     </div>
                   )}
-
-                  {/* ================= Submit ================= */}
 
                   <button
                     type="submit"
@@ -439,8 +380,7 @@ export default function ForgotPasswordPage() {
 
                 </form>
 
-                {/* Divider */}
-
+                {/* เส้นคั่น และลิงก์กลับไปเข้าสู่ระบบ */}
                 <div className="my-8 flex items-center gap-4">
 
                   <div className="h-px flex-1 bg-[#eee8e9]" />
@@ -452,8 +392,6 @@ export default function ForgotPasswordPage() {
                   <div className="h-px flex-1 bg-[#eee8e9]" />
 
                 </div>
-
-                {/* Login */}
 
                 <p className="text-center text-sm text-[#7b7c84]">
                   จำรหัสผ่านได้แล้ว?{" "}
@@ -478,11 +416,7 @@ export default function ForgotPasswordPage() {
   );
 }
 
-/* =========================================================
-   STEP COMPONENT
-========================================================= */
-
-// แสดงขั้นตอนหนึ่งขั้น: หมายเลข หัวข้อ และคำอธิบาย
+// แสดงขั้นตอนหนึ่งขั้นของการรีเซ็ตรหัสผ่าน (หมายเลข หัวข้อ คำอธิบาย)
 function Step({
   number,
   title,

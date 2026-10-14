@@ -1,16 +1,17 @@
 import { Pool, types } from "pg";
 
-// ฐานข้อมูลตั้ง TimeZone = UTC และคอลัมน์เวลาเป็น timestamp without time zone
-// ค่าที่ NOW() บันทึกจึงเป็นเวลา UTC ต้องอ่านเป็น UTC ไม่งั้นเวลาจะเพี้ยน 7 ชั่วโมง
+// ให้คอลัมน์ TIMESTAMP (ไม่มี timezone) ถูกอ่านเป็นเวลา UTC
 types.setTypeParser(
   types.builtins.TIMESTAMP,
   (value) => new Date(`${value.replace(" ", "T")}Z`),
 );
 
+// เก็บ pool ไว้ใน global เพื่อไม่สร้างซ้ำตอน hot reload
 declare global {
   var postgresPool: Pool | undefined;
 }
 
+// อ่าน DATABASE_URL จาก env ถ้าไม่มีให้หยุดทำงานทันที
 const connectionString = process.env.DATABASE_URL;
 
 if (!connectionString) {
@@ -19,11 +20,11 @@ if (!connectionString) {
   );
 }
 
+// connection pool ของ PostgreSQL (สูงสุด 5 การเชื่อมต่อต่อแอป)
 const pool =
   global.postgresPool ??
   new Pool({
     connectionString,
-    // Supabase session pooler รับได้รวม 15 ช่องทั้งทีม → แอปละไม่เกิน 5 ให้ 2–3 คนรันพร้อมกันได้
     max: 5,
     idleTimeoutMillis: 30_000,
     connectionTimeoutMillis: 5_000,
@@ -33,6 +34,7 @@ if (process.env.NODE_ENV !== "production") {
   global.postgresPool = pool;
 }
 
+// log error ของ connection ที่ว่างอยู่ ไม่ให้แอปล่ม
 pool.on("error", (error) => {
   console.error("PostgreSQL pool error:", error);
 });

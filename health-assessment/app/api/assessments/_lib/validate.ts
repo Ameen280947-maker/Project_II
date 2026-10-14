@@ -1,24 +1,15 @@
 import { NextResponse } from "next/server";
 import type { Pool, PoolClient } from "pg";
 
-/* =========================================================
-   ตัวช่วยตรวจข้อมูลที่ใช้ร่วมกันใน /api/assessments/*
-
-   - ไฟล์นี้ไม่ import pool เพื่อให้ทดสอบฟังก์ชันคำนวณแบบ offline ได้
-   - คะแนนคิดจาก question_choices ในฐานข้อมูลเสมอ
-     ไม่เชื่อคะแนนที่หน้าเว็บส่งมา
-========================================================= */
-
+// ตัวเชื่อมต่อ DB: pool หรือ client ใน transaction
 type Db = Pool | PoolClient;
 
-// สร้าง response JSON แจ้งข้อผิดพลาด (ค่าเริ่มต้น status 400)
+// สร้าง response JSON แจ้งข้อผิดพลาด (ค่าเริ่มต้น 400) พร้อมข้อความ
 export function badRequest(message: string, status = 400) {
   return NextResponse.json({ success: false, message }, { status });
 }
 
-/* ---------- อ่าน body ---------- */
-
-// JSON เสีย หรือไม่ใช่ object → null (ให้ route ตอบ 400 แทน 500)
+// อ่าน body ของ request เป็น JSON object คืน null ถ้า parse ไม่ได้หรือไม่ใช่ object
 export async function readJsonObject(
   request: Request,
 ): Promise<Record<string, unknown> | null> {
@@ -32,9 +23,7 @@ export async function readJsonObject(
   }
 }
 
-/* ---------- ตรวจตัวเลข ---------- */
-
-// รับเฉพาะตัวเลขหรือข้อความตัวเลข (ไม่รับ true/false/""/null ที่ Number() แปลงเป็น 0/1)
+// แปลงค่า number/string เป็นตัวเลขที่ finite คืน null ถ้าแปลงไม่ได้
 function toNumber(value: unknown): number | null {
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
   if (typeof value === "string" && value.trim() !== "") {
@@ -44,44 +33,39 @@ function toNumber(value: unknown): number | null {
   return null;
 }
 
-// จำนวนเต็มในช่วง [min, max] ไม่งั้น null (ทศนิยมไม่ผ่าน)
+// แปลงเป็นจำนวนเต็มที่อยู่ในช่วง min–max ไม่งั้นคืน null
 export function toIntInRange(value: unknown, min: number, max: number): number | null {
   const n = toNumber(value);
   return n !== null && Number.isInteger(n) && n >= min && n <= max ? n : null;
 }
 
-// ตัวเลข (มีทศนิยมได้) ในช่วง [min, max] ไม่งั้น null
+// แปลงเป็นตัวเลข (ทศนิยมได้) ที่อยู่ในช่วง min–max ไม่งั้นคืน null
 export function toNumberInRange(value: unknown, min: number, max: number): number | null {
   const n = toNumber(value);
   return n !== null && n >= min && n <= max ? n : null;
 }
 
-// id ในฐานข้อมูล (จำนวนเต็มบวก)
+// แปลงเป็น ID จำนวนเต็มบวก ไม่งั้นคืน null
 export function toId(value: unknown): number | null {
   return toIntInRange(value, 1, Number.MAX_SAFE_INTEGER);
 }
 
-/* ---------- ผู้ใช้ ---------- */
-
-// ตรวจว่ามีผู้ใช้ id นี้อยู่ในฐานข้อมูลหรือไม่
+// ตรวจว่ามีผู้ใช้ user_id นี้ในตาราง users หรือไม่
 export async function userExists(db: Db, userId: number) {
   const result = await db.query("SELECT 1 FROM users WHERE user_id = $1 LIMIT 1", [userId]);
   return (result.rowCount ?? 0) > 0;
 }
 
-/* =========================================================
-   คำตอบแบบเลือกตอบ
-========================================================= */
-
+// ตัวเลือกคำตอบหนึ่งแถวจาก DB พร้อมคะแนนและลำดับข้อ
 export type ChoiceRow = {
   choice_id: number;
   question_id: number;
   choice_text: string;
   score: number;
-  display_order: number; // ลำดับของ "คำถาม"
+  display_order: number;
 };
 
-// ตัวเลือกที่ใช้งานอยู่ของคำถามที่ใช้งานอยู่ในแบบประเมินนี้
+// ดึงตัวเลือกคำตอบที่ใช้งานอยู่ทั้งหมดของแบบประเมิน (question_choices + questions)
 export async function loadActiveChoices(db: Db, assessmentTypeId: number): Promise<ChoiceRow[]> {
   const { rows } = await db.query(
     `
@@ -110,23 +94,19 @@ export async function loadActiveChoices(db: Db, assessmentTypeId: number): Promi
   }));
 }
 
+// คำตอบที่ผู้ใช้ส่งมา (อ้างด้วย choiceId หรือ choiceText)
 export type SubmittedChoice = {
   questionId: unknown;
   choiceId?: unknown;
   choiceText?: unknown;
 };
 
+// ผลการตรวจคำตอบ: สำเร็จ (ตัวเลือกที่เลือก + คะแนนรวม) หรือข้อความ error
 export type ResolvedAnswers =
   | { ok: true; picked: ChoiceRow[]; total: number }
   | { ok: false; message: string };
 
-/*
-  จับคู่คำตอบกับตัวเลือกจริงในฐานข้อมูล แล้วรวมคะแนนจากฐานข้อมูล
-  - ถ้าส่ง choiceId มา ใช้ choiceId (ไม่งั้นใช้ choiceText ที่ตรงกันทุกตัวอักษร)
-  - ปฏิเสธ: คำถามของแบบประเมินอื่น, ตอบข้อเดียวกันซ้ำ, ตัวเลือกที่ไม่มีจริง
-  - ต้องตอบครบทุกคำถามที่ใช้งานอยู่ ยกเว้นข้อใน skippedIds (ข้อที่ถูกข้ามตามเงื่อนไข)
-  picked เรียงตามลำดับคำถาม
-*/
+// ตรวจคำตอบที่ส่งมาให้ตรงกับตัวเลือกในฐานข้อมูล ครบทุกข้อและไม่ซ้ำ แล้วรวมคะแนน
 export function resolveChoiceAnswers(
   choices: ChoiceRow[],
   submitted: SubmittedChoice[],
@@ -140,6 +120,7 @@ export function resolveChoiceAnswers(
     return { ok: false, message: "ไม่พบคำถามของแบบประเมินนี้" };
   }
 
+  // ตรวจคำตอบทีละข้อ: questionId ถูกต้อง ไม่ซ้ำ และตัวเลือกมีอยู่จริง
   const picked = new Map<number, ChoiceRow>();
 
   for (const item of submitted) {
@@ -181,6 +162,7 @@ export function resolveChoiceAnswers(
     picked.set(questionId, choice);
   }
 
+  // ต้องตอบครบทุกข้อ แล้วเรียงตามลำดับข้อและรวมคะแนน
   if (picked.size !== requiredIds.size) {
     return { ok: false, message: "กรุณาตอบคำถามให้ครบทุกข้อ" };
   }

@@ -18,10 +18,7 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ตัวเลือกคำตอบหนึ่งรายการ พร้อมคะแนน
 type Choice = {
   choice_id: number;
   question_id: number;
@@ -29,6 +26,7 @@ type Choice = {
   score: number;
 };
 
+// คำถามหนึ่งข้อจาก API พร้อมตัวเลือก
 type Question = {
   question_id: number;
   question_text: string;
@@ -38,17 +36,14 @@ type Question = {
   choices: Choice[];
 };
 
-/* =========================================================
-   MAIN COMPONENT WITH SUSPENSE
-========================================================= */
-
-// เนื้อหาแบบประเมินซึมเศร้า 9Q: โหลดคำถาม ให้เลือกคำตอบ แล้วส่งผล
+// เนื้อหาหน้าแบบประเมินซึมเศร้า 9Q (อ่าน previousAssessmentId จาก query string)
 function Depression9QContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
   const previousAssessmentId = searchParams.get("previousAssessmentId");
 
+  // state ของหน้า: คำถาม คำตอบ สถานะโหลด/ส่ง error และ userId
   const [questions, setQuestions] = useState<Question[]>([]);
   const [answers, setAnswers] = useState<Record<number, number>>({});
 
@@ -57,12 +52,13 @@ function Depression9QContent() {
   const [error, setError] = useState("");
   const [userId, setUserId] = useState<string | null>(null);
 
+  // อ่าน userId และโหลดคำถาม 9Q ตอนเปิดหน้า
   useEffect(() => {
     if (typeof window !== "undefined") {
       setUserId(localStorage.getItem("userId"));
     }
 
-    // โหลดคำถาม 9Q จาก API
+    // โหลดคำถาม 9Q จาก GET /api/assessments/depression?stage=9q
     async function loadQuestions() {
       try {
         setLoading(true);
@@ -91,7 +87,7 @@ function Depression9QContent() {
     loadQuestions();
   }, []);
 
-  // บันทึก choiceId ที่ผู้ใช้เลือกของข้อนั้น
+  // บันทึกตัวเลือกที่ผู้ใช้เลือกของแต่ละข้อลง state
   function selectAnswer(questionId: number, choiceId: number) {
     setAnswers((prev) => ({
       ...prev,
@@ -100,10 +96,11 @@ function Depression9QContent() {
     setError("");
   }
 
-  // ตรวจว่าตอบครบ (ไม่ครบเลื่อนไปข้อแรกที่ขาด) แล้ว POST ผล 9Q และพาไปหน้าถัดไป
+  // ตรวจว่าตอบครบทุกข้อ ส่ง POST /api/assessments/depression แล้วพาไปหน้าผลลัพธ์
   async function submitAssessment() {
     setError("");
 
+    // ตรวจว่าตอบครบ ถ้าไม่ครบเลื่อนจอไปข้อแรกที่ยังไม่ตอบ
     const unanswered = questions.filter(
       (question) =>
         question.is_required && answers[question.question_id] === undefined
@@ -111,7 +108,6 @@ function Depression9QContent() {
 
     if (unanswered.length > 0) {
       setError(`กรุณาตอบคำถามให้ครบถ้วน (ยังขาดอีก ${unanswered.length} ข้อ)`);
-      // Scroll to first unanswered question
       const firstUnansweredId = unanswered[0].question_id;
       const el = document.getElementById(`q-${firstUnansweredId}`);
       if (el) {
@@ -120,6 +116,7 @@ function Depression9QContent() {
       return;
     }
 
+    // ตรวจ userId
     const activeUserId =
       userId || (typeof window !== "undefined" ? localStorage.getItem("userId") : null);
 
@@ -131,6 +128,7 @@ function Depression9QContent() {
     try {
       setSubmitting(true);
 
+      // ส่งคำตอบ stage 9q (ผูกกับผล 2Q เดิม) ไปบันทึกที่ API
       const answerList = questions.map((question) => ({
         question_id: question.question_id,
         choice_id: answers[question.question_id],
@@ -157,6 +155,7 @@ function Depression9QContent() {
         throw new Error(data.error || "ไม่สามารถบันทึกผลการประเมินได้");
       }
 
+      // ไปหน้าถัดไปตาม next_path หรือหน้าคำแนะนำ 9Q
       if (data.next_path) {
         router.push(data.next_path);
       } else {
@@ -173,11 +172,13 @@ function Depression9QContent() {
     }
   }
 
+  // ค่าความคืบหน้าสำหรับแสดงผล (จำนวนข้อที่ตอบแล้ว)
   const answeredCount = Object.keys(answers).length;
   const progressPercent = questions.length
     ? Math.round((answeredCount / questions.length) * 100)
     : 0;
 
+  // หน้าระหว่างโหลดคำถาม
   if (loading) {
     return (
       <div className="flex min-h-screen bg-[#f8f9fb]">
@@ -201,7 +202,7 @@ function Depression9QContent() {
       <main className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
         <div className="mx-auto max-w-4xl">
 
-          {/* Header */}
+          {/* ส่วนหัว: ชื่อแบบประเมิน ปุ่มย้อนกลับ และคำชี้แจง */}
           <div className="mb-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -219,7 +220,6 @@ function Depression9QContent() {
                 </div>
               </div>
 
-              {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
               <HealthConsentNotice />
               <AssessmentBackLink
                 href={previousAssessmentId ? "/assessment_depression_2q" : "/assessment-menu-mental-health"}
@@ -238,7 +238,7 @@ function Depression9QContent() {
             <AssessmentSourceNote typeId={14} className="mt-2" />
           </div>
 
-          {/* Progress Bar */}
+          {/* แถบความคืบหน้าแบบติดด้านบน */}
           <div className="sticky top-4 z-10 mb-8 rounded-2xl border border-[#eee5e6] bg-white p-4 shadow-sm backdrop-blur-md">
             <div className="mb-2 flex items-center justify-between text-sm">
               <span className="font-semibold text-[#2f3037]">
@@ -257,7 +257,7 @@ function Depression9QContent() {
             </div>
           </div>
 
-          {/* Questions List */}
+          {/* รายการคำถามทั้ง 9 ข้อ (ข้อเกี่ยวกับการทำร้ายตนเองมีกรอบเตือน) */}
           <div className="space-y-6">
             {questions.map((question, index) => {
               const selected = answers[question.question_id];
@@ -363,7 +363,6 @@ function Depression9QContent() {
             })}
           </div>
 
-          {/* Error Banner */}
           {error && (
             <div className="mt-6 flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-medium text-red-600">
               <AlertTriangle size={18} className="shrink-0" />
@@ -371,7 +370,7 @@ function Depression9QContent() {
             </div>
           )}
 
-          {/* Bottom Action Bar */}
+          {/* ปุ่มย้อนกลับ และปุ่มส่งเพื่อดูผล */}
           <div className="mt-8 flex flex-wrap items-center justify-between gap-4 border-t border-[#eee5e6] pt-6">
             <Link
               href={
@@ -404,7 +403,7 @@ function Depression9QContent() {
             </button>
           </div>
 
-          {/* Hotline Information Box */}
+          {/* การ์ดสายด่วนสุขภาพจิต 1323 */}
           <div className="mt-8 flex items-start gap-4 rounded-2xl border border-[#eee5e6] bg-white p-5 text-sm shadow-sm">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600">
               <HeartHandshake size={22} />
@@ -423,7 +422,7 @@ function Depression9QContent() {
   );
 }
 
-// หน้าแบบประเมิน 9Q: ครอบเนื้อหาด้วย Suspense พร้อมไอคอนโหลด
+// หน้า: ห่อเนื้อหา 9Q ด้วย Suspense (เพราะใช้ useSearchParams) พร้อมตัวโหลด
 export default function Depression9QPage() {
   return (
     <Suspense

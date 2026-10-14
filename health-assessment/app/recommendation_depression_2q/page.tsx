@@ -12,13 +12,11 @@ import RecommendationLayout, {
   ScoreCircle,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้าและลิงก์กลับไปทำแบบประเมินใหม่
 const TONE = "violet";
 const EDIT_HREF = "/assessment_depression_2q";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// รูปแบบผลคัดกรอง 2Q จาก API (คะแนน ระดับ คำแนะนำ)
 type Result = {
   assessment_id: number;
   total_score: number;
@@ -27,19 +25,18 @@ type Result = {
   assessed_at: string;
 };
 
-/* =========================================================
-   COMPONENT CONTENT
-========================================================= */
-
-// เนื้อหาหน้าผล 2Q: โหลดผลตาม assessmentId แล้วแสดงผลคัดกรองและคำแนะนำ
+// เนื้อหาหน้า: แสดงผลคัดกรองซึมเศร้า 2Q และคำแนะนำ/ทางไปทำ 9Q
+// ถ้าคะแนน > 0 หรือมีแนวโน้ม จะแสดงกล่องชวนทำ 9Q ต่อ (ส่ง previousAssessmentId ไปด้วย)
 function Depression2QRecommendationContent() {
   const searchParams = useSearchParams();
   const assessmentId = searchParams.get("assessmentId");
 
+  // state ของหน้า: ผลประเมิน สถานะโหลด และ error
   const [result, setResult] = useState<Result | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
     if (!assessmentId) {
       setError("ไม่พบรหัสผลการประเมิน (Assessment ID)");
@@ -47,7 +44,7 @@ function Depression2QRecommendationContent() {
       return;
     }
 
-    // โหลดผลประเมิน 2Q ของผู้ใช้ตาม assessmentId จาก API
+    // ดึงผล 2Q จาก /api/assessments/depression?stage=2q (401 → ไปหน้า login)
     async function loadResult() {
       try {
         setLoading(true);
@@ -65,7 +62,6 @@ function Depression2QRecommendationContent() {
           }
         );
 
-        // session หมดอายุ → กลับไปหน้า login
         if (res.status === 401) {
           localStorage.removeItem("userId");
           window.location.replace("/login");
@@ -91,6 +87,7 @@ function Depression2QRecommendationContent() {
     loadResult();
   }, [assessmentId]);
 
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -99,6 +96,7 @@ function Depression2QRecommendationContent() {
     return <RecommendationError tone={TONE} message={error} editHref={EDIT_HREF} />;
   }
 
+  // ค่าที่คำนวณสำหรับแสดงผล (มีความเสี่ยงหรือไม่, คะแนน, ชุดสี)
   const isRisk =
     result.total_score > 0 ||
     result.risk_level.includes("เสี่ยง") ||
@@ -107,6 +105,7 @@ function Depression2QRecommendationContent() {
   const score = Number(result.total_score ?? 0);
   const t = RECOMMENDATION_TONES[TONE];
 
+  // ส่วนแสดงผล: วงคะแนน (เต็ม 2) ระดับ และคำแนะนำ
   return (
     <RecommendationLayout
       tone={TONE}
@@ -128,9 +127,7 @@ function Depression2QRecommendationContent() {
       editHref={EDIT_HREF}
       menuHref="/assessment-menu-mental-health"
     >
-      {/* =====================================================
-         มีแนวโน้มซึมเศร้า → ชวนทำแบบประเมิน 9Q ต่อทันที
-      ===================================================== */}
+      {/* กล่องขั้นตอนถัดไป: ชวนทำแบบประเมิน 9Q (แสดงเมื่อมีความเสี่ยง) */}
       {isRisk && (
         <section className={`mt-8 rounded-[28px] border-2 bg-gradient-to-br p-6 sm:p-8 ${t.panel}`}>
           <div className="flex flex-col items-start justify-between gap-5 sm:flex-row sm:items-center">
@@ -160,7 +157,7 @@ function Depression2QRecommendationContent() {
   );
 }
 
-// หน้าผลและคำแนะนำ 2Q: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลคัดกรองซึมเศร้า 2Q ครอบด้วย Suspense
 export default function Depression2QRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>

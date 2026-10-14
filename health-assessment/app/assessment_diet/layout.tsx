@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 
-// แบบประเมินอาหาร (assessment_type_id = 10) แจ้งผู้ใช้เมื่อ staff ปิดแบบประเมินนี้อยู่
+// เลย์เอาต์: ห่อหน้าประเมินพฤติกรรมการกินและแสดงประกาศเมื่อแบบประเมินถูกปิด
 export default function AssessmentDietLayout({ children }: { children: ReactNode }) {
   return (
     <>

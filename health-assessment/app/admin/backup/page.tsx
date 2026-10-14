@@ -13,10 +13,7 @@ import {
 } from "../components/AdminUI";
 import { adminFetch, adminHeaders, formatBytes, formatDateTime } from "../components/adminApi";
 
-/* =========================================================
-   หน้า: สำรองข้อมูล  (/admin/backup)
-========================================================= */
-
+// โครงข้อมูลหนึ่งแถวของประวัติการสำรอง (ตาราง backup_history)
 type Backup = {
   backup_id: number;
   file_name: string;
@@ -29,14 +26,15 @@ type Backup = {
   created_at: string;
 };
 
-// หน้าสำรองข้อมูลของแอดมิน: กดสร้างไฟล์สำรอง (ดาวน์โหลด JSON) และดูประวัติการสำรอง
+// หน้า Admin: สำรองข้อมูลฐานข้อมูลเป็นไฟล์ JSON และแสดงประวัติการสำรอง
 export default function AdminBackupPage() {
+  // state ของหน้า: ประวัติ สถานะโหลด/กำลังสำรอง และข้อความแจ้งเตือน
   const [history, setHistory] = useState<Backup[]>([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
 
-  // โหลดประวัติการสำรองข้อมูลจาก API
+  // ดึงประวัติการสำรองข้อมูลจาก API /api/admin/backup
   const load = useCallback(async () => {
     const res = await adminFetch<{ history: Backup[] }>("/api/admin/backup");
     if (res.success) setHistory(res.history);
@@ -44,11 +42,12 @@ export default function AdminBackupPage() {
     setLoading(false);
   }, []);
 
+  // โหลดประวัติการสำรองตอนเปิดหน้า
   useEffect(() => {
     load();
   }, [load]);
 
-  // สั่งสำรองข้อมูล แล้วดาวน์โหลดไฟล์ที่ได้ลงเครื่องทันที จากนั้นโหลดประวัติใหม่
+  // สั่งสำรองข้อมูลผ่าน API แล้วดาวน์โหลดไฟล์ backup ที่ได้ลงเครื่อง
   const runBackup = async () => {
     setRunning(true);
     setNotice(null);
@@ -89,12 +88,13 @@ export default function AdminBackupPage() {
         subtitle="ดาวน์โหลดข้อมูลในฐานข้อมูลเป็นไฟล์ JSON และดูประวัติการสำรอง"
       />
 
+      {/* ข้อความแจ้งผล และสถานะกำลังโหลด */}
       {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
       {loading ? (
         <LoadingBlock />
       ) : (
         <div className="grid gap-6 lg:grid-cols-5">
-          {/* สร้าง backup */}
+          {/* การ์ดปุ่มสั่งสำรองข้อมูลและคำเตือน */}
           <Card className="lg:col-span-2">
             <h2 className="text-lg font-bold">สำรองข้อมูลทั้งหมด</h2>
             <p className="mt-1 text-sm text-[#64748b]">
@@ -112,7 +112,7 @@ export default function AdminBackupPage() {
             </div>
           </Card>
 
-          {/* ประวัติ */}
+          {/* การ์ดรายการประวัติการสำรองข้อมูล */}
           <Card className="overflow-hidden p-0 lg:col-span-3">
             <div className="flex items-center justify-between p-6 pb-3">
               <h2 className="text-lg font-bold">ประวัติการสำรองข้อมูล</h2>

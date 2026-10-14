@@ -21,10 +21,7 @@ import {
 } from "./components/AdminUI";
 import { adminFetch, formatDateTime } from "./components/adminApi";
 
-/* =========================================================
-   หน้า: ตรวจสอบระบบ  (/admin)
-========================================================= */
-
+// ข้อมูลผลตรวจระบบที่ได้จาก API /api/admin/system
 type SystemData = {
   checkedAt: string;
   overall: Status;
@@ -38,19 +35,21 @@ type SystemData = {
   };
 };
 
+// ชื่อแสดงผลของแต่ละ role
 const ROLE_LABEL: Record<string, string> = {
   user: "ผู้ทำแบบประเมิน",
   staff: "Staff",
   system_admin: "System Admin",
 };
 
-// หน้าตรวจสอบระบบของแอดมิน: สถานะส่วนต่าง ๆ ของระบบและสถิติภาพรวม
+// หน้า Admin หลัก: แสดงสถานะสุขภาพของระบบ ฐานข้อมูล และสถิติผู้ใช้
 export default function AdminSystemPage() {
+  // state ของหน้า: ผลตรวจระบบ สถานะโหลด และข้อความ error
   const [data, setData] = useState<SystemData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  // โหลดผลตรวจสอบระบบและสถิติจาก API
+  // ดึงผลตรวจสอบระบบจาก API /api/admin/system
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
@@ -60,10 +59,12 @@ export default function AdminSystemPage() {
     setLoading(false);
   }, []);
 
+  // ตรวจระบบตอนเปิดหน้า
   useEffect(() => {
     load();
   }, [load]);
 
+  // ข้อความสรุปตามสถานะรวมของระบบ
   const overallText: Record<Status, string> = {
     ok: "ระบบทำงานปกติทุกส่วน",
     warning: "ระบบทำงานได้ แต่มีบางส่วนที่ควรตรวจสอบ",
@@ -83,12 +84,13 @@ export default function AdminSystemPage() {
         }
       />
 
+      {/* ข้อความ error และสถานะกำลังโหลดครั้งแรก */}
       {error && <Notice kind="error">{error}</Notice>}
       {loading && !data && <LoadingBlock />}
 
       {data && (
         <div className="space-y-6">
-          {/* สถานะรวม */}
+          {/* แถบสรุปสถานะรวม (สีเปลี่ยนตาม ok/warning/error) */}
           <div
             className={`flex flex-col gap-2 rounded-3xl p-6 text-white sm:flex-row sm:items-center sm:justify-between ${
               data.overall === "ok"
@@ -105,7 +107,7 @@ export default function AdminSystemPage() {
             <p className="text-sm text-blue-100">ตรวจล่าสุด {formatDateTime(data.checkedAt)}</p>
           </div>
 
-          {/* สถิติ */}
+          {/* การ์ดสถิติ: ผู้ใช้ การประเมิน ข้อผิดพลาดค้าง และสำรองล่าสุด */}
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard icon={<UsersRound size={22} />} label="ผู้ใช้ทั้งหมด" value={data.stats.totalUsers} />
             <StatCard
@@ -123,7 +125,7 @@ export default function AdminSystemPage() {
           </div>
 
           <div className="grid gap-6 lg:grid-cols-3 [&>*]:min-w-0">
-            {/* รายการตรวจ */}
+            {/* รายการผลตรวจแต่ละส่วนของระบบ */}
             <Card className="min-w-0 lg:col-span-2">
               <h2 className="mb-4 text-lg font-bold">ผลการตรวจสอบ</h2>
               <ul className="divide-y divide-[#eef1f7]">
@@ -139,8 +141,8 @@ export default function AdminSystemPage() {
               </ul>
             </Card>
 
+            {/* การ์ดจำนวนผู้ใช้แยกตามบทบาท พร้อมแถบสัดส่วน */}
             <div className="min-w-0 space-y-6">
-              {/* ผู้ใช้ตามบทบาท */}
               <Card>
                 <h2 className="mb-4 text-lg font-bold">ผู้ใช้ตามบทบาท</h2>
                 <div className="space-y-3">

@@ -12,10 +12,7 @@ import {
 } from "../components/AdminUI";
 import { adminFetch, formatDateTime } from "../components/adminApi";
 
-/* =========================================================
-   หน้า: แก้ไขข้อผิดพลาด  (/admin/errors)
-========================================================= */
-
+// โครงข้อมูล error log หนึ่งรายการ (ตาราง system_error_logs)
 type Log = {
   log_id: number;
   source: string;
@@ -29,8 +26,10 @@ type Log = {
   created_at: string;
 };
 
+// แท็บกรองตามสถานะ
 type Tab = "open" | "resolved" | "ignored" | "all";
 
+// รายการแท็บและชื่อที่แสดง
 const TABS: { key: Tab; label: string }[] = [
   { key: "open", label: "ยังไม่แก้ไข" },
   { key: "resolved", label: "แก้ไขแล้ว" },
@@ -38,14 +37,16 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
 ];
 
+// สีป้ายตามระดับความรุนแรงของ log
 const LEVEL_STYLE = {
   error: "bg-[#fdecec] text-[#b91c1c]",
   warning: "bg-[#fef5e2] text-[#b45309]",
   info: "bg-[#e8eefc] text-[#1e3a8a]",
 };
 
-// หน้าจัดการข้อผิดพลาดของระบบ: กรองตามสถานะ ค้นหา เปลี่ยนสถานะ และบันทึกวิธีแก้ไข
+// หน้า Admin: ติดตามรายการข้อผิดพลาดของระบบ ค้นหา/กรองตามสถานะ และบันทึกวิธีแก้ไข
 export default function AdminErrorsPage() {
+  // state ของหน้า: แท็บ คำค้น รายการ log, log ที่กาง/กำลังปิด และหมายเหตุ
   const [tab, setTab] = useState<Tab>("open");
   const [q, setQ] = useState("");
   const [logs, setLogs] = useState<Log[]>([]);
@@ -56,7 +57,7 @@ export default function AdminErrorsPage() {
   const [resolving, setResolving] = useState<Log | null>(null);
   const [note, setNote] = useState("");
 
-  // โหลดรายการข้อผิดพลาดตามแท็บสถานะและคำค้น พร้อมจำนวนในแต่ละสถานะ
+  // ดึงรายการ error log และจำนวนตามสถานะจาก API ตามแท็บและคำค้น
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ status: tab, q });
@@ -70,12 +71,13 @@ export default function AdminErrorsPage() {
     setLoading(false);
   }, [tab, q]);
 
+  // โหลดใหม่เมื่อแท็บ/คำค้นเปลี่ยน (หน่วง 250ms กันยิงถี่ตอนพิมพ์)
   useEffect(() => {
     const t = setTimeout(load, 250);
     return () => clearTimeout(t);
   }, [load]);
 
-  // เปลี่ยนสถานะของรายการข้อผิดพลาด (พร้อมบันทึกวิธีแก้) แล้วโหลดรายการใหม่
+  // เปลี่ยนสถานะ error log (PATCH) พร้อมบันทึกหมายเหตุการแก้ไข แล้วโหลดใหม่
   const updateStatus = async (log: Log, status: Log["status"], resolutionNote = "") => {
     const res = await adminFetch("/api/admin/errors", {
       method: "PATCH",
@@ -87,7 +89,7 @@ export default function AdminErrorsPage() {
     load();
   };
 
-  // ลบรายการที่แก้ไขแล้วและข้ามไปทั้งหมด (ถามยืนยันก่อน)
+  // ลบ error log ที่แก้ไขแล้วหรือข้ามไปทั้งหมด (DELETE) หลังผู้ใช้ยืนยัน
   const clearClosed = async () => {
     if (!window.confirm("ลบรายการที่ 'แก้ไขแล้ว' และ 'ข้ามไป' ทั้งหมด?")) return;
     const res = await adminFetch("/api/admin/errors", { method: "DELETE" });
@@ -110,6 +112,7 @@ export default function AdminErrorsPage() {
 
       {notice && <Notice kind={notice.kind}>{notice.text}</Notice>}
 
+      {/* แถบแท็บสถานะ และช่องค้นหา */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex flex-wrap gap-2">
           {TABS.map((t) => {
@@ -138,6 +141,7 @@ export default function AdminErrorsPage() {
         </div>
       </div>
 
+      {/* กำลังโหลด / ไม่มีรายการ / รายการ error log */}
       {loading && logs.length === 0 ? (
         <LoadingBlock />
       ) : logs.length === 0 ? (
@@ -194,7 +198,7 @@ export default function AdminErrorsPage() {
         </div>
       )}
 
-      {/* ---------- MODAL: ยืนยันแก้ไข ---------- */}
+      {/* Modal กรอกหมายเหตุวิธีแก้ไขก่อนปิดรายการ */}
       {resolving && (
         <Modal title="บันทึกการแก้ไข" onClose={() => setResolving(null)}>
           <p className="mb-3 text-sm text-[#64748b]">{resolving.message}</p>
@@ -217,7 +221,7 @@ export default function AdminErrorsPage() {
   );
 }
 
-// กล่อง Modal กลางจอ ปิดได้ด้วยปุ่ม X, คลิกพื้นหลัง หรือกด Esc
+// หน้าต่าง Modal ทั่วไป ปิดได้ด้วยการคลิกพื้นหลังหรือกด Escape
 function Modal({
   title,
   onClose,
@@ -227,8 +231,8 @@ function Modal({
   onClose: () => void;
   children: React.ReactNode;
 }) {
-  // กด Esc เพื่อปิด
   useEffect(() => {
+    // ปิด Modal เมื่อกดปุ่ม Escape
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };

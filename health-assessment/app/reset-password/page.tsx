@@ -23,10 +23,7 @@ import {
   useSearchParams,
 } from "next/navigation";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// รูปแบบ response ของ /api/auth/reset-password
 type ResetPasswordResponse = {
   success: boolean;
   message?: string;
@@ -38,11 +35,8 @@ type ResetPasswordResponse = {
   };
 };
 
-/* =========================================================
-   CONTENT
-========================================================= */
-
-// เนื้อหาหน้าตั้งรหัสผ่านใหม่: รับอีเมลและ token จาก URL
+// เนื้อหาหน้า: ฟอร์มตั้งรหัสผ่านใหม่โดยใช้ email และ token จาก URL
+// มี 3 สถานะ: ลิงก์ไม่ครบ → ให้เริ่มใหม่, เปลี่ยนสำเร็จ → ไปหน้า login, ปกติ → แสดงฟอร์ม
 function ResetPasswordContent() {
   const router =
     useRouter();
@@ -50,14 +44,7 @@ function ResetPasswordContent() {
   const searchParams =
     useSearchParams();
 
-  /* =========================================================
-     รับข้อมูลจากหน้า VERIFY OTP
-
-     ตัวอย่าง URL:
-
-     /reset-password?token=xxxxx&email=test@gmail.com
-  ========================================================= */
-
+  // อ่าน email และ token สำหรับรีเซ็ตจาก URL
   const email =
     searchParams.get(
       "email",
@@ -68,10 +55,7 @@ function ResetPasswordContent() {
       "token",
     ) ?? "";
 
-  /* =========================================================
-     STATE
-  ========================================================= */
-
+  // state ของฟอร์ม: รหัสผ่าน การแสดงรหัส สถานะโหลด error และผลสำเร็จ
   const [
     password,
     setPassword,
@@ -107,11 +91,8 @@ function ResetPasswordContent() {
     setSuccess,
   ] = useState(false);
 
-  /* =========================================================
-     SUBMIT
-  ========================================================= */
-
-  // ตรวจรหัสผ่านใหม่ (อย่างน้อย 8 ตัว และตรงกันทั้งสองช่อง) แล้วส่งไปเปลี่ยนรหัสผ่าน
+  // ตรวจรหัสผ่านใหม่แล้วส่งไป /api/auth/reset-password สำเร็จจะพาไปหน้า login
+  // ตรวจ: มี email/token, รหัส ≥8 ตัว, ยืนยันตรงกัน → POST → ล้างฟอร์มและตั้ง success
   const handleSubmit =
     async (
       event: FormEvent<HTMLFormElement>,
@@ -122,10 +103,6 @@ function ResetPasswordContent() {
         setLoading(true);
         setError("");
 
-        /* =========================
-           ตรวจ EMAIL + RESET TOKEN
-        ========================= */
-
         if (
           !email ||
           !resetToken
@@ -134,10 +111,6 @@ function ResetPasswordContent() {
             "ข้อมูลสำหรับตั้งรหัสผ่านใหม่ไม่ครบ กรุณาเริ่มใหม่",
           );
         }
-
-        /* =========================
-           PASSWORD
-        ========================= */
 
         if (!password) {
           throw new Error(
@@ -170,20 +143,7 @@ function ResetPasswordContent() {
           );
         }
 
-        /* =====================================================
-           RESET PASSWORD API
-
-           ต้องตรงกับ:
-           app/api/auth/reset-password/route.ts
-
-           API รับ:
-           {
-             email,
-             resetToken,
-             newPassword
-           }
-        ===================================================== */
-
+        // ส่งรหัสผ่านใหม่ไป API
         const response =
           await fetch(
             "/api/auth/reset-password",
@@ -214,10 +174,6 @@ function ResetPasswordContent() {
         const data =
           (await response.json()) as ResetPasswordResponse;
 
-        /* =========================
-           ERROR FROM API
-        ========================= */
-
         if (
           !response.ok ||
           !data.success
@@ -227,10 +183,6 @@ function ResetPasswordContent() {
               "ไม่สามารถเปลี่ยนรหัสผ่านได้",
           );
         }
-
-        /* =====================================================
-           SUCCESS
-        ===================================================== */
 
         setPassword("");
         setConfirmPassword("");
@@ -255,13 +207,7 @@ function ResetPasswordContent() {
       }
     };
 
-  /* =========================================================
-     URL ไม่ครบ
-
-     ถ้า user เปิดหน้า reset-password เอง
-     โดยไม่ได้ผ่าน verify OTP
-  ========================================================= */
-
+  // หน้าจอเมื่อลิงก์ไม่มี email/token → ให้เริ่มขั้นตอนลืมรหัสผ่านใหม่
   if (
     !email ||
     !resetToken
@@ -305,10 +251,7 @@ function ResetPasswordContent() {
     );
   }
 
-  /* =========================================================
-     SUCCESS PAGE
-  ========================================================= */
-
+  // หน้าจอเมื่อเปลี่ยนรหัสผ่านสำเร็จ
   if (success) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#fbf9f9] px-5">
@@ -356,33 +299,19 @@ function ResetPasswordContent() {
     );
   }
 
-  /* =========================================================
-     RESET PASSWORD FORM
-  ========================================================= */
-
+  // หน้าจอหลัก: ฟอร์มตั้งรหัสผ่านใหม่
   return (
     <main className="min-h-screen overflow-hidden bg-[#fbf9f9] text-[#2f3037]">
 
       <div className="relative flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
 
-        {/* =====================================================
-            BACKGROUND
-        ====================================================== */}
-
         <div className="pointer-events-none absolute left-[-120px] top-[-120px] h-[350px] w-[350px] rounded-full bg-[#fff0f2] blur-3xl" />
 
         <div className="pointer-events-none absolute bottom-[-140px] right-[-100px] h-[400px] w-[400px] rounded-full bg-[#f9e5e8] blur-3xl" />
 
-        {/* =====================================================
-            CONTAINER
-        ====================================================== */}
-
         <div className="relative z-10 grid w-full max-w-[1050px] overflow-hidden rounded-[36px] border border-[#eee5e6] bg-white shadow-[0_30px_80px_rgba(70,35,40,0.08)] lg:grid-cols-[1fr_520px]">
 
-          {/* =================================================
-              LEFT
-          ================================================== */}
-
+          {/* แผงซ้าย: ข้อความแนะนำและอีเมลบัญชี (จอใหญ่) */}
           <section className="hidden bg-gradient-to-br from-[#fffafa] via-white to-[#fff2f4] p-12 lg:flex lg:flex-col lg:justify-center">
 
             <div className="grid h-20 w-20 place-items-center rounded-[25px] bg-white text-[#b91c2b] shadow-[0_15px_35px_rgba(185,28,43,0.12)]">
@@ -430,19 +359,8 @@ function ResetPasswordContent() {
 
           </section>
 
-          {/* =================================================
-              RIGHT
-          ================================================== */}
-
+          {/* แผงขวา: ลิงก์ย้อนกลับ หัวข้อ และฟอร์ม */}
           <section className="flex min-h-[620px] flex-col justify-center p-7 sm:p-10 lg:p-12">
-
-            {/* =================================================
-                BACK
-
-                กลับไป Verify OTP
-                ไม่ส่ง resetToken กลับไป
-                เพราะถ้าย้อนควร Verify ใหม่
-            ================================================== */}
 
             <Link
               href={`/verify-otp?email=${encodeURIComponent(
@@ -459,10 +377,6 @@ function ResetPasswordContent() {
 
             </Link>
 
-            {/* =================================================
-                ICON
-            ================================================== */}
-
             <div className="grid h-16 w-16 place-items-center rounded-[22px] bg-[#fff0f2] text-[#b91c2b]">
 
               <LockKeyhole
@@ -471,10 +385,6 @@ function ResetPasswordContent() {
 
             </div>
 
-            {/* =================================================
-                TITLE
-            ================================================== */}
-
             <h2 className="mt-7 text-3xl font-black">
               ตั้งรหัสผ่านใหม่
             </h2>
@@ -482,10 +392,6 @@ function ResetPasswordContent() {
             <p className="mt-3 max-w-[420px] text-sm leading-7 text-[#85858d]">
               กรุณากำหนดรหัสผ่านใหม่อย่างน้อย 8 ตัวอักษร
             </p>
-
-            {/* =================================================
-                ACCOUNT
-            ================================================== */}
 
             <div className="mt-5 rounded-2xl bg-[#faf8f8] px-5 py-4">
 
@@ -499,20 +405,13 @@ function ResetPasswordContent() {
 
             </div>
 
-            {/* =================================================
-                FORM
-            ================================================== */}
-
+            {/* ฟอร์ม: รหัสผ่านใหม่ ยืนยันรหัส ข้อความเตือน และปุ่มบันทึก */}
             <form
               onSubmit={
                 handleSubmit
               }
               className="mt-7 space-y-5"
             >
-
-              {/* =================================================
-                  PASSWORD
-              ================================================== */}
 
               <PasswordField
                 label="รหัสผ่านใหม่"
@@ -547,10 +446,6 @@ function ResetPasswordContent() {
                 }
               />
 
-              {/* =================================================
-                  CONFIRM PASSWORD
-              ================================================== */}
-
               <PasswordField
                 label="ยืนยันรหัสผ่านใหม่"
                 value={
@@ -584,10 +479,7 @@ function ResetPasswordContent() {
                 }
               />
 
-              {/* =================================================
-                  PASSWORD LENGTH
-              ================================================== */}
-
+              {/* ข้อความตรวจสอบรหัสผ่านแบบทันที และ error จาก API */}
               {password &&
                 password.length <
                   8 && (
@@ -595,10 +487,6 @@ function ResetPasswordContent() {
                     รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร
                   </p>
                 )}
-
-              {/* =================================================
-                  PASSWORD MATCH
-              ================================================== */}
 
               {confirmPassword &&
                 password !==
@@ -608,10 +496,6 @@ function ResetPasswordContent() {
                   </p>
                 )}
 
-              {/* =================================================
-                  ERROR
-              ================================================== */}
-
               {error && (
                 <div className="rounded-2xl border border-[#f2d3d7] bg-[#fff0f2] px-4 py-3 text-sm font-medium text-[#b91c2b]">
 
@@ -619,10 +503,6 @@ function ResetPasswordContent() {
 
                 </div>
               )}
-
-              {/* =================================================
-                  SUBMIT
-              ================================================== */}
 
               <button
                 type="submit"
@@ -662,11 +542,7 @@ function ResetPasswordContent() {
   );
 }
 
-/* =========================================================
-   PASSWORD FIELD
-========================================================= */
-
-// ช่องกรอกรหัสผ่านพร้อมป้ายชื่อ และปุ่มแสดง/ซ่อนรหัสผ่าน
+// ช่องกรอกรหัสผ่านพร้อมป้ายชื่อและปุ่มสลับแสดง/ซ่อน
 function PasswordField({
   label,
   value,
@@ -767,11 +643,7 @@ function PasswordField({
   );
 }
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าตั้งรหัสผ่านใหม่ ห่อด้วย Suspense (เพราะใช้ useSearchParams)
+// หน้า: รีเซ็ตรหัสผ่าน ครอบด้วย Suspense พร้อมหน้าโหลด
 export default function ResetPasswordPage() {
   return (
     <Suspense

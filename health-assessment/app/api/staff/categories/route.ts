@@ -4,18 +4,10 @@ import { logAccess, requireStaff } from "@/lib/staff/auth";
 import { logSystemError } from "@/lib/errorLogger";
 import { CATEGORY_NAME_MAX, CATEGORY_SUBTITLE_MAX, isCategoryTheme } from "@/lib/assessmentCategories";
 
-/* =========================================================
-   /api/staff/categories — จัดการหมวดหมู่แบบประเมิน
-   PATCH  { categoryId, name, subtitle, theme } → แก้ชื่อ / คำอธิบายสั้น / สี
-   DELETE { categoryId, moveTo }                → ลบหมวด แล้วย้ายแบบประเมินในหมวดไปหมวด moveTo (null = ไม่มีหมวด)
-   - หมวดหลัก 3 หมวด (is_builtin) แก้/ลบไม่ได้ เพราะหน้าเมนูและการ์ดของหมวดเขียนไว้ในโค้ด
-   - การสร้างหมวดใหม่ทำพร้อมการสร้างแบบประเมิน (POST /api/staff/assessments)
-========================================================= */
-
-// สร้าง response JSON แจ้งข้อผิดพลาด (ค่าเริ่มต้น status 400)
+// สร้าง JSON response แจ้งข้อผิดพลาดพร้อม status code
 const fail = (message: string, status = 400) => NextResponse.json({ success: false, message }, { status });
 
-// โหลดหมวดหมู่ที่แก้ไขได้ (ไม่พบ = 404, หมวดหลักของระบบ = error)
+// โหลดหมวดหมู่และตรวจว่าแก้ไขได้ (ไม่ใช่หมวดหลักของระบบ is_builtin)
 async function loadEditable(categoryId: number) {
   const { rows } = await pool.query("SELECT category_id, name, is_builtin FROM assessment_categories WHERE category_id = $1", [categoryId]);
   const c = rows[0];
@@ -24,7 +16,7 @@ async function loadEditable(categoryId: number) {
   return { category: c as { category_id: number; name: string } };
 }
 
-// PATCH: แก้ชื่อ คำอธิบายสั้น และสีของหมวดหมู่
+// API (เจ้าหน้าที่): แก้ชื่อ คำอธิบาย และธีมของหมวดหมู่ โดยห้ามชื่อซ้ำ
 export async function PATCH(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -32,6 +24,7 @@ export async function PATCH(request: NextRequest) {
 
   const categoryId = Number(body.categoryId);
   const name = String(body.name ?? "").trim();
+  // ตรวจข้อมูลที่ส่งมา: id ชื่อ คำอธิบาย และธีมสี
   const subtitle = String(body.subtitle ?? "").trim();
   const theme = body.theme;
   if (!Number.isInteger(categoryId) || categoryId <= 0) return fail("ไม่พบหมวดหมู่นี้");
@@ -44,6 +37,7 @@ export async function PATCH(request: NextRequest) {
     const found = await loadEditable(categoryId);
     if (found.error) return found.error;
 
+    // ตรวจชื่อซ้ำ แล้วอัปเดตหมวดหมู่และบันทึก log
     const dup = await pool.query("SELECT 1 FROM assessment_categories WHERE LOWER(name) = LOWER($1) AND category_id <> $2", [name, categoryId]);
     if (dup.rowCount) return fail("มีหมวดหมู่ชื่อนี้แล้ว", 409);
 
@@ -57,7 +51,6 @@ export async function PATCH(request: NextRequest) {
     await logAccess(auth.staff.userId, null, "update_assessment_category", `category ${categoryId} · ${name}${renamed}`);
     return NextResponse.json({ success: true });
   } catch (error) {
-    // ชื่อซ้ำจากการบันทึกพร้อมกัน (unique index บน LOWER(name))
     if ((error as { code?: string }).code === "23505") return fail("มีหมวดหมู่ชื่อนี้แล้ว", 409);
     void logSystemError("PATCH /api/staff/categories", error);
     console.error("PATCH /api/staff/categories error:", error);
@@ -65,7 +58,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-// DELETE: ลบหมวดหมู่ แล้วย้ายแบบประเมินในหมวดไปหมวด moveTo (null = ไม่มีหมวด)
+// API (เจ้าหน้าที่): ลบหมวดหมู่ และย้ายแบบประเมินในหมวดไปหมวดปลายทาง (moveTo) ถ้ากำหนด
 export async function DELETE(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -81,6 +74,7 @@ export async function DELETE(request: NextRequest) {
     const found = await loadEditable(categoryId);
     if (found.error) return found.error;
 
+    // ใน transaction: ตรวจหมวดปลายทาง ย้ายแบบประเมิน แล้วลบหมวดหมู่
     await client.query("BEGIN");
     let targetName = "ไม่มีหมวดหมู่";
     if (moveTo !== null) {

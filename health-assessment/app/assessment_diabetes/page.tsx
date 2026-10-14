@@ -26,10 +26,7 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ข้อมูลสุขภาพของผู้ใช้ที่ใช้ประเมิน (แปลงจาก response ของ /api/profile)
 type HealthProfile = {
   age: number | null;
   gender: string | null;
@@ -39,16 +36,12 @@ type HealthProfile = {
   sbp: number | null;
   dbp: number | null;
 
-  /*
-    หน้านี้ไม่ได้แสดง แต่ต้องส่งค่าเดิมกลับตอนบันทึก
-    เพราะ PUT /api/profile เขียนทับทุกช่อง
-  */
   smoking: boolean;
   has_diabetes: boolean;
   family_diabetes: boolean | null;
 };
 
-/* ค่าที่แก้ไขได้ในโหมดแก้ไข (เก็บเป็น string ตามช่อง input) */
+// ค่าในฟอร์มแก้ไขโปรไฟล์ (เก็บเป็น string ระหว่างพิมพ์)
 type ProfileDraft = {
   age: string;
   gender: string;
@@ -57,6 +50,7 @@ type ProfileDraft = {
   waist_cm: string;
 };
 
+// รูปแบบ response จาก POST /api/assessments/diabetes
 type AssessmentResponse = {
   success: boolean;
   message?: string;
@@ -84,31 +78,16 @@ type AssessmentResponse = {
   };
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าแบบประเมินความเสี่ยงเบาหวานใน 12 ปี: ใช้ข้อมูลสุขภาพจากโปรไฟล์ร่วมกับคำตอบเพิ่มเติม
+// หน้า: ประเมินความเสี่ยงโรคเบาหวานจากโปรไฟล์ (อายุ เพศ BMI รอบเอว) และประวัติสุขภาพ
 export default function AssessmentDiabetesPage() {
   const router = useRouter();
 
-  /* =======================================================
-     USER
-  ======================================================= */
-
+  // state ของหน้า: ผู้ใช้ โปรไฟล์ ค่าความดัน ประวัติครอบครัว สถานะต่าง ๆ และ draft ฟอร์มแก้ไข
   const [userId, setUserId] =
     useState<number | null>(null);
 
-  /* =======================================================
-     PROFILE
-  ======================================================= */
-
   const [profile, setProfile] =
     useState<HealthProfile | null>(null);
-
-  /* =======================================================
-     ADDITIONAL DATA
-  ======================================================= */
 
   const [sbp, setSbp] =
     useState("");
@@ -118,10 +97,6 @@ export default function AssessmentDiabetesPage() {
 
   const [familyDiabetes, setFamilyDiabetes] =
     useState<boolean | null>(null);
-
-  /* =======================================================
-     STATE
-  ======================================================= */
 
   const [loadingProfile, setLoadingProfile] =
     useState(true);
@@ -134,11 +109,6 @@ export default function AssessmentDiabetesPage() {
 
   const [successMessage, setSuccessMessage] =
     useState("");
-
-  /* =======================================================
-     EDIT PROFILE
-     ทำงานแบบเดียวกับหน้าแบบประเมินโรคหัวใจและหลอดเลือด
-  ======================================================= */
 
   const [isEditingProfile, setIsEditingProfile] =
     useState(false);
@@ -155,21 +125,15 @@ export default function AssessmentDiabetesPage() {
       waist_cm: "",
     });
 
-  /* =========================================================
-     LOAD PROFILE
-  ========================================================= */
-
+  // โหลดโปรไฟล์สุขภาพตอนเปิดหน้า
   useEffect(() => {
-    // โหลดข้อมูลสุขภาพของผู้ใช้จากโปรไฟล์ (ไม่มี userId ให้ไปหน้า login)
+    // ตรวจ userId ใน localStorage แล้วโหลดโปรไฟล์จาก GET /api/profile
     const loadProfile = async () => {
       try {
         setLoadingProfile(true);
         setError("");
 
-        /* -----------------------------------------------
-           USER ID
-        ------------------------------------------------ */
-
+        // ตรวจ userId ใน localStorage
         const storedUserId =
           localStorage.getItem("userId");
 
@@ -191,10 +155,7 @@ export default function AssessmentDiabetesPage() {
 
         setUserId(id);
 
-        /* -----------------------------------------------
-           LOAD PROFILE
-        ------------------------------------------------ */
-
+        // ดึงโปรไฟล์จาก API
         const response = await fetch(
           `/api/profile?userId=${id}`,
           {
@@ -216,19 +177,12 @@ export default function AssessmentDiabetesPage() {
           );
         }
 
-        /* -----------------------------------------------
-           SOURCE
-        ------------------------------------------------ */
-
+        // แปลงข้อมูลให้อยู่ในรูป HealthProfile (รองรับชื่อฟิลด์หลายแบบ)
         const source =
           data.profile ??
           data.healthProfile ??
           data.data ??
           data;
-
-        /* -----------------------------------------------
-           NORMALIZE
-        ------------------------------------------------ */
 
         const normalized: HealthProfile = {
           age:
@@ -296,13 +250,7 @@ export default function AssessmentDiabetesPage() {
               : null,
         };
 
-        /* -----------------------------------------------
-           REQUIRED PROFILE DATA
-           
-           ไม่บังคับ SBP/DBP
-           เพราะถ้าไม่มีให้กรอกในหน้านี้
-        ------------------------------------------------ */
-
+        // ข้อมูลหลักต้องครบ แล้วเติมค่าความดัน/ประวัติครอบครัวที่มีอยู่ลงฟอร์ม
         if (
           normalized.age === null ||
           normalized.gender === null ||
@@ -317,21 +265,11 @@ export default function AssessmentDiabetesPage() {
 
         setProfile(normalized);
 
-        /* -----------------------------------------------
-           ประวัติเบาหวานในครอบครัว
-           ใช้ค่าจากข้อมูลสุขภาพเป็นค่าเริ่มต้น
-        ------------------------------------------------ */
-
         if (normalized.family_diabetes !== null) {
           setFamilyDiabetes(
             normalized.family_diabetes,
           );
         }
-
-        /* -----------------------------------------------
-           ถ้ามี BP อยู่แล้ว
-           ให้ใส่ลงช่องอัตโนมัติ
-        ------------------------------------------------ */
 
         if (normalized.sbp !== null) {
           setSbp(String(normalized.sbp));
@@ -359,11 +297,7 @@ export default function AssessmentDiabetesPage() {
     void loadProfile();
   }, [router]);
 
-  /* =========================================================
-     START / CANCEL EDITING
-  ========================================================= */
-
-  // เปิดโหมดแก้ไข โดยคัดลอกข้อมูลโปรไฟล์ปัจจุบันลงแบบร่าง
+  // คัดลอกค่าโปรไฟล์ปัจจุบันลง draft แล้วเปิดโหมดแก้ไข
   const startEditingProfile = () => {
     if (!profile) {
       return;
@@ -383,19 +317,14 @@ export default function AssessmentDiabetesPage() {
     setIsEditingProfile(true);
   };
 
-  // ยกเลิกโหมดแก้ไขข้อมูลสุขภาพ
+  // ปิดโหมดแก้ไขโปรไฟล์โดยไม่บันทึก
   const cancelEditingProfile = () => {
     setIsEditingProfile(false);
     setError("");
     setSuccessMessage("");
   };
 
-  /* =========================================================
-     SAVE PROFILE
-     PUT /api/profile (ช่วงค่าเดียวกับหน้า CVD และหน้าข้อมูลสุขภาพ)
-  ========================================================= */
-
-  // ตรวจช่วงค่าข้อมูลสุขภาพในแบบร่าง แล้วบันทึกลงโปรไฟล์ผ่าน PUT /api/profile
+  // ตรวจค่าใน draft แล้วบันทึกโปรไฟล์ผ่าน PUT /api/profile
   const saveProfile = async () => {
     try {
       setSavingProfile(true);
@@ -408,6 +337,7 @@ export default function AssessmentDiabetesPage() {
         );
       }
 
+      // ตรวจช่วงค่าของอายุ เพศ ส่วนสูง น้ำหนัก และรอบเอว
       const age = Number(draft.age);
       const height = Number(draft.height_cm);
       const weight = Number(draft.weight_kg);
@@ -460,6 +390,7 @@ export default function AssessmentDiabetesPage() {
         );
       }
 
+      // บันทึกโปรไฟล์ที่ API
       const response = await fetch(
         "/api/profile",
         {
@@ -509,6 +440,7 @@ export default function AssessmentDiabetesPage() {
         );
       }
 
+      // อัปเดตโปรไฟล์ในหน้าและปิดโหมดแก้ไข
       setProfile({
         ...profile,
         age,
@@ -542,11 +474,7 @@ export default function AssessmentDiabetesPage() {
     }
   };
 
-  /* =========================================================
-     BMI
-     ระหว่างแก้ไขคำนวณจากค่าที่กำลังกรอก
-  ========================================================= */
-
+  // คำนวณ BMI จากค่าที่กำลังแก้ไขหรือค่าในโปรไฟล์
   const bmiHeight = isEditingProfile
     ? Number(draft.height_cm)
     : profile?.height_cm ?? 0;
@@ -561,11 +489,7 @@ export default function AssessmentDiabetesPage() {
         Math.pow(bmiHeight / 100, 2)
       : null;
 
-  /* =========================================================
-     SUBMIT
-  ========================================================= */
-
-  // ตรวจเงื่อนไขก่อนประเมิน แล้ว POST ไปคำนวณความเสี่ยงเบาหวาน และพาไปหน้าคำแนะนำ
+  // ส่งข้อมูลประเมิน POST /api/assessments/diabetes เก็บผลใน localStorage แล้วไปหน้าผลลัพธ์
   const handleSubmit = async (
     event: FormEvent<HTMLFormElement>,
   ) => {
@@ -574,21 +498,13 @@ export default function AssessmentDiabetesPage() {
     setError("");
     setSuccessMessage("");
 
-    /* -----------------------------------------------
-       ห้ามประเมินระหว่างแก้ไขข้อมูล
-       เพราะ API คำนวณจากข้อมูลสุขภาพที่บันทึกแล้ว
-    ------------------------------------------------ */
-
+    // ตรวจสถานะฟอร์ม ผู้ใช้ และโปรไฟล์
     if (isEditingProfile) {
       setError(
         "กรุณาบันทึกหรือยกเลิกการแก้ไขข้อมูลสุขภาพก่อนประเมิน",
       );
       return;
     }
-
-    /* -----------------------------------------------
-       USER
-    ------------------------------------------------ */
 
     if (!userId) {
       setError(
@@ -597,10 +513,6 @@ export default function AssessmentDiabetesPage() {
       return;
     }
 
-    /* -----------------------------------------------
-       PROFILE
-    ------------------------------------------------ */
-
     if (!profile) {
       setError(
         "ไม่พบข้อมูลสุขภาพ",
@@ -608,10 +520,7 @@ export default function AssessmentDiabetesPage() {
       return;
     }
 
-    /* -----------------------------------------------
-       BLOOD PRESSURE
-    ------------------------------------------------ */
-
+    // ตรวจค่าความดัน SBP/DBP และการเลือกประวัติครอบครัว
     const systolic = Number(sbp);
     const diastolic = Number(dbp);
 
@@ -651,7 +560,6 @@ export default function AssessmentDiabetesPage() {
       return;
     }
 
-    // API รับเฉพาะจำนวนเต็ม และตัวบนต้องมากกว่าตัวล่าง
     if (!Number.isInteger(systolic) || !Number.isInteger(diastolic)) {
       setError(
         "ค่าความดันต้องเป็นจำนวนเต็ม",
@@ -666,10 +574,6 @@ export default function AssessmentDiabetesPage() {
       return;
     }
 
-    /* -----------------------------------------------
-       FAMILY HISTORY
-    ------------------------------------------------ */
-
     if (
       familyDiabetes === null
     ) {
@@ -679,13 +583,10 @@ export default function AssessmentDiabetesPage() {
       return;
     }
 
-    /* -----------------------------------------------
-       SUBMIT
-    ------------------------------------------------ */
-
     try {
       setSubmitting(true);
 
+      // ส่งข้อมูลไปประเมินและบันทึกที่ API
       const response = await fetch(
         "/api/assessments/diabetes",
         {
@@ -723,20 +624,13 @@ export default function AssessmentDiabetesPage() {
         );
       }
 
-      /* -----------------------------------------------
-         SAVE RESULT
-      ------------------------------------------------ */
-
+      // เก็บผลไว้ใน localStorage แล้วไปหน้าคำแนะนำ
       localStorage.setItem(
         "diabetesAssessment",
         JSON.stringify(
           data.assessment,
         ),
       );
-
-      /* -----------------------------------------------
-         RESULT PAGE
-      ------------------------------------------------ */
 
       router.push(
         `/recommendation_diabetes?assessmentId=${data.assessment.assessment_id}`,
@@ -757,10 +651,7 @@ export default function AssessmentDiabetesPage() {
     }
   };
 
-  /* =========================================================
-     LOADING
-  ========================================================= */
-
+  // หน้าระหว่างโหลดโปรไฟล์
   if (loadingProfile) {
     return (
       <main className="min-h-screen bg-[#fbf9f9]">
@@ -781,10 +672,7 @@ export default function AssessmentDiabetesPage() {
     );
   }
 
-  /* =========================================================
-     ERROR PROFILE
-  ========================================================= */
-
+  // โหลดโปรไฟล์ไม่สำเร็จ/ข้อมูลไม่ครบ → หน้า error
   if (error && !profile) {
     return (
       <main className="min-h-screen bg-[#fbf9f9]">
@@ -818,10 +706,6 @@ export default function AssessmentDiabetesPage() {
     );
   }
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="flex min-h-screen">
@@ -829,10 +713,7 @@ export default function AssessmentDiabetesPage() {
 
         <section className="min-w-0 flex-1 px-5 py-8 sm:px-8 lg:px-12">
 
-          {/* =================================================
-              HEADER
-          ================================================= */}
-
+          {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ความยินยอม และปุ่มย้อนกลับ */}
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
             <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#3f7a2e]">
@@ -848,17 +729,12 @@ export default function AssessmentDiabetesPage() {
 
             </div>
 
-            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
             <HealthConsentNotice />
             <AssessmentBackLink href="/assessment-menu" />
           </header>
-          {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
           <AssessmentSourceNote typeId={4} className="mt-3" />
 
-          {/* =================================================
-              ERROR
-          ================================================= */}
-
+          {/* ข้อความ error / บันทึกสำเร็จ */}
           {error && (
             <div className="mt-6 rounded-2xl border border-[#f3cdd1] bg-[#fff0f2] px-5 py-4 text-sm font-semibold text-[#b91c2b]">
               {error}
@@ -871,26 +747,16 @@ export default function AssessmentDiabetesPage() {
             </div>
           )}
 
-          {/* =================================================
-              FORM
-          ================================================= */}
-
+          {/* ฟอร์มประเมิน: ข้อมูลสุขภาพ ความดัน และประวัติครอบครัว */}
           <form
             onSubmit={handleSubmit}
             className="mt-8"
           >
             <div>
 
-              {/* =================================================
-                  LEFT
-              ================================================= */}
-
               <div className="space-y-6">
 
-                {/* =================================================
-                    HEALTH PROFILE
-                ================================================= */}
-
+                {/* การ์ดข้อมูลสุขภาพ: แสดงหรือแก้ไขอายุ เพศ ส่วนสูง น้ำหนัก BMI รอบเอว */}
                 <section className="rounded-[28px] border border-[#eee5e6] bg-white p-6 shadow-[0_16px_45px_rgba(35,25,30,0.05)] sm:p-8">
 
                   <div className="flex flex-wrap items-center justify-between gap-4">
@@ -943,6 +809,7 @@ export default function AssessmentDiabetesPage() {
 
                   <div className="mt-7 space-y-4">
 
+                    {/* โหมดแก้ไข = ช่องกรอก, โหมดปกติ = แถวแสดงค่า */}
                     {isEditingProfile ? (
                       <>
                         <EditRow
@@ -1092,10 +959,7 @@ export default function AssessmentDiabetesPage() {
                   </div>
                 </section>
 
-                {/* =================================================
-                    BLOOD PRESSURE
-                ================================================= */}
-
+                {/* การ์ดกรอกค่าความดันโลหิต SBP/DBP */}
                 <section className="rounded-[28px] border border-[#eee5e6] bg-white p-6 shadow-[0_16px_45px_rgba(35,25,30,0.05)] sm:p-8">
 
                   <div className="flex items-center gap-3">
@@ -1111,8 +975,6 @@ export default function AssessmentDiabetesPage() {
                   </div>
 
                   <div className="mt-7 grid gap-5 sm:grid-cols-2">
-
-                    {/* SBP */}
 
                     <div>
                       <label className="mb-2 block text-sm font-bold">
@@ -1137,8 +999,6 @@ export default function AssessmentDiabetesPage() {
                         </span>
                       </div>
                     </div>
-
-                    {/* DBP */}
 
                     <div>
                       <label className="mb-2 block text-sm font-bold">
@@ -1171,10 +1031,7 @@ export default function AssessmentDiabetesPage() {
                   </div>
                 </section>
 
-                {/* =================================================
-                    FAMILY HISTORY
-                ================================================= */}
-
+                {/* การ์ดประวัติเบาหวานในครอบครัว (มี/ไม่มี) */}
                 <section className="rounded-[28px] border border-[#eee5e6] bg-white p-6 shadow-[0_16px_45px_rgba(35,25,30,0.05)] sm:p-8">
 
                   <div className="flex items-center gap-3">
@@ -1223,7 +1080,7 @@ export default function AssessmentDiabetesPage() {
                 </section>
               </div>
 
-              {/* ปุ่มประเมิน */}
+              {/* ปุ่มส่งประเมินความเสี่ยง */}
               <div className="mt-6 flex justify-end">
                 <button
                   type="submit"
@@ -1251,11 +1108,7 @@ export default function AssessmentDiabetesPage() {
   );
 }
 
-/* =========================================================
-   INFO ROW
-========================================================= */
-
-// แถวแสดงข้อมูลสุขภาพแบบอ่านอย่างเดียว (ไอคอน ป้ายชื่อ ค่า)
+// คอมโพเนนต์: แถวแสดงข้อมูลโปรไฟล์ (ไอคอน ป้ายชื่อ และค่า) แบบอ่านอย่างเดียว
 function InfoRow({
   icon,
   label,
@@ -1282,11 +1135,7 @@ function InfoRow({
   );
 }
 
-/* =========================================================
-   EDIT ROW
-   แถวข้อมูลแบบกรอกได้ ใช้ในโหมดแก้ไขข้อมูลสุขภาพ
-========================================================= */
-
+// คอมโพเนนต์: แถวช่องกรอกตัวเลขพร้อมหน่วยสำหรับแก้ไขข้อมูลโปรไฟล์
 function EditRow({
   icon,
   label,
@@ -1335,11 +1184,7 @@ function EditRow({
   );
 }
 
-/* =========================================================
-   YES / NO BUTTON
-========================================================= */
-
-// ปุ่มตัวเลือกใช่/ไม่ใช่ เปลี่ยนสีเมื่อถูกเลือก
+// คอมโพเนนต์: ปุ่มตัวเลือก ใช่/ไม่ใช่ ที่เปลี่ยนสีเมื่อถูกเลือก
 function YesNoButton({
   active,
   children,

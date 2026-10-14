@@ -12,11 +12,7 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 
-/* =========================================================
-   SIDEBAR สำหรับ System Admin (โทนน้ำเงินเข้ม)
-========================================================= */
-
-// short = ชื่อสั้นสำหรับแถบเมนูบนมือถือ (4 ช่องต้องพอดีจอ)
+// รายการเมนูของหน้า Admin: ลิงก์ ชื่อเต็ม ชื่อย่อ (มือถือ) และไอคอน
 const MENU: { href: string; label: string; short: string; icon: ReactNode }[] = [
   { href: "/admin", label: "ตรวจสอบระบบ", short: "ตรวจสอบ", icon: <Activity size={21} /> },
   { href: "/admin/database", label: "ดูแลฐานข้อมูล", short: "ฐานข้อมูล", icon: <Database size={21} /> },
@@ -24,22 +20,20 @@ const MENU: { href: string; label: string; short: string; icon: ReactNode }[] = 
   { href: "/admin/backup", label: "สำรองข้อมูล", short: "สำรอง", icon: <HardDriveDownload size={21} /> },
 ];
 
-// คอมโพเนนต์แถบเมนูของแอดมิน (แถบซ้ายบนจอใหญ่ / แถบล่างบนมือถือ) พร้อมปุ่มออกจากระบบ
+// แถบเมนูด้านข้างของหน้า Admin พร้อมชื่อผู้ดูแลและปุ่มออกจากระบบ
 export default function AdminSidebar({ username }: { username: string }) {
   const pathname = usePathname();
   const router = useRouter();
 
-  // ออกจากระบบฝั่งแอดมิน แล้วพากลับไปหน้า login
+  // ออกจากระบบ Admin ผ่าน API logout แล้วพากลับไปหน้า login
   const logout = async () => {
-    // ลบเฉพาะ cookie ของ admin (session_admin) แท็บที่เปิดเป็นผู้ใช้หรือ staff ยังใช้งานต่อได้
-    // admin ไม่ได้เก็บค่าใน localStorage จึงไม่ต้องลบ
     await fetch("/api/auth/logout?role=admin", { method: "POST" }).catch(() => {});
     router.replace("/login");
   };
 
   return (
     <>
-      {/* ---------- DESKTOP ---------- */}
+      {/* Sidebar สำหรับจอใหญ่ (desktop) */}
       <aside className="sticky top-0 hidden h-screen w-[250px] shrink-0 flex-col bg-gradient-to-b from-[#172554] to-[#1e3a8a] px-5 py-7 text-white lg:flex">
         <Link href="/admin" className="flex items-center gap-3 px-2">
           <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/15 ring-1 ring-white/20">
@@ -51,6 +45,7 @@ export default function AdminSidebar({ username }: { username: string }) {
           </div>
         </Link>
 
+        {/* เมนูนำทาง ไฮไลต์หน้าที่เปิดอยู่ */}
         <nav className="mt-12 space-y-2" aria-label="เมนูผู้ดูแลระบบ">
           {MENU.map((item) => {
             const active =
@@ -73,6 +68,7 @@ export default function AdminSidebar({ username }: { username: string }) {
           })}
         </nav>
 
+        {/* ชื่อผู้ดูแลที่ล็อกอิน และปุ่มออกจากระบบ */}
         <div className="mt-auto space-y-3">
           <div className="rounded-2xl bg-white/10 px-4 py-3">
             <p className="text-xs text-blue-200">เข้าสู่ระบบในชื่อ</p>
@@ -89,7 +85,7 @@ export default function AdminSidebar({ username }: { username: string }) {
         </div>
       </aside>
 
-      {/* ---------- MOBILE (แถบด้านบน) ---------- */}
+      {/* แถบหัวและเมนูแบบแท็บสำหรับมือถือ */}
       <header className="sticky top-0 z-30 bg-[#172554] text-white lg:hidden">
         <div className="flex items-center justify-between px-4 py-3">
           <div className="flex items-center gap-2 font-bold">

@@ -17,24 +17,13 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
-/* =========================================================
-   GET
-   1) ถ้ามี assessmentId -> ดึงผลการประเมินและคำตอบ
-   2) ถ้าไม่มี assessmentId -> ดึงรายการคำถามและตัวเลือก
-========================================================= */
-
+// API: คืนชุดคำถามแบบประเมินการสูบบุหรี่ หรือผลประเมินที่บันทึกไว้ตาม assessmentId
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const assessmentIdParam = searchParams.get("assessmentId");
 
-    /* -----------------------------------------------------
-       CASE 1: ดึงผลการประเมินจาก assessmentId
-    ----------------------------------------------------- */
+    // มี assessmentId → ตรวจสิทธิ์แล้วคืนผลประเมินที่บันทึกไว้
     if (assessmentIdParam) {
       const auth = requireUser(request);
       if (!auth.ok) return auth.response;
@@ -51,7 +40,7 @@ export async function GET(request: NextRequest) {
         );
       }
 
-      // ดึงข้อมูล Assessment
+      // ดึงผลประเมินพร้อมคำแนะนำ และคำตอบรายข้อ
       const assessmentResult = await pool.query(
         `
         SELECT
@@ -90,7 +79,6 @@ export async function GET(request: NextRequest) {
 
       const assessmentRow = assessmentResult.rows[0];
 
-      // ดึงข้อมูลคำตอบ
       const answersResult = await pool.query(
         `
         SELECT
@@ -134,9 +122,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    /* -----------------------------------------------------
-       CASE 2: ดึงรายการคำถามสำหรับทำแบบประเมิน
-    ----------------------------------------------------- */
+    // ไม่มี assessmentId → ดึงคำถามและตัวเลือกจาก DB แล้วจัดกลุ่มตามคำถาม
     const questionsResult = await pool.query(
       `
       SELECT
@@ -183,6 +169,7 @@ export async function GET(request: NextRequest) {
       questions: Array.from(questionMap.values()),
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/smoking", error);
     console.error("GET SMOKING ASSESSMENT ERROR:", error);
     return NextResponse.json(
@@ -195,15 +182,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* =========================================================
-   ข้อที่ต้องข้าม
-   ข้อ 2 (ลำดับที่ 2) ถามว่าเคยสูบบุหรี่ตลอดชีวิตหรือไม่
-   ถ้าตอบตัวเลือก 0 คะแนน ("ไม่สูบ") ข้อหลังจากนั้น (จำนวนมวน, มวนแรกหลังตื่นนอน) ไม่ต้องถาม
-========================================================= */
-
+// ลำดับข้อคำถาม "เคยสูบบุหรี่หรือไม่" ที่ใช้ตัดสินว่าต้องข้ามข้อถัดไป
 const LIFETIME_QUESTION_ORDER = 2;
 
-// หาข้อที่ต้องข้าม (ข้อหลังข้อ 2) เมื่อผู้ใช้ตอบว่าไม่สูบบุหรี่
+// ถ้าตอบข้อ 2 ว่าไม่เคยสูบบุหรี่ (คะแนน 0) คืน ID คำถามข้อถัดไปที่ต้องข้าม
 function getSkippedQuestionIds(
   choices: ChoiceRow[],
   answers: Record<string, unknown>,
@@ -223,28 +205,21 @@ function getSkippedQuestionIds(
   );
 }
 
-/* =========================================================
-   POST
-   บันทึกผลการประเมินการสูบบุหรี่
-========================================================= */
-
+// API: ตรวจคำตอบแบบประเมินการสูบบุหรี่ (ข้ามข้อที่ไม่ต้องตอบ) รวมคะแนน แล้วบันทึกผลลงฐานข้อมูล
 export async function POST(request: NextRequest) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน ความยินยอม และคำตอบ
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
   const auth = requireUser(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(6);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(auth.userId);
   if (noConsent) return noConsent;
   const userId = auth.userId;
 
-  // รูปแบบเดิม: { [question_id]: ข้อความตัวเลือก }
   const answers = body.answers;
 
   if (!answers || typeof answers !== "object" || Array.isArray(answers)) {
@@ -258,14 +233,9 @@ export async function POST(request: NextRequest) {
       return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
-    // ตัวเลือกและคะแนนของคำถามสูบบุหรี่ (assessment_type_id = 6)
+    // หาข้อที่ข้ามได้ (ไม่เคยสูบ) แล้วตรวจคำตอบกับตัวเลือกใน DB และรวมคะแนน
     const choicesRows = await loadActiveChoices(client, 6);
 
-    /*
-      เอกสารอ้างอิงคิดคะแนนรวมจากข้อ 1-4 จึงต้องตอบครบทุกข้อ
-      ด้วยข้อความตัวเลือกที่มีอยู่จริง (คะแนนดึงจากฐานข้อมูล)
-      ยกเว้นตอบข้อ 2 ว่า "ไม่สูบ" (ไม่เคยสูบตลอดชีวิต) → ข้ามข้อถัดไป และนับเป็น 0 คะแนน
-    */
     const skippedIds = getSkippedQuestionIds(
       choicesRows,
       answers as Record<string, unknown>,
@@ -294,12 +264,7 @@ export async function POST(request: NextRequest) {
       score: choice.score,
     }));
 
-    /*
-     * การแปลผลตามเอกสารอ้างอิง ตารางที่ 14 (คะแนนรวมข้อ 1-4):
-     * 0 คะแนน: เสี่ยงต่ำ
-     * 1-4 คะแนน: เสี่ยงปานกลาง
-     * 5-8 คะแนน: เสี่ยงสูง
-     */
+    // แปลคะแนนเป็นระดับความเสี่ยง และหาคำแนะนำจาก DB
     let riskLevel = "เสี่ยงต่ำ";
     if (totalScore >= 5) {
       riskLevel = "เสี่ยงสูง";
@@ -307,7 +272,6 @@ export async function POST(request: NextRequest) {
       riskLevel = "เสี่ยงปานกลาง";
     }
 
-    // ดึง recommendation_id ที่ตรงกับระดับความเสี่ยง
     const recResult = await client.query(
       `
       SELECT rec_id
@@ -321,9 +285,9 @@ export async function POST(request: NextRequest) {
 
     const recommendationId = recResult.rows[0]?.rec_id ?? null;
 
+    // บันทึกผลลง assessment และคำตอบลง assessment_answers ใน transaction
     await client.query("BEGIN");
 
-    // บันทึก assessment
     const insertAssessmentResult = await client.query(
       `
       INSERT INTO assessment (
@@ -342,7 +306,6 @@ export async function POST(request: NextRequest) {
 
     const newAssessmentId = insertAssessmentResult.rows[0].assessment_id;
 
-    // บันทึกคำตอบใน assessment_answers
     for (const item of answersToInsert) {
       await client.query(
         `
@@ -366,9 +329,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // commit ผูกเวอร์ชันแบบประเมิน แล้วคืนผลลัพธ์
     await client.query("COMMIT");
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId, typeId: 6, assessmentId: newAssessmentId });
 
     return NextResponse.json({
@@ -378,6 +341,7 @@ export async function POST(request: NextRequest) {
       risk_level: riskLevel,
     });
   } catch (error) {
+    // จัดการ error → บันทึก log, rollback และคืน 500
     void logSystemError("POST /api/assessments/smoking", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST SMOKING ASSESSMENT ERROR:", error);

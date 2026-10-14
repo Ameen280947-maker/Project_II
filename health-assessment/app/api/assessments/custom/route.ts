@@ -15,19 +15,11 @@ import { logSystemError } from "@/lib/errorLogger";
 import { rejectIfNoHealthConsent } from "../_lib/healthConsent";
 import { markAssessmentSaved } from "../_lib/assessmentVersion";
 
-/* =========================================================
-   /api/assessments/custom  (แบบประเมินที่เจ้าหน้าที่สร้างเพิ่ม)
-   GET                                  → รายการแบบประเมินที่เปิดใช้งาน
-   GET ?type=<id>                       → คำถาม + ตัวเลือก + menuHref (id ไม่ใช่ตัวเลข/ไม่มีจริง = 404)
-   GET ?assessmentId=<id>&userId=<id>   → ผลการประเมินของผู้ใช้ใน session เท่านั้น
-   POST { userId, typeId, answers: [{ questionId, choiceId }] }
-   - คะแนนคิดจากฐานข้อมูลเสมอ ไม่เชื่อคะแนนที่ส่งมาจากเบราว์เซอร์
-   - ต้องตอบครบทุกข้อ ข้อละ 1 คำตอบ
-========================================================= */
-
+// API: แบบประเมินที่ admin สร้างเอง คืนรายการแบบประเมิน, คำถามของ type ที่ระบุ หรือผลประเมินตาม assessmentId
 export async function GET(request: NextRequest) {
   const p = new URL(request.url).searchParams;
   try {
+    // มี assessmentId → ตรวจสิทธิ์แล้วคืนผลประเมิน
     if (p.has("assessmentId")) {
       const auth = requireUser(request, p.get("userId"));
       if (!auth.ok) return auth.response;
@@ -37,6 +29,7 @@ export async function GET(request: NextRequest) {
       return result(assessmentId, auth.userId);
     }
 
+    // ไม่ระบุ type → คืนรายการแบบประเมินทั้งหมด
     if (!p.has("type")) return NextResponse.json({ success: true, types: await listGenericTypes() });
 
     const typeId = toId(p.get("type"));
@@ -44,6 +37,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "ไม่พบแบบประเมินนี้" }, { status: 404 });
     }
 
+    // ตรวจว่าแบบประเมินนี้มีเกณฑ์แปลผลและเปิดใช้งานอยู่
     const levels = await getGenericLevels(typeId);
     const t = await pool.query(
       `SELECT t.assessment_name, t.description, t.is_active, c.category_id, c.route_path
@@ -55,6 +49,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: "ไม่พบแบบประเมินนี้ หรือยังไม่เปิดให้ใช้งาน" }, { status: 404 });
     }
 
+    // ดึงคำถามและตัวเลือก แล้วจัดกลุ่มตัวเลือกตามคำถาม
     const { rows } = await pool.query(
       `SELECT q.question_id, q.question_text, c.choice_id, c.choice_text
          FROM questions q
@@ -77,20 +72,20 @@ export async function GET(request: NextRequest) {
         name: t.rows[0].assessment_name,
         description: t.rows[0].description,
         questions,
-        // หน้าเมนูของหมวดที่แบบประเมินนี้อยู่ (ใช้กับปุ่มย้อนกลับ) ไม่มีหมวด = หน้าเลือกหมวด
         menuHref: t.rows[0].category_id
           ? categoryHref({ id: t.rows[0].category_id, routePath: t.rows[0].route_path })
           : "/assessment-type",
       },
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/custom", error);
     console.error("GET /api/assessments/custom error:", error);
     return NextResponse.json({ success: false, message: "ไม่สามารถโหลดแบบประเมินได้" }, { status: 500 });
   }
 }
 
-// ดึงผลประเมินของผู้ใช้ พร้อมคำแนะนำและข้อมูลระดับความเสี่ยง
+// ดึงผลประเมินของผู้ใช้พร้อมคำแนะนำและระดับความรุนแรง แล้วคืนเป็น JSON response
 async function result(assessmentId: number, userId: number) {
   const { rows } = await pool.query(
     `SELECT a.assessment_id, a.assessment_type_id, a.total_score, a.risk_level, a.assessed_at,
@@ -104,6 +99,7 @@ async function result(assessmentId: number, userId: number) {
   const a = rows[0];
   if (!a) return NextResponse.json({ success: false, message: "ไม่พบผลการประเมิน" }, { status: 404 });
 
+  // หาระดับความรุนแรงและคะแนนเต็มจากเกณฑ์แปลผล แล้วคืน JSON
   const levels = (await getGenericLevels(a.assessment_type_id)) ?? [];
   const level = levels.find((l) => l.riskLevel === a.risk_level);
   return NextResponse.json({
@@ -125,17 +121,16 @@ async function result(assessmentId: number, userId: number) {
   });
 }
 
-// POST: บันทึกคำตอบแบบประเมินที่ staff สร้าง โดยคิดคะแนนจากฐานข้อมูล
+// API: ตรวจคำตอบแบบประเมินที่สร้างเอง รวมคะแนน หาระดับความเสี่ยง แล้วบันทึกผลลงฐานข้อมูล
 export async function POST(request: NextRequest) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ ความยินยอม และข้อมูลที่ส่งมา (typeId, answers)
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
   const auth = requireUser(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
   const userId = auth.userId;
 
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(userId);
   if (noConsent) return noConsent;
 
@@ -150,13 +145,14 @@ export async function POST(request: NextRequest) {
   try {
     if (!(await userExists(client, userId))) return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
 
+    // ตรวจว่าแบบประเมินเปิดใช้งานและมีเกณฑ์แปลผล
     const levels = await getGenericLevels(typeId, client);
     const t = await client.query("SELECT is_active FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
     if (!levels || !t.rows[0]?.is_active) {
       return NextResponse.json({ success: false, message: "แบบประเมินนี้ยังไม่เปิดให้ใช้งาน" }, { status: 404 });
     }
 
-    // คำถามที่ใช้งานอยู่ และคะแนนของแต่ละตัวเลือก (ตอบซ้ำ/ตัวเลือกไม่มีจริง/ไม่ครบ = 400)
+    // ตรวจคำตอบกับตัวเลือกใน DB รวมคะแนน แล้วหาระดับความเสี่ยง
     const resolved = resolveChoiceAnswers(
       await loadActiveChoices(client, typeId),
       answers.map((a) => ({ questionId: a?.questionId, choiceId: a?.choiceId ?? null }))
@@ -174,6 +170,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // บันทึกผลลง assessment และคำตอบลง assessment_answers ใน transaction
     await client.query("BEGIN");
     const ins = await client.query(
       `INSERT INTO assessment (user_id, assessment_type_id, recommendation_id, total_score, risk_level, assessed_at)
@@ -190,11 +187,11 @@ export async function POST(request: NextRequest) {
     }
     await client.query("COMMIT");
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId, typeId: typeId, assessmentId: assessmentId });
 
     return NextResponse.json({ success: true, assessmentId, totalScore: total, riskLevel: level.riskLevel });
   } catch (error) {
+    // จัดการ error → บันทึก log, rollback และคืน 500
     void logSystemError("POST /api/assessments/custom", error);
     await client.query("ROLLBACK").catch(() => {});
     console.error("POST /api/assessments/custom error:", error);

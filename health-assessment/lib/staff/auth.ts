@@ -2,23 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import pool from "@/lib/db";
 import { getSession } from "@/lib/session";
 
-/* =========================================================
-   ตรวจสิทธิ์ Staff ฝั่งเซิร์ฟเวอร์
-   ทุก API ของ Staff ต้องเรียกฟังก์ชันนี้ก่อน
-   - อ่านตัวตนจาก cookie "session_staff" (ตั้งตอน login, ลงลายเซ็น HMAC)
-   - header "x-staff-id" จาก staffFetch ต้องตรงกับ cookie ถ้าส่งมา
-   - เช็ค role ในฐานข้อมูลจริงอีกชั้น
-========================================================= */
-
-export const STAFF_ROLE_ID = 3; // ตาราง roles: 1 = system_admin, 2 = user, 3 = staff
+// role_id ของเจ้าหน้าที่และผู้ใช้ทั่วไป
+export const STAFF_ROLE_ID = 3;
 export const USER_ROLE_ID = 2;
 
+// ข้อมูลเจ้าหน้าที่ที่ผ่านการตรวจสิทธิ์
 export type StaffUser = { userId: number; username: string };
 
-// ตรวจ session ของ staff + x-staff-id + role ในฐานข้อมูล คืน staff หรือ response error 401/403
+// ตรวจ session staff, header x-staff-id ต้องตรงกัน และบัญชีต้องเป็น role staff ที่ยังใช้งานอยู่
 export async function requireStaff(
   request: NextRequest
 ): Promise<{ staff: StaffUser; error?: never } | { staff?: never; error: NextResponse }> {
+  // ตรวจ session และ header x-staff-id ของแท็บนี้
   const session = getSession(request, "staff");
   if (!session) {
     return { error: NextResponse.json({ success: false, message: "กรุณาเข้าสู่ระบบ" }, { status: 401 }) };
@@ -29,6 +24,7 @@ export async function requireStaff(
     return { error: NextResponse.json({ success: false, message: "บัญชีในแท็บนี้ไม่ตรงกับที่เข้าสู่ระบบ กรุณาเข้าสู่ระบบใหม่" }, { status: 403 }) };
   }
 
+  // ตรวจจาก DB ว่ายังเป็นเจ้าหน้าที่ที่เปิดใช้งานอยู่
   const { rows } = await pool.query(
     "SELECT user_id, username, role_id, is_active FROM users WHERE user_id = $1",
     [id]
@@ -40,7 +36,7 @@ export async function requireStaff(
   return { staff: { userId: u.user_id, username: u.username } };
 }
 
-// บันทึกการเข้าถึงข้อมูลรายบุคคล (PDPA) ถ้าบันทึกไม่ได้ไม่ให้ทั้งคำขอพัง
+// บันทึกการกระทำของเจ้าหน้าที่ลงตาราง access_logs (ถ้าล้มเหลวแค่ log ใน console)
 export async function logAccess(staffId: number, targetUserId: number | null, action: string, detail?: string) {
   try {
     await pool.query(

@@ -3,21 +3,14 @@ import pool from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { logSystemError } from "@/lib/errorLogger";
 
-/* =========================================================
-   GET /api/settings/export?userId=...
-   ข้อมูลของผู้ใช้สำหรับปุ่ม "ดาวน์โหลดข้อมูลของฉัน" (สิทธิ์ขอรับข้อมูลตาม PDPA)
-   - profiles    : โปรไฟล์สุขภาพทุกเวอร์ชัน (แถวล่าสุดคือข้อมูลปัจจุบัน)
-   - assessments : ประวัติการประเมิน
-   - answers     : คำตอบรายข้อของทุกการประเมิน
-========================================================= */
-
+// API: ส่งออกข้อมูลส่วนตัวของผู้ใช้ (โปรไฟล์สุขภาพ ผลประเมิน และคำตอบ) เป็น JSON
 export async function GET(request: NextRequest) {
   try {
-    // ใช้ผู้ใช้จาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(request, new URL(request.url).searchParams.get("userId"));
     if (!auth.ok) return auth.response;
     const userId = auth.userId;
 
+    // ดึงโปรไฟล์ทุกเวอร์ชัน ผลประเมิน และคำตอบรายข้อพร้อมกัน
     const [profiles, assessments, answers] = await Promise.all([
       pool.query(
         `SELECT profile_id, age, gender, height_cm, weight_kg, waist_cm,

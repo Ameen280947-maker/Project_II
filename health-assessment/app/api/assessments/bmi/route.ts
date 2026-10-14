@@ -10,16 +10,14 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// แถวคำถามจากตาราง questions
 type QuestionRow = {
   question_id: number;
   question_text: string;
   display_order: number;
 };
 
-/* =========================================================
-   BMI level mapper
-========================================================= */
-// แปลงค่า BMI เป็นระดับ (ผอม/ปกติ/น้ำหนักเกิน/อ้วน/อ้วนอันตราย)
+// แปลค่า BMI เป็นระดับ ผอม/ปกติ/น้ำหนักเกิน/อ้วน/อ้วนอันตราย (เกณฑ์คนเอเชีย)
 function mapBmiToLevel(bmi: number) {
   if (bmi < 18.5) return "ผอม";
   if (bmi < 23) return "ปกติ";
@@ -28,15 +26,13 @@ function mapBmiToLevel(bmi: number) {
   return "อ้วนอันตราย";
 }
 
-/* =========================================================
-   GET
-   ดึงผล assessment BMI
-========================================================= */
+// API: ดึงผลประเมิน BMI ตาม assessmentId ของผู้ใช้ที่ล็อกอิน พร้อมคำแนะนำ
 export async function GET(request: Request) {
   const auth = requireUser(request);
   if (!auth.ok) return auth.response;
 
   try {
+    // ตรวจ assessmentId จาก query string
     const url = new URL(request.url);
 
     const assessmentId = Number(url.searchParams.get("assessmentId"));
@@ -48,6 +44,7 @@ export async function GET(request: Request) {
       );
     }
 
+    // ดึงผลประเมิน BMI ของผู้ใช้พร้อมคำแนะนำ
     const assessmentResult = await pool.query<{
       assessment_id: number;
       user_id: number;
@@ -89,6 +86,7 @@ export async function GET(request: Request) {
       );
     }
 
+    // ดึงคำตอบ แล้วแยกน้ำหนัก/ส่วนสูงเพื่อคำนวณ BMI กลับ
     const answersResult = await pool.query<{
       display_order: number;
       question_text: string;
@@ -111,7 +109,6 @@ export async function GET(request: Request) {
     let weightKg: number | null = null;
     let heightCm: number | null = null;
 
-    // จับคู่จากข้อความคำถาม (ลำดับคำถามในฐานข้อมูลคือ ส่วนสูง=1 น้ำหนัก=2)
     for (const answer of answersResult.rows) {
       if (answer.question_text.includes("น้ำหนัก")) {
         weightKg = Number(answer.answer_value);
@@ -122,6 +119,7 @@ export async function GET(request: Request) {
       }
     }
 
+    // ประกอบผลลัพธ์แล้วคืน JSON
     const assessment = assessmentResult.rows[0];
 
     const bmi =
@@ -143,6 +141,7 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/bmi", error);
     console.error("GET BMI ERROR:", error);
     return NextResponse.json(
@@ -155,26 +154,22 @@ export async function GET(request: Request) {
   }
 }
 
-/* =========================================================
-   POST
-   บันทึกแบบประเมิน BMI
-========================================================= */
+// API: คำนวณ BMI จากน้ำหนัก/ส่วนสูง บันทึกผลประเมินลงฐานข้อมูล แล้วคืนระดับและคำแนะนำ
 export async function POST(request: Request) {
+  // อ่าน body ตรวจสิทธิ์ผู้ใช้ สถานะแบบประเมิน และความยินยอม
   const body = await readJsonObject(request);
   if (!body) return badRequest("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
   const auth = requireUser(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(1);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(auth.userId);
   if (noConsent) return noConsent;
   const userId = auth.userId;
 
+  // ตรวจน้ำหนัก (10–400 กก.) และส่วนสูง (50–250 ซม.)
   const weightKg = toNumberInRange(body.weightKg, 10, 400);
   const heightCm = toNumberInRange(body.heightCm, 50, 250);
 
@@ -193,9 +188,9 @@ export async function POST(request: Request) {
       return badRequest("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
+    // เริ่ม transaction แล้วหา assessment_type_id และคำถามน้ำหนัก/ส่วนสูงใน DB
     await client.query("BEGIN");
 
-    /* หาประเภทแบบประเมิน */
     const typeResult = await client.query<{ assessment_type_id: number }>(
       `
       SELECT assessment_type_id
@@ -212,7 +207,6 @@ export async function POST(request: Request) {
 
     const assessmentTypeId = typeResult.rows[0].assessment_type_id;
 
-    /* ดึงคำถาม (มี 2 คำถาม: ส่วนสูง และ น้ำหนัก) */
     const questionResult = await client.query<QuestionRow>(
       `
       SELECT
@@ -231,7 +225,6 @@ export async function POST(request: Request) {
       throw new Error("คำถาม BMI ในฐานข้อมูลไม่ครบ");
     }
 
-    // จับคู่จากข้อความคำถาม ไม่อิง display_order
     const weightQuestion = questionResult.rows.find((q) => q.question_text.includes("น้ำหนัก"));
     const heightQuestion = questionResult.rows.find((q) => q.question_text.includes("ส่วนสูง"));
 
@@ -239,11 +232,10 @@ export async function POST(request: Request) {
       throw new Error("ไม่พบคำถามน้ำหนักหรือส่วนสูง");
     }
 
-    /* คำนวณ BMI */
+    // คำนวณ BMI ระดับความเสี่ยง และหาคำแนะนำที่ตรงกัน
     const bmi = Number((weightKg / Math.pow(heightCm / 100, 2)).toFixed(2));
     const riskLevel = mapBmiToLevel(bmi);
 
-    /* เลือกคำแนะนำ */
     const recommendationResult = await client.query<{
       rec_id: number;
       recommendation_text: string;
@@ -262,7 +254,7 @@ export async function POST(request: Request) {
 
     const recommendation = recommendationResult.rows[0] ?? null;
 
-    /* บันทึก assessment */
+    // บันทึกผลลง assessment และคำตอบน้ำหนัก/ส่วนสูงลง assessment_answers
     const assessmentResult = await client.query<{ assessment_id: number }>(
       `
       INSERT INTO assessment (
@@ -280,7 +272,6 @@ export async function POST(request: Request) {
 
     const assessmentId = assessmentResult.rows[0].assessment_id;
 
-    /* บันทึกคำตอบ น้ำหนัก */
     await client.query(
       `
       INSERT INTO assessment_answers (
@@ -295,7 +286,6 @@ export async function POST(request: Request) {
       [assessmentId, weightQuestion.question_id, String(weightKg)],
     );
 
-    /* บันทึกคำตอบ ส่วนสูง */
     await client.query(
       `
       INSERT INTO assessment_answers (
@@ -310,9 +300,9 @@ export async function POST(request: Request) {
       [assessmentId, heightQuestion.question_id, String(heightCm)],
     );
 
+    // commit ผูกเวอร์ชันแบบประเมิน แล้วคืนผลลัพธ์
     await client.query("COMMIT");
 
-    /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
     await markAssessmentSaved(client, { userId, typeId: assessmentTypeId, assessmentId: assessmentId });
 
     return NextResponse.json(
@@ -328,6 +318,7 @@ export async function POST(request: Request) {
       { status: 201 },
     );
   } catch (error) {
+    // จัดการ error → บันทึก log, rollback และคืน 500
     void logSystemError("POST /api/assessments/bmi", error);
     try {
       await client.query("ROLLBACK");

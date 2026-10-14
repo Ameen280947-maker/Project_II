@@ -10,21 +10,7 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   ดูแลฐานข้อมูล
-
-   GET  /api/admin/database
-        → รายการตาราง (จำนวนแถว, ขนาด)
-        → ผลตรวจความถูกต้องของข้อมูล (ข้อมูลกำพร้า)
-
-   POST /api/admin/database
-        body: { action: "fix_integrity", check: string }
-
-   ทุก query รันทีละตัว ไม่แย่ง connection กับผู้ใช้
-   (Supabase session pooler รับได้จำกัด)
-========================================================= */
-
-/* ข้อมูลกำพร้า = แถวที่อ้างถึงข้อมูลแม่ที่ถูกลบไปแล้ว */
+// รายการตรวจความถูกต้องของข้อมูล: SQL นับแถวที่ผิด และ SQL สำหรับแก้ไข
 const INTEGRITY_CHECKS: {
   key: string;
   label: string;
@@ -70,7 +56,6 @@ const INTEGRITY_CHECKS: {
     countSql: `SELECT COUNT(*)::int AS n FROM users u
                WHERE u.role_id IS NULL
                   OR NOT EXISTS (SELECT 1 FROM roles r WHERE r.role_id = u.role_id)`,
-    // ตั้งเป็น role ผู้ใช้ทั่วไป
     fixSql: [
       `UPDATE users SET role_id = (SELECT role_id FROM roles WHERE role_name = 'user' LIMIT 1)
        WHERE role_id IS NULL
@@ -79,16 +64,13 @@ const INTEGRITY_CHECKS: {
   },
 ];
 
-/* =========================================================
-   GET
-========================================================= */
-
-// GET: คืนรายการตาราง (จำนวนแถว/ขนาด) ผลตรวจข้อมูลกำพร้า และขนาดฐานข้อมูล
+// API: คืนขนาดฐานข้อมูล จำนวนแถวของแต่ละตาราง และจำนวนข้อมูลที่ผิดจากการตรวจความถูกต้อง
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
 
+    // ดึงรายชื่อตารางใน schema public พร้อมขนาด
     const tablesRes = await pool.query(
       `
       SELECT
@@ -101,7 +83,7 @@ export async function GET(request: NextRequest) {
     );
     const tableNames: string[] = tablesRes.rows.map((r) => r.table_name);
 
-    // นับจำนวนแถวจริงทุกตารางใน query เดียว (ใช้ connection เดียว)
+    // นับจำนวนแถวทุกตารางด้วย query เดียว (UNION ALL)
     const counts: number[] = [];
     if (tableNames.length) {
       const countRes = await pool.query(
@@ -118,7 +100,7 @@ export async function GET(request: NextRequest) {
       total_bytes: Number(row.total_bytes),
     }));
 
-    // ตรวจข้อมูลกำพร้าทีละรายการ
+    // รันรายการตรวจความถูกต้องทีละข้อ (ข้อที่ error ให้คืน count = null)
     const integrity = [];
     for (const check of INTEGRITY_CHECKS) {
       try {
@@ -134,6 +116,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // ขนาดฐานข้อมูลทั้งหมด แล้วคืนผลรวม
     const sizeRes = await pool.query(
       `SELECT pg_size_pretty(pg_database_size(current_database())) AS size`,
     );
@@ -150,22 +133,18 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* =========================================================
-   POST
-========================================================= */
-
-// POST: แก้ไขข้อมูลกำพร้าตามรายการตรวจที่เลือก (action = fix_integrity)
+// API: รันคำสั่งดูแลฐานข้อมูล เช่น แก้ข้อมูลที่ผิดตามรายการตรวจ (ทำใน transaction)
 export async function POST(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
     if (!auth.ok) return auth.response;
 
+    // อ่านคำสั่งที่ส่งมา (action, check)
     const body = (await request.json().catch(() => ({}))) as {
       action?: string;
       check?: string;
     };
 
-    /* ---------- แก้ไขข้อมูลกำพร้า ---------- */
     if (body.action === "fix_integrity") {
       const check = INTEGRITY_CHECKS.find((c) => c.key === body.check);
       if (!check) {
@@ -175,6 +154,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // รัน SQL แก้ไขทั้งหมดใน transaction แล้วคืนจำนวนแถวที่แก้
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
@@ -197,6 +177,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // action ไม่รู้จัก → 400
     return NextResponse.json(
       { success: false, message: "คำสั่งไม่ถูกต้อง" },
       { status: 400 },

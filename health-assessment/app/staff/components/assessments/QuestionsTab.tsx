@@ -5,30 +5,28 @@ import { ArrowDown, ArrowUp, Check, Pencil, Plus, Trash2, X } from "lucide-react
 import { inputCls } from "../ui";
 import { IconBtn, newKey, type EQuestion } from "./shared";
 
-/* =========================================================
-   แท็บ "คำถามและคะแนน"
-========================================================= */
-
+// ชนิดของตัวเลือกหนึ่งข้อในคำถาม
 type Choice = EQuestion["choices"][number];
 
-// แท็บคำถาม: แสดงรายการคำถาม เพิ่ม ลบ เลื่อนลำดับ และแก้ไขแต่ละข้อ
+// แท็บจัดการคำถาม: เพิ่ม แก้ไข ลบ และสลับลำดับคำถามของแบบประเมิน
 export default function QuestionsTab({ questions, onChange }: { questions: EQuestion[]; onChange: (qs: EQuestion[]) => void }) {
+  // key ของคำถามที่กำลังแก้ไขอยู่
   const [editing, setEditing] = useState<string | null>(null);
 
-  // แก้ไขข้อมูลคำถามตาม key
+  // อัปเดตบางฟิลด์ของคำถามตาม key
   const update = (key: string, patch: Partial<EQuestion>) => onChange(questions.map((q) => (q.key === key ? { ...q, ...patch } : q)));
-  // สลับลำดับคำถามขึ้น/ลง
+  // สลับตำแหน่งคำถามขึ้นหรือลงหนึ่งลำดับ
   const move = (i: number, d: -1 | 1) => {
     const next = [...questions];
     [next[i], next[i + d]] = [next[i + d], next[i]];
     onChange(next);
   };
-  // ลบคำถาม (ถามยืนยันก่อน)
+  // ยืนยันแล้วลบคำถามออกจากรายการ
   const remove = (key: string) => {
     if (!confirm("ลบคำถามข้อนี้? (ผลประเมินเดิมของผู้ใช้จะไม่หาย)")) return;
     onChange(questions.filter((q) => q.key !== key));
   };
-  // เพิ่มคำถามใหม่ (ใช้ตัวเลือกของคำถามแบบตัวเลือกข้อแรกเป็นแม่แบบ) แล้วเปิดแก้ไข
+  // เพิ่มคำถามใหม่ โดยคัดลอกชุดตัวเลือกจากคำถามแรกที่มี (ถ้ามี) แล้วเปิดโหมดแก้ไข
   const add = () => {
     const tpl = questions.find((q) => q.type === "choice")?.choices.map((c) => ({ text: c.text, score: c.score }));
     const q: EQuestion = {
@@ -46,6 +44,7 @@ export default function QuestionsTab({ questions, onChange }: { questions: EQues
 
   return (
     <div className="mt-4 flex flex-col gap-3">
+      {/* รายการการ์ดคำถาม และปุ่มเพิ่มคำถาม */}
       {questions.length === 0 && <p className="text-sm text-staff-muted">ยังไม่มีคำถาม เริ่มจากกด “เพิ่มคำถาม”</p>}
       {questions.map((q, i) => (
         <QuestionCard
@@ -71,7 +70,7 @@ export default function QuestionsTab({ questions, onChange }: { questions: EQues
   );
 }
 
-// การ์ดคำถามหนึ่งข้อ: แสดง/แก้ไขข้อความ ตัวเลือก และคะแนน พร้อมปุ่มเลื่อน/ลบ
+// การ์ดคำถามหนึ่งข้อ แสดงข้อความ/ตัวเลือกพร้อมคะแนน และแก้ไขได้เมื่ออยู่ในโหมดแก้ไข
 function QuestionCard({
   q,
   index,
@@ -91,11 +90,12 @@ function QuestionCard({
   onMove: (d: -1 | 1) => void;
   onRemove: () => void;
 }) {
-  // แก้ไขตัวเลือกลำดับที่ j ของคำถามนี้
+  // อัปเดตข้อความหรือคะแนนของตัวเลือกลำดับที่ j
   const setChoice = (j: number, patch: Partial<Choice>) => onChange({ choices: q.choices.map((c, k) => (k === j ? { ...c, ...patch } : c)) });
 
   return (
     <div className={`rounded-2xl border p-4 transition ${editing ? "border-staff-300 bg-staff-soft" : "border-staff-line"}`}>
+      {/* หัวการ์ด: ลำดับ ข้อความคำถาม และปุ่มเลื่อน/แก้ไข/ลบ */}
       <div className="flex flex-wrap items-start gap-3 sm:flex-nowrap">
         <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-staff-100 text-sm font-bold text-staff-700">{index + 1}</span>
         <div className="min-w-0 flex-1 basis-[calc(100%-44px)] sm:basis-auto">
@@ -131,6 +131,7 @@ function QuestionCard({
         </div>
       </div>
 
+      {/* แสดงตัวเลือกและคะแนน (โหมดดู) */}
       {q.type === "choice" && !editing && (
         <div className="mt-3 flex flex-wrap gap-2 sm:pl-11">
           {q.choices.map((c, j) => (
@@ -142,6 +143,7 @@ function QuestionCard({
         </div>
       )}
 
+      {/* แก้ไขข้อความ/คะแนนตัวเลือก เพิ่ม/ลบตัวเลือก (โหมดแก้ไข) */}
       {q.type === "choice" && editing && (
         <div className="mt-3 flex flex-col gap-2 sm:pl-11">
           {q.choices.map((c, j) => (

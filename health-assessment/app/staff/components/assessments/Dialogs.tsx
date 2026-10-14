@@ -14,13 +14,8 @@ import {
 } from "@/lib/assessmentCategories";
 import type { CategoryOption } from "./shared";
 
-/* =========================================================
-   สร้างแบบประเมินใหม่
-   - ต้องเลือกหมวดหมู่: หมวดที่มีอยู่ หรือ "สร้างหมวดหมู่ใหม่" (ชื่อ / คำอธิบายสั้น / สี)
-   - หมวดใหม่ถูกสร้างพร้อมแบบประเมินใน transaction เดียว (POST /api/staff/assessments)
-========================================================= */
-
-// กล่องสร้างแบบประเมินใหม่: กรอกชื่อ คำอธิบาย เลือกหรือสร้างหมวดหมู่ แล้วส่งไป API
+// กล่องโต้ตอบสร้างแบบประเมินใหม่ เลือกหมวดเดิมหรือสร้างหมวดใหม่พร้อมสี
+// รับ categories (รายการหมวด), onClose, onCreated(id) → เรียกเมื่อสร้างสำเร็จ
 export function CreateDialog({
   categories,
   onClose,
@@ -30,9 +25,9 @@ export function CreateDialog({
   onClose: () => void;
   onCreated: (id: number) => void;
 }) {
+  // state ของฟอร์มสร้างแบบประเมินและหมวดใหม่
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  // "" = ยังไม่เลือก, "new" = สร้างหมวดใหม่, อื่น ๆ = category_id
   const [category, setCategory] = useState("");
   const [catName, setCatName] = useState("");
   const [catSubtitle, setCatSubtitle] = useState("");
@@ -40,11 +35,13 @@ export function CreateDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // ค่าที่คำนวณสำหรับตรวจฟอร์ม
   const isNew = category === "new";
   const nameTaken = isNew && categories.some((c) => c.name.trim().toLowerCase() === catName.trim().toLowerCase());
   const ready = name.trim() && category && (!isNew || (catName.trim() && !nameTaken));
 
-  // ส่งคำขอสร้างแบบประเมิน (พร้อมสร้างหมวดใหม่ถ้าเลือก)
+  // ส่ง POST /api/staff/assessments เพื่อสร้างแบบประเมิน (และหมวดใหม่ถ้าเลือก) แล้วแจ้ง id กลับ
+  // ขั้นตอน: ตั้งสถานะกำลังบันทึก → ส่ง newCategory หรือ categoryId → สำเร็จเรียก onCreated / ล้มเหลวแสดง error
   const submit = async () => {
     setSaving(true);
     setError("");
@@ -74,6 +71,7 @@ export function CreateDialog({
         <p className="mt-1 text-sm text-staff-muted">
           สำหรับแบบประเมินที่ตอบแบบเลือกตัวเลือก รวมคะแนน แล้วแปลผลตามช่วงคะแนน · แบบประเมินจะเริ่มแบบปิดไว้จนกว่าจะเพิ่มคำถาม ตั้งเกณฑ์แปลผล เผยแพร่ แล้วจึงกดเปิดใช้งาน
         </p>
+        {/* ฟอร์มชื่อ คำอธิบาย และหมวดหมู่ */}
         <label className="mt-4 flex flex-col gap-1.5 text-sm font-semibold">
           ชื่อแบบประเมิน
           <input value={name} onChange={(e) => setName(e.target.value)} maxLength={100} autoFocus placeholder="เช่น แบบประเมินภาวะหมดไฟในการทำงาน" className={inputCls} />
@@ -83,7 +81,6 @@ export function CreateDialog({
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} maxLength={500} className={inputCls} placeholder="แบบประเมินนี้ใช้ทำอะไร ใช้เวลาประมาณกี่นาที" />
         </label>
 
-        {/* ===== หมวดหมู่ที่ผู้ใช้จะเห็นแบบประเมินนี้ ===== */}
         <label className="mt-3 flex flex-col gap-1.5 text-sm font-semibold">
           หมวดหมู่
           <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
@@ -101,6 +98,7 @@ export function CreateDialog({
           <span className="text-xs font-normal text-staff-muted">ผู้ใช้จะพบแบบประเมินนี้ในหมวดที่เลือก (หน้า &quot;เข้าสู่แบบประเมิน&quot;)</span>
         </label>
 
+        {/* ฟอร์มสร้างหมวดหมู่ใหม่ */}
         {isNew && (
           <div className="mt-3 flex flex-col gap-3 rounded-2xl border border-dashed border-staff-300 p-4">
             <label className="flex flex-col gap-1.5 text-sm font-semibold">
@@ -128,6 +126,7 @@ export function CreateDialog({
           </div>
         )}
 
+        {/* error และปุ่มยกเลิก/สร้าง */}
         <div className="mt-3">
           <ErrorBox message={error} />
         </div>
@@ -144,7 +143,7 @@ export function CreateDialog({
   );
 }
 
-/* ===== เลือกสีของหมวด (ใช้ทั้งตอนสร้างและแก้ไขหมวด) ===== */
+// ตัวเลือกสีธีมของหมวดหมู่ แสดงเป็นปุ่มวงสีให้กดเลือก
 export function ThemePicker({ value, onChange }: { value: CategoryTheme; onChange: (t: CategoryTheme) => void }) {
   return (
     <fieldset>
@@ -172,11 +171,8 @@ export function ThemePicker({ value, onChange }: { value: CategoryTheme; onChang
   );
 }
 
-/* =========================================================
-   ยืนยันการลบแบบประเมิน (พิมพ์ชื่อให้ตรงก่อนลบ)
-========================================================= */
-
-// กล่องยืนยันลบแบบประเมิน ต้องพิมพ์ชื่อให้ตรงก่อนลบ
+// กล่องยืนยันการลบแบบประเมิน ต้องพิมพ์ชื่อให้ตรงก่อนลบ และเตือนจำนวนผลที่จะหายไป
+// รับ typeId, name, resultCount (จำนวนผลประเมินของผู้ใช้), onClose, onDeleted
 export function DeleteDialog({
   typeId,
   name,
@@ -186,7 +182,6 @@ export function DeleteDialog({
 }: {
   typeId: number;
   name: string;
-  // ผลประเมินของผู้ใช้ในแบบนี้ (จะถูกลบไปด้วย)
   resultCount: number;
   onClose: () => void;
   onDeleted: () => void;
@@ -195,7 +190,8 @@ export function DeleteDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  // ส่งคำขอลบแบบประเมินพร้อมชื่อที่พิมพ์ยืนยัน
+  // ส่ง DELETE /api/staff/assessments พร้อมชื่อยืนยัน แล้วแจ้งว่าลบสำเร็จ
+  // ขั้นตอน: ตั้ง busy → ส่ง typeId + confirmName → สำเร็จเรียก onDeleted / ล้มเหลวแสดง error
   const submit = async () => {
     setBusy(true);
     setError("");
@@ -218,6 +214,7 @@ export function DeleteDialog({
         <p className="mt-1 text-sm text-staff-muted">
           คำถาม ตัวเลือก เกณฑ์แปลผล คำแนะนำ และประวัติการแก้ไขของแบบประเมินนี้จะถูกลบทั้งหมด และกู้คืนไม่ได้
         </p>
+        {/* คำเตือนจำนวนผลประเมินที่จะถูกลบ */}
         {resultCount > 0 ? (
           <p className="mt-3 rounded-xl border border-[#f7c6c9] bg-[#fff5f5] px-3 py-2 text-sm font-semibold text-risk-crit" role="alert">
             มีผลการประเมินของผู้ใช้ {resultCount.toLocaleString("th-TH")} รายการ ผลเหล่านี้จะถูกลบออกจากประวัติของผู้ใช้ด้วย
@@ -226,6 +223,7 @@ export function DeleteDialog({
         ) : (
           <p className="mt-3 text-sm text-staff-muted">ยังไม่มีผู้ใช้ทำแบบประเมินนี้</p>
         )}
+        {/* ช่องยืนยันชื่อ error และปุ่มลบ */}
         <label className="mt-4 flex flex-col gap-1.5 text-sm font-semibold">
           พิมพ์ชื่อแบบประเมินเพื่อยืนยัน
           <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={name} autoFocus className={inputCls} />

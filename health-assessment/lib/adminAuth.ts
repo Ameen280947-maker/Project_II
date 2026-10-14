@@ -3,29 +3,24 @@ import pool from "@/lib/db";
 import { ensureAdminTables } from "@/lib/adminSchema";
 import { getSession } from "@/lib/session";
 
-/* =========================================================
-   ตรวจสิทธิ์ System Admin สำหรับ API /api/admin/*
-
-   อ่านผู้ใช้จาก session cookie (ตั้งตอน login, ลงลายเซ็น HMAC)
-   แล้วเช็กกับฐานข้อมูลอีกครั้งว่า role_name = 'system_admin'
-   - ไม่มี session → 401
-   - ไม่ใช่ admin  → 403
-   ไม่เชื่อ header / userId ที่หน้าเว็บส่งมา
-========================================================= */
-
+// ชื่อ role ของผู้ดูแลระบบในตาราง roles
 export const ADMIN_ROLE = "system_admin";
 
+// ข้อมูลผู้ดูแลระบบที่ผ่านการตรวจสิทธิ์
 export type AdminUser = {
   user_id: number;
   username: string;
 };
 
+// ผลการตรวจสิทธิ์: ผ่าน (ได้ admin) หรือไม่ผ่าน (ได้ response error)
 type AdminCheck =
   | { ok: true; admin: AdminUser }
   | { ok: false; response: NextResponse };
 
-// ตรวจ session ของแอดมินและ role ในฐานข้อมูล ผ่านแล้วคืนข้อมูลแอดมิน ไม่ผ่านคืน response 401/403
+// ตรวจ session admin และ role system_admin จากตาราง users/roles คืน 401/403 ถ้าไม่ผ่าน
+// ผ่านแล้วสร้างตารางของ admin (ถ้ายังไม่มี) และคืนข้อมูล admin
 export async function requireAdmin(request: NextRequest): Promise<AdminCheck> {
+  // ตรวจว่ามี session admin ที่ถูกต้อง
   const session = getSession(request, "admin");
   const userId = session?.userId ?? 0;
 
@@ -39,6 +34,7 @@ export async function requireAdmin(request: NextRequest): Promise<AdminCheck> {
     };
   }
 
+  // ดึงผู้ใช้และ role จาก DB แล้วตรวจว่าเป็น system_admin
   const result = await pool.query(
     `
     SELECT u.user_id, u.username, r.role_name
@@ -62,6 +58,7 @@ export async function requireAdmin(request: NextRequest): Promise<AdminCheck> {
     };
   }
 
+  // เตรียมตารางของระบบผู้ดูแลก่อนใช้งาน
   await ensureAdminTables();
 
   return {
@@ -70,7 +67,7 @@ export async function requireAdmin(request: NextRequest): Promise<AdminCheck> {
   };
 }
 
-/* ตอบ error 500 แบบเดียวกันทุก API */
+// สร้าง response 500 พร้อมข้อความและรายละเอียด error
 export function serverError(message: string, error: unknown) {
   return NextResponse.json(
     {
@@ -82,7 +79,7 @@ export function serverError(message: string, error: unknown) {
   );
 }
 
-/* รายชื่อตารางจริงใน schema public (ใช้ตรวจชื่อตารางก่อนนำไปต่อ SQL) */
+// ดึงรายชื่อตารางทั้งหมดใน schema public ของฐานข้อมูล
 export async function listPublicTables(): Promise<string[]> {
   const result = await pool.query(
     `
@@ -95,7 +92,7 @@ export async function listPublicTables(): Promise<string[]> {
   return result.rows.map((row) => String(row.table_name));
 }
 
-/* ใส่ "..." ครอบชื่อตาราง กัน SQL injection (ใช้คู่กับ listPublicTables) */
+// ครอบชื่อตาราง/คอลัมน์ด้วยเครื่องหมายคำพูดเพื่อใช้ใน SQL อย่างปลอดภัย
 export function quoteIdent(name: string) {
   return `"${name.replace(/"/g, '""')}"`;
 }

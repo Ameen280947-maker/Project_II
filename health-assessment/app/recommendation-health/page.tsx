@@ -30,10 +30,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/* =========================================================
-   TYPES (ตรงกับ /api/dashboard และ /api/notifications)
-========================================================= */
-
+// ผลประเมินหนึ่งรายการจาก /api/dashboard (รวมค่าความดันและธงทำร้ายตนเอง)
 type Assessment = {
   assessment_id: number;
   assessment_type_id: number;
@@ -44,40 +41,41 @@ type Assessment = {
   diastolic?: number | string | null;
   assessed_at: string;
   recommendation_text?: string | null;
-  self_harm_flag?: boolean; // 9Q: ตอบข้อคิดทำร้ายตนเอง > 0
+  self_harm_flag?: boolean;
 };
 
+// response ของ /api/dashboard: ผลล่าสุดของแต่ละประเภท + ประวัติทั้งหมด
 type DashboardData = {
   success: boolean;
   latestByType: Assessment[];
   assessments: Assessment[];
 };
 
+// หมวดของแบบประเมิน: สุขภาพจิต / สุขภาพกาย / พฤติกรรม
 type Category = "mind" | "body" | "behavior";
 
+// ค่าตั้งของแต่ละประเภทแบบประเมิน: ชื่อ ไอคอน หมวด เกณฑ์ระดับ ขั้นตอนดูแล เป้าหมายรายสัปดาห์
 type TypeConfig = {
-  match: string[]; // assessment_name ที่เป็นไปได้ (ตัวพิมพ์เล็ก)
+  match: string[];
   thaiName: string;
   icon: LucideIcon;
   category: Category;
   max?: number;
   unit?: string;
-  detailHref?: string; // หน้าคำแนะนำฉบับเต็มของแต่ละแบบประเมินที่มีอยู่แล้ว
+  detailHref?: string;
   levelFromScore?: (score: number) => Level;
   why: string;
   steps: string[];
   goal: string;
-  seeDoctor?: string; // ใส่เฉพาะเมื่อเอกสารระบุ
+  seeDoctor?: string;
   weeklyGoals: string[];
-  source?: string; // แหล่งอ้างอิงของเนื้อหาคำแนะนำ
+  source?: string;
 };
 
-/* =========================================================
-   THEME (สีเดียวกับระบบเดิม)
-========================================================= */
-
+// สีหลักของหน้า
 const PRIMARY = "#b91c2b";
 
+// ป้ายชื่อ สี และลำดับความสำคัญ (n) ของแต่ละระดับความเสี่ยง
 const LEVEL_STYLE: Record<Level, { label: string; pill: string; iconWrap: string; dot: string; n: number }> = {
   high: {
     label: "ควรพบผู้เชี่ยวชาญ",
@@ -109,6 +107,7 @@ const LEVEL_STYLE: Record<Level, { label: string; pill: string; iconWrap: string
   },
 };
 
+// แท็บกรองแผนตามหมวด
 const CATEGORY_TABS: { key: "all" | Category; label: string }[] = [
   { key: "all", label: "ทั้งหมด" },
   { key: "mind", label: "สุขภาพจิต" },
@@ -116,15 +115,8 @@ const CATEGORY_TABS: { key: "all" | Category; label: string }[] = [
   { key: "behavior", label: "พฤติกรรม" },
 ];
 
-/* =========================================================
-   เนื้อหาคำแนะนำต่อแบบประเมิน
-   อ้างอิงเอกสาร "แนวทางการวิเคราะห์ข้อมูลการคัดกรองสุขภาพและพฤติกรรมเสี่ยง
-   โรคไม่ติดต่อ" กองโรคไม่ติดต่อ กรมควบคุมโรค (เลขตารางกำกับไว้แต่ละแบบ)
-   seeDoctor ใส่เฉพาะเมื่อเอกสารระบุไว้
-========================================================= */
-
+// ตารางค่าตั้งของทุกแบบประเมิน (จับคู่ด้วยชื่อแบบประเมิน) ใช้สร้างแผนดูแลและเป้าหมาย
 const TYPE_CONFIGS: TypeConfig[] = [
-  // ไม่อยู่ในเอกสาร — เอกสารกำหนดให้ทำ 9Q ต่อจาก 2Q (ตารางที่ 30) ใช้แนวทางกรมสุขภาพจิต
   {
     match: ["9q", "แบบประเมินโรคซึมเศร้า 9q"],
     thaiName: "ภาวะซึมเศร้า (9Q)",
@@ -144,7 +136,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     seeDoctor: "มีความคิดอยากทำร้ายตนเอง ให้โทร 1323 หรือ 1669 ทันที",
     weeklyGoals: ["นัดพบแพทย์หรือบุคลากรสาธารณสุข"],
   },
-  // ตารางที่ 29–30
   {
     match: ["phq-2", "2q", "คัดกรองภาวะซึมเศร้า 2q"],
     thaiName: "คัดกรองภาวะซึมเศร้า (2Q)",
@@ -162,7 +153,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     goal: "ทำแบบประเมินโรคซึมเศร้า 9Q ต่อ",
     weeklyGoals: ["ทำแบบประเมิน 9Q ต่อ"],
   },
-  // ตารางที่ 27–28 (ST-5)
   {
     match: ["stress", "ความเครียด", "st-5"],
     thaiName: "ความเครียด",
@@ -184,7 +174,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
       "8–9 คะแนน ควรพบแพทย์ภายใน 2 สัปดาห์ · 10–15 คะแนน ต้องได้รับการรักษาจากแพทย์ทันที และดูแลต่อเนื่อง 3–6 เดือน",
     weeklyGoals: ["ฝึกการหายใจคลายเครียดทุกวัน", "พูดคุยกับคนใกล้ชิดอย่างน้อย 1 ครั้ง"],
   },
-  // ตารางที่ 21–22
   {
     match: ["sleep", "การนอนหลับ"],
     thaiName: "การนอนหลับ",
@@ -202,7 +191,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     goal: "นอนหลับ 7–9 ชั่วโมง ได้ 6–7 วันต่อสัปดาห์",
     weeklyGoals: ["นอนหลับ 7–9 ชั่วโมง อย่างน้อย 6 คืน", "งดคาเฟอีน 6 ชั่วโมงก่อนนอน"],
   },
-  // ตารางที่ 11–12
   {
     match: ["bmi", "ภาวะน้ำหนักเกิน", "ดัชนีมวลกาย"],
     thaiName: "ดัชนีมวลกาย",
@@ -222,7 +210,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     seeDoctor: "ค่า BMI ตั้งแต่ 30 ขึ้นไป (อ้วนอันตราย)",
     weeklyGoals: ["ชั่งน้ำหนักและติดตามค่า BMI"],
   },
-  // ตารางที่ 3–4
   {
     match: ["blood pressure", "ความดันโลหิต"],
     thaiName: "ความดันโลหิต",
@@ -243,7 +230,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
       "นั่งพัก 5 นาทีแล้ววัดซ้ำ ถ้ายังสูง: 140–159/90–99 พบแพทย์ภายใน 3 เดือน · 160–179/100–109 ภายใน 1 เดือน · ตั้งแต่ 180/110 ต้องพบแพทย์ทันที",
     weeklyGoals: ["วัดความดันโลหิตและจดบันทึก", "ออกกำลังกายสะสม 150 นาที"],
   },
-  // ตารางที่ 1–2
   {
     match: ["thai cvd", "cvd", "โรคหัวใจและหลอดเลือด"],
     thaiName: "ความเสี่ยงโรคหัวใจและหลอดเลือด",
@@ -264,7 +250,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     seeDoctor: "ความเสี่ยงตั้งแต่ 30% ขึ้นไป (เสี่ยงสูง) ควรเข้ารับคำปรึกษาจากแพทย์",
     weeklyGoals: ["ออกกำลังกายอย่างสม่ำเสมอ", "รับประทานผักผลไม้ทุกวัน"],
   },
-  // ตารางที่ 5–7 (Thai Diabetes Score)
   {
     match: ["diabetes tds", "diabetes", "เบาหวาน", "ความเสี่ยงโรคเบาหวาน"],
     thaiName: "ความเสี่ยงโรคเบาหวาน",
@@ -284,7 +269,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     seeDoctor: "ระดับเสี่ยงสูงหรือสูงมาก ควรเข้ารับการตรวจระดับน้ำตาลในเลือดที่หน่วยบริการ",
     weeklyGoals: ["ออกกำลังกายสม่ำเสมอ", "ควบคุมอาหารและน้ำหนัก"],
   },
-  // ตารางที่ 23–24
   {
     match: ["diet", "พฤติกรรมการรับประทานอาหาร", "อาหาร"],
     thaiName: "พฤติกรรมการรับประทานอาหาร",
@@ -302,7 +286,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     goal: "กินผักวันละ 5 ทัพพีทุกวัน และลดหวาน มัน เค็ม",
     weeklyGoals: ["กินผักวันละ 5 ทัพพี อย่างน้อย 5 วัน", "ชิมก่อนปรุงทุกมื้อ"],
   },
-  // ตารางที่ 17–20
   {
     match: ["physical activity", "กิจกรรมทางกาย"],
     thaiName: "กิจกรรมทางกาย",
@@ -320,7 +303,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     goal: "มีกิจกรรมทางกายสะสม 150 นาทีต่อสัปดาห์",
     weeklyGoals: ["ออกกำลังกายสะสม 150 นาที", "ลุกขยับร่างกายทุก 2 ชั่วโมง"],
   },
-  // ตารางที่ 15–16
   {
     match: ["alcohol", "การดื่มแอลกอฮอล์", "แอลกอฮอล์"],
     thaiName: "การดื่มแอลกอฮอล์",
@@ -338,7 +320,6 @@ const TYPE_CONFIGS: TypeConfig[] = [
     seeDoctor: "คะแนนตั้งแต่ 27 ขึ้นไป (เสี่ยงสูง) ควรพบเจ้าหน้าที่สาธารณสุขเพื่อเข้ารับการบำบัด",
     weeklyGoals: ["ลดปริมาณการดื่มลงจากสัปดาห์ก่อน"],
   },
-  // ตารางที่ 13–14
   {
     match: ["smoking", "การสูบบุหรี่", "บุหรี่"],
     thaiName: "การสูบบุหรี่",
@@ -360,9 +341,10 @@ const TYPE_CONFIGS: TypeConfig[] = [
   },
 ];
 
-// เป้าหมายพื้นฐานเพื่อป้องกัน NCDs (แสดงเสมอ) — ตารางที่ 4, 18 และ 23
+// เป้าหมายพื้นฐานป้องกัน NCDs ที่แสดงเสมอ
 const BASE_GOALS = ["ออกกำลังกายสะสมอย่างน้อย 150 นาที", "กินผักวันละ 5 ทัพพี"];
 
+// ค่าตั้งสำรองสำหรับแบบประเมินที่ไม่อยู่ใน TYPE_CONFIGS
 const FALLBACK_CONFIG: TypeConfig = {
   match: [],
   thaiName: "",
@@ -375,6 +357,7 @@ const FALLBACK_CONFIG: TypeConfig = {
   weeklyGoals: [],
 };
 
+// เบอร์สายด่วนช่วยเหลือที่แสดงบนหน้า
 const HOTLINES = [
   { number: "1669", label: "การแพทย์ฉุกเฉิน", style: "bg-red-50 text-[#b91c2b] hover:bg-red-100" },
   { number: "1323", label: "สุขภาพจิต", style: "bg-gray-50 text-gray-900 hover:bg-gray-100" },
@@ -382,6 +365,7 @@ const HOTLINES = [
   { number: "1413", label: "เลิกเหล้า", style: "bg-gray-50 text-gray-900 hover:bg-gray-100" },
 ];
 
+// อาการอันตรายที่ควรไปโรงพยาบาลหรือโทร 1669 ทันที
 const RED_FLAGS = [
   "เจ็บแน่นหน้าอก หายใจไม่อิ่ม เหงื่อแตก",
   "หน้าเบี้ยว แขนขาอ่อนแรง พูดไม่ชัดทันที",
@@ -389,34 +373,30 @@ const RED_FLAGS = [
   "มีความคิดอยากทำร้ายตัวเอง",
 ];
 
-/* =========================================================
-   HELPERS
-========================================================= */
-
-// หาค่าตั้งค่าแผนคำแนะนำของแบบประเมินจากชื่อ (ไม่พบใช้ค่าสำรอง)
+// หา config ของประเภทแบบประเมินจากชื่อ (ไม่พบใช้ค่า fallback)
 const getConfig = (name?: string | null): TypeConfig => {
   const key = String(name || "").toLowerCase().trim();
   return TYPE_CONFIGS.find((c) => c.match.includes(key)) ?? FALLBACK_CONFIG;
 };
 
-// เช็กว่าเป็นแบบประเมินความดันโลหิตหรือไม่
+// ตรวจว่าผลประเมินนี้เป็นแบบประเมินความดันโลหิตหรือไม่
 const isBloodPressure = (a: Assessment) =>
   String(a.assessment_name || "").toLowerCase().trim() === "blood pressure";
 
-// ค่าคะแนนของผลประเมิน: ความดันใช้ตัวบน แบบอื่นใช้คะแนนรวม (ไม่มีข้อมูลคืน NaN)
+// ดึงคะแนนเป็นตัวเลข (ความดันใช้ค่า systolic) คืน NaN ถ้าไม่มีค่า
 const scoreOf = (a?: Assessment | null): number => {
   if (!a) return NaN;
   const raw = isBloodPressure(a) ? a.systolic : a.total_score;
   return raw === null || raw === undefined || raw === "" ? NaN : Number(raw);
 };
 
-// แปลงคะแนนเป็นข้อความ (ทศนิยม 2 ตำแหน่ง ไม่มีค่าแสดง "-")
+// จัดรูปแบบคะแนน: จำนวนเต็มแสดงตรง ๆ ทศนิยม 2 ตำแหน่ง ไม่มีค่าแสดง "-"
 const formatScore = (n: number) => {
   if (!Number.isFinite(n)) return "-";
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 };
 
-// ข้อความคะแนนที่แสดง: ความดันแสดงเป็น ตัวบน/ตัวล่าง แบบอื่นแสดงคะแนนรวม
+// ข้อความคะแนนสำหรับแสดงผล (ความดันแสดงเป็น systolic/diastolic)
 const displayScore = (a: Assessment) => {
   if (isBloodPressure(a)) {
     return a.systolic != null && a.diastolic != null ? `${a.systolic}/${a.diastolic}` : "-";
@@ -424,9 +404,8 @@ const displayScore = (a: Assessment) => {
   return formatScore(scoreOf(a));
 };
 
-// หาระดับความเสี่ยงจากคะแนนตามเกณฑ์ หรือจาก risk_level ที่บันทึกไว้
+// คำนวณระดับความเสี่ยง (ทำร้ายตัวเอง = สูงทันที, มิฉะนั้นใช้คะแนนหรือ risk_level)
 const getLevel = (a: Assessment): Level => {
-  // 9Q ที่ตอบข้อคิดทำร้ายตนเอง = เสี่ยงสูงเสมอ ไม่ว่าคะแนนรวมเท่าไร
   if (a.self_harm_flag) return "high";
   const cfg = getConfig(a.assessment_name);
   const s = scoreOf(a);
@@ -434,11 +413,11 @@ const getLevel = (a: Assessment): Level => {
   return riskLevelOf(a.assessment_name, a.risk_level);
 };
 
-// แปลงวันที่เป็นรูปแบบไทย เช่น 12 ต.ค. 2569 (ไม่มีวันที่แสดง "-")
+// แปลงวันที่เป็นรูปแบบไทยแบบย่อ (เช่น 1 ม.ค. 2568)
 const formatDate = (date?: string | null) =>
   date ? new Date(date).toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" }) : "-";
 
-// ใช้วันจันทร์ของสัปดาห์เป็น key สำหรับเก็บเป้าหมายรายสัปดาห์
+// สร้าง key ของสัปดาห์ปัจจุบัน (วันจันทร์ YYYY-MM-DD) ใช้เก็บเป้าหมายรายสัปดาห์
 const weekKey = () => {
   const d = new Date();
   const day = (d.getDay() + 6) % 7;
@@ -446,7 +425,7 @@ const weekKey = () => {
   return d.toISOString().slice(0, 10);
 };
 
-// ลิงก์ไปหน้าผลละเอียดของการประเมินนั้น (ไม่มีหน้าเฉพาะใช้หน้าประวัติ)
+// สร้างลิงก์ไปหน้าผลรายละเอียดของแบบประเมิน (ไม่มีให้ไปหน้าประวัติ)
 const resultHref = (a: Assessment) => {
   const cfg = getConfig(a.assessment_name);
   return cfg.detailHref
@@ -454,12 +433,10 @@ const resultHref = (a: Assessment) => {
     : `/history?assessmentId=${a.assessment_id}`;
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าคำแนะนำสุขภาพ: แผนดูแลตามผลที่เสี่ยง เป้าหมายรายสัปดาห์ และกำหนดประเมินซ้ำ
+// หน้า: สรุปคำแนะนำสุขภาพรวม แผนปรับพฤติกรรมตามความเสี่ยง และเป้าหมายรายสัปดาห์
+// เรียงแผนจากผลล่าสุดที่เสี่ยง (ทำร้ายตนเอง > ระดับ > วันที่) พร้อมสายด่วนและเช็กลิสต์เป้าหมาย
 export default function RecommendationHealthPage() {
+  // state ของหน้า: ข้อมูล dashboard การแจ้งเตือน ตัวกรอง การ์ดที่เปิด และเป้าหมายที่ทำแล้ว
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [notifs, setNotifs] = useState<CalculatedNotification[]>([]);
@@ -472,9 +449,9 @@ export default function RecommendationHealthPage() {
   const [showFlags, setShowFlags] = useState(false);
   const [doneGoals, setDoneGoals] = useState<Record<string, boolean>>({});
 
-  /* ---------- load ---------- */
+  // โหลดข้อมูลผลประเมินและการแจ้งเตือนตอนเปิดหน้า
   useEffect(() => {
-    // โหลดข้อมูล Dashboard + การแจ้งเตือน และเป้าหมายรายสัปดาห์ที่เก็บในเครื่อง
+    // โหลดเป้าหมายจาก localStorage และดึงข้อมูล /api/dashboard กับ /api/notifications
     const load = async () => {
       try {
         setLoading(true);
@@ -483,19 +460,16 @@ export default function RecommendationHealthPage() {
         if (!uid) throw new Error("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
         setUserId(uid);
 
-        // เป้าหมายรายสัปดาห์เก็บไว้ในเครื่อง แยกตามผู้ใช้และสัปดาห์
         try {
           const saved = localStorage.getItem(`weeklyGoals:${uid}:${weekKey()}`);
           if (saved) setDoneGoals(JSON.parse(saved));
         } catch {
-          /* ignore */
         }
 
         const [dashRes, notifRes] = await Promise.all([
           fetch(`/api/dashboard?userId=${encodeURIComponent(uid)}`, { cache: "no-store" }),
           fetch(`/api/notifications?userId=${encodeURIComponent(uid)}`, { cache: "no-store" }),
         ]);
-        // session หมดอายุ → กลับไปหน้า login
         if (dashRes.status === 401) {
           localStorage.removeItem("userId");
           router.replace("/login");
@@ -517,11 +491,10 @@ export default function RecommendationHealthPage() {
     load();
   }, [router]);
 
-  /* ---------- derive ---------- */
+  // ค่าที่คำนวณสำหรับแสดงผล: แผนที่ต้องดูแล (เสี่ยงสูง/กลาง) และผลที่อยู่ในเกณฑ์ดี
   const latest = data?.latestByType ?? [];
   const history = data?.assessments ?? [];
 
-  // รายการแบบประเมินที่ผลเสี่ยง (สูง/ระวัง) เรียงตามความรุนแรงและวันที่ล่าสุด
   const plans = useMemo(
     () =>
       latest
@@ -531,7 +504,6 @@ export default function RecommendationHealthPage() {
         })
         .sort(
           (a, b) =>
-            // ข้อคิดทำร้ายตนเองขึ้นก่อนเสมอ
             Number(!!b.self_harm_flag) - Number(!!a.self_harm_flag) ||
             LEVEL_STYLE[getLevel(b)].n - LEVEL_STYLE[getLevel(a)].n ||
             new Date(b.assessed_at).getTime() - new Date(a.assessed_at).getTime()
@@ -541,7 +513,7 @@ export default function RecommendationHealthPage() {
 
   const goods = useMemo(() => latest.filter((a) => getLevel(a) === "ok"), [latest]);
 
-  // หาผลครั้งก่อนหน้าของแบบประเมินเดียวกัน
+  // หาผลประเมินครั้งก่อนหน้าของแบบประเมินประเภทเดียวกัน
   const previousOf = (a: Assessment) =>
     history
       .filter(
@@ -551,23 +523,22 @@ export default function RecommendationHealthPage() {
       )
       .sort((x, y) => new Date(y.assessed_at).getTime() - new Date(x.assessed_at).getTime())[0];
 
-  // หาการแจ้งเตือนประเมินซ้ำของแบบประเมินนั้น
+  // หาการแจ้งเตือนประเมินซ้ำที่ตรงกับประเภทแบบประเมินนี้
   const notifOf = (a: Assessment) => notifs.find((n) => n.assessmentTypeId === a.assessment_type_id);
 
-  // รวมเป้าหมายรายสัปดาห์จากแผนที่เสี่ยง + หลักป้องกัน NCDs ตัดตัวซ้ำ เหลือไม่เกิน 7 ข้อ
+  // เป้าหมายรายสัปดาห์: รวมจากแผนที่เสี่ยง + เป้าหมายพื้นฐาน ตัดซ้ำ ไม่เกิน 7 ข้อ และคำนวณ % ความคืบหน้า
   const weeklyGoals = useMemo(() => {
     const fromPlans = plans.flatMap((a) =>
       getConfig(a.assessment_name).weeklyGoals.map((g) => ({ label: g, from: `จากแผน: ${getConfig(a.assessment_name).thaiName || a.assessment_name}` }))
     );
     const all = [...fromPlans, ...BASE_GOALS.map((g) => ({ label: g, from: "หลักป้องกัน NCDs" }))];
-    // ตัดเป้าหมายที่ซ้ำกัน
     return all.filter((g, i) => all.findIndex((x) => x.label === g.label) === i).slice(0, 7);
   }, [plans]);
 
   const doneCount = weeklyGoals.filter((g) => doneGoals[g.label]).length;
   const progress = weeklyGoals.length ? Math.round((doneCount / weeklyGoals.length) * 100) : 0;
 
-  // ติ๊ก/ยกเลิกเป้าหมาย แล้วบันทึกลง localStorage ของผู้ใช้ในสัปดาห์นี้
+  // สลับสถานะทำแล้ว/ยังไม่ทำของเป้าหมาย และบันทึกลง localStorage ของสัปดาห์นี้
   const toggleGoal = (label: string) => {
     const next = { ...doneGoals, [label]: !doneGoals[label] };
     setDoneGoals(next);
@@ -575,28 +546,27 @@ export default function RecommendationHealthPage() {
       try {
         localStorage.setItem(`weeklyGoals:${userId}:${weekKey()}`, JSON.stringify(next));
       } catch {
-        /* ignore */
       }
     }
   };
 
-  // เช็กว่าแบบประเมินอยู่ในหมวดที่เลือกกรองไว้หรือไม่
+  // ตรวจว่าผลประเมินตรงกับหมวดที่เลือกกรองอยู่หรือไม่
   const inFilter = (a: Assessment) => filter === "all" || getConfig(a.assessment_name).category === filter;
   const shownPlans = plans.filter(inFilter);
 
-  // เปิดการ์ดแรกไว้ตอนโหลดเสร็จ
+  // เปิดการ์ดแผนอันดับแรกให้อัตโนมัติเมื่อโหลดเสร็จ
   useEffect(() => {
     if (openId === null && plans.length > 0) setOpenId(plans[0].assessment_id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plans]);
 
-  /* ---------- render ---------- */
   return (
     <div className="flex min-h-screen bg-[#faf9f7]">
       <Sidebar />
 
       <main className="flex-1 min-w-0 px-6 py-8 lg:px-10">
         <div className="max-w-7xl mx-auto">
+          {/* สถานะกำลังโหลด / error / เนื้อหาหลัก */}
           {loading ? (
             <div className="py-32 text-center" role="status">
               <div className="w-10 h-10 border-4 border-gray-200 border-t-[#b91c2b] rounded-full animate-spin mx-auto mb-4" />
@@ -610,9 +580,7 @@ export default function RecommendationHealthPage() {
             </div>
           ) : (
             <>
-              {/* =================================================
-                  HEADER
-              ================================================= */}
+              {/* หัวข้อหน้า + ปุ่มพิมพ์/บันทึก PDF */}
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
                 <div>
                   <p className="text-sm font-bold tracking-[0.25em] text-[#b91c2b] uppercase">Health Recommendations</p>
@@ -629,9 +597,7 @@ export default function RecommendationHealthPage() {
                 </button>
               </div>
 
-              {/* =================================================
-                  SUMMARY
-              ================================================= */}
+              {/* การ์ดสรุป: เรื่องที่ควรดูแล / ผลที่ดี / ความคืบหน้าเป้าหมาย */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
                 <SummaryCard
                   icon={AlertTriangle}
@@ -663,9 +629,7 @@ export default function RecommendationHealthPage() {
                 </div>
               </div>
 
-              {/* =================================================
-                  URGENT HELP
-              ================================================= */}
+              {/* สายด่วนช่วยเหลือ + รายการสัญญาณอันตราย (กดเปิด/ปิด) */}
               <section className="bg-white border border-gray-100 rounded-3xl p-5 sm:p-6 mb-8">
                 <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mb-4">
                   <h2 className="flex items-center gap-2 font-bold text-gray-800">
@@ -710,11 +674,8 @@ export default function RecommendationHealthPage() {
                 )}
               </section>
 
-              {/* =================================================
-                  PLAN + WEEKLY GOALS
-              ================================================= */}
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-10">
-                {/* ---------- Plan ---------- */}
+                {/* แผนดูแลตามลำดับความสำคัญ พร้อมแท็บกรองหมวด */}
                 <section className="xl:col-span-2 flex flex-col gap-4">
                   <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
                     <div>
@@ -738,6 +699,7 @@ export default function RecommendationHealthPage() {
                     </div>
                   </div>
 
+                  {/* รายการการ์ดแผน (หรือกล่องว่างเมื่อไม่มีข้อมูล) */}
                   {latest.length === 0 ? (
                     <EmptyBox
                       text="ยังไม่มีผลการประเมิน ทำแบบประเมินก่อนเพื่อรับคำแนะนำที่เหมาะกับคุณ"
@@ -760,7 +722,7 @@ export default function RecommendationHealthPage() {
                   )}
                 </section>
 
-                {/* ---------- Weekly goals ---------- */}
+                {/* เช็กลิสต์เป้าหมายสัปดาห์นี้ */}
                 <aside className="flex flex-col gap-6">
                   <div className="bg-white border border-gray-100 rounded-3xl p-6">
                     <p className="text-sm font-semibold text-[#b91c2b] uppercase tracking-wider">This Week</p>
@@ -814,11 +776,7 @@ export default function RecommendationHealthPage() {
   );
 }
 
-/* =========================================================
-   COMPONENTS
-========================================================= */
-
-// การ์ดตัวเลขสรุป พร้อมไอคอน ชื่อ และหน่วย
+// การ์ดสรุปตัวเลข (ไอคอน ชื่อ ค่า หน่วย)
 function SummaryCard({
   icon: Icon,
   iconWrap,
@@ -864,7 +822,8 @@ function EmptyBox({ text, action }: { text: string; action?: { href: string; lab
   );
 }
 
-// การ์ดแผนดูแลของแบบประเมินหนึ่ง กดขยายดูขั้นตอน คะแนนเทียบครั้งก่อน และกำหนดประเมินซ้ำ
+// การ์ดแผนปรับพฤติกรรมของแบบประเมินหนึ่งรายการ (กางดูรายละเอียด/เทียบผลครั้งก่อน)
+// แสดงลำดับ ระดับ คะแนนที่เปลี่ยน สถานะครบรอบประเมินซ้ำ คำเตือนทำร้ายตนเอง ขั้นตอนดูแล และลิงก์ประเมินซ้ำ
 function PlanCard({
   rank,
   assessment: a,
@@ -886,6 +845,7 @@ function PlanCard({
   const s = LEVEL_STYLE[level];
   const Icon = cfg.icon;
 
+  // คำนวณคะแนนที่เปลี่ยนจากครั้งก่อน และข้อความ/ลิงก์การประเมินซ้ำ
   const score = scoreOf(a);
   const prevScore = scoreOf(previous);
   const delta = Number.isFinite(score) && Number.isFinite(prevScore) ? Math.round((score - prevScore) * 100) / 100 : null;
@@ -898,6 +858,7 @@ function PlanCard({
 
   return (
     <article className="bg-white border border-gray-100 rounded-3xl overflow-hidden">
+      {/* ส่วนหัวการ์ด: ลำดับ ชื่อ ระดับ คะแนน (กดเพื่อกาง/หุบ) */}
       <button onClick={onToggle} aria-expanded={open} className="w-full text-left p-5 sm:p-6 flex items-center gap-4 hover:bg-gray-50/60 transition">
         <span className="w-7 h-7 rounded-full bg-gray-100 text-gray-600 text-sm font-bold flex items-center justify-center shrink-0">
           {rank}
@@ -928,7 +889,7 @@ function PlanCard({
         <ChevronDown size={20} className={`text-gray-400 shrink-0 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
-      {/* 9Q ตอบข้อคิดทำร้ายตนเอง → แสดงช่องทางช่วยเหลือเสมอ แม้ยังไม่เปิดการ์ด */}
+      {/* คำเตือนเมื่อผลพบความคิดทำร้ายตนเอง + ปุ่มโทร 1323 */}
       {a.self_harm_flag && (
         <div className="mx-5 sm:mx-6 mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 flex flex-wrap items-center gap-3">
           <AlertTriangle size={20} className="text-[#b91c2b] shrink-0" />
@@ -946,6 +907,7 @@ function PlanCard({
         </div>
       )}
 
+      {/* รายละเอียดเมื่อกางการ์ด: เหตุผล ขั้นตอน เป้าหมาย ปุ่มประเมินซ้ำ/ดูผล */}
       {open && (
         <div className="mx-5 sm:mx-6 pt-5 pb-6 border-t border-gray-100 flex flex-col gap-6">
           <p className="text-sm text-gray-600 leading-relaxed">
@@ -967,7 +929,6 @@ function PlanCard({
                 ))}
               </ol>
 
-              {/* คำแนะนำจากฐานข้อมูล (ถ้ามี) */}
               {a.recommendation_text?.trim() && (
                 <div className="mt-5 rounded-2xl bg-[#faf9f7] p-4">
                   <p className="text-xs font-bold text-gray-500 mb-1">คำแนะนำสำหรับผลของคุณ</p>
@@ -1008,7 +969,7 @@ function PlanCard({
   );
 }
 
-// กล่องข้อความสั้นมีเส้นสีด้านซ้าย (น้ำเงิน/แดง/เทา)
+// กล่องข้อความแจ้งข้อมูลตามโทนสี (ฟ้า/แดง/เทา)
 function InfoBox({ tone, title, text }: { tone: "blue" | "red" | "gray"; title: string; text: string }) {
   const styles = {
     blue: "border-blue-400 text-blue-700",

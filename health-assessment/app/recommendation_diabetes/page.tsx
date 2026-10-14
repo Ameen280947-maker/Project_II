@@ -16,12 +16,10 @@ import RecommendationLayout, {
   type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้า ใช้กับคอมโพเนนต์แสดงผลประเมิน
 const TONE = "green";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ข้อมูลผลประเมินเบาหวาน (ข้อมูลร่างกาย ความดัน ประวัติครอบครัว % ความเสี่ยง)
 type Assessment = {
   assessment_id: number;
   user_id: number;
@@ -47,6 +45,7 @@ type Assessment = {
   created_at: string;
 };
 
+// คำแนะนำตามระดับความเสี่ยง (หัวข้อและเนื้อหา)
 type Recommendation = {
   recommendation_id: number;
   risk_level: string;
@@ -54,6 +53,7 @@ type Recommendation = {
   recommendation: string;
 };
 
+// รูปแบบ response ของ API ผลประเมินเบาหวาน
 type ResponseData = {
   success: boolean;
   message?: string;
@@ -65,11 +65,7 @@ type ResponseData = {
     | null;
 };
 
-/* =========================================================
-   ระดับความเสี่ยง → ชื่อ + สีป้าย
-   low <5%, moderate 5-<10%, high 10-<20%, very_high ≥20%
-========================================================= */
-
+// แปลงรหัส risk_level (low…very_high) เป็นชื่อระดับภาษาไทยและสี
 const RISK_INFO: Record<string, { name: string; color: RiskColor }> = {
   low: { name: "ความเสี่ยงน้อย", color: "green" },
   moderate: { name: "ความเสี่ยงปานกลาง", color: "yellow" },
@@ -77,13 +73,10 @@ const RISK_INFO: Record<string, { name: string; color: RiskColor }> = {
   very_high: { name: "ความเสี่ยงสูงมาก", color: "red" },
 };
 
+// ค่าแสดงผลเมื่อไม่รู้จักระดับความเสี่ยง
 const UNKNOWN_RISK = { name: "ไม่ทราบระดับความเสี่ยง", color: "gray" as RiskColor };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าผลและคำแนะนำความเสี่ยงเบาหวาน: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลและคำแนะนำความเสี่ยงโรคเบาหวาน ครอบด้วย Suspense
 export default function RecommendationDiabetesPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>
@@ -92,7 +85,8 @@ export default function RecommendationDiabetesPage() {
   );
 }
 
-// เนื้อหาหน้าผลเบาหวาน: โหลดผลตาม assessmentId แล้วแสดงระดับความเสี่ยงและคำแนะนำ
+// เนื้อหาหน้า: แสดงคะแนนความเสี่ยงเบาหวาน ระดับความเสี่ยง และคำแนะนำ
+// แสดงโอกาสเกิดเบาหวานใน 12 ปีเป็น % พร้อมระดับและคำแนะนำที่ API ส่งมา
 function RecommendationDiabetesContent() {
   const searchParams =
     useSearchParams();
@@ -102,10 +96,7 @@ function RecommendationDiabetesContent() {
       "assessmentId",
     );
 
-  /* =======================================================
-     STATE
-  ======================================================= */
-
+  // state ของหน้า: ผลประเมิน คำแนะนำ สถานะโหลด และ error
   const [
     assessment,
     setAssessment,
@@ -132,12 +123,9 @@ function RecommendationDiabetesContent() {
     setError,
   ] = useState("");
 
-  /* =========================================================
-     LOAD RESULT
-  ========================================================= */
-
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
-    // โหลดผลประเมินเบาหวาน (ถ้า URL ไม่มี assessmentId ให้ใช้ค่าที่เก็บใน localStorage)
+    // หา assessmentId (จาก URL หรือ localStorage) แล้วดึงผลจาก /api/assessments/diabetes
     const loadResult =
       async () => {
         try {
@@ -147,10 +135,6 @@ function RecommendationDiabetesContent() {
 
           let id =
             assessmentId;
-
-          /* -----------------------------------------------
-             FALLBACK LOCAL STORAGE
-          ------------------------------------------------ */
 
           if (!id) {
             const stored =
@@ -177,10 +161,6 @@ function RecommendationDiabetesContent() {
             );
           }
 
-          /* -----------------------------------------------
-             GET API
-          ------------------------------------------------ */
-
           const response =
             await fetch(
               `/api/assessments/diabetes?assessmentId=${id}`,
@@ -191,7 +171,6 @@ function RecommendationDiabetesContent() {
               },
             );
 
-          // session หมดอายุ → กลับไปหน้า login
           if (response.status === 401) {
             localStorage.removeItem("userId");
             window.location.replace("/login");
@@ -241,10 +220,7 @@ function RecommendationDiabetesContent() {
     assessmentId,
   ]);
 
-  /* =========================================================
-     LOADING / ERROR
-  ========================================================= */
-
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -262,14 +238,12 @@ function RecommendationDiabetesContent() {
     );
   }
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
+  // ค่าที่คำนวณสำหรับแสดงผล (% จำกัด 0–100, ชื่อ/สีระดับ, ชุดสี)
   const riskPercent = Math.min(Math.max(Number(assessment.risk_percent), 0), 100);
   const risk = RISK_INFO[assessment.risk_level] ?? UNKNOWN_RISK;
   const t = RECOMMENDATION_TONES[TONE];
 
+  // ส่วนแสดงผล: วง % ความเสี่ยง สรุปผล และคำแนะนำ
   return (
     <RecommendationLayout
       tone={TONE}
@@ -308,7 +282,6 @@ function RecommendationDiabetesContent() {
           "ยังไม่มีคำแนะนำสำหรับระดับความเสี่ยงนี้"
         )
       }
-      // ใช้ id ที่โหลดได้จริง (รองรับกรณีดึงจาก localStorage)
       assessmentId={assessment.assessment_id}
       editHref="/assessment_diabetes"
     />

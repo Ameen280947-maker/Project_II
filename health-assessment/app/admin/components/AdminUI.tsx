@@ -3,11 +3,7 @@
 import type { ReactNode } from "react";
 import { CheckCircle2, AlertTriangle, XCircle, Loader2 } from "lucide-react";
 
-/* =========================================================
-   ชิ้นส่วน UI ที่ใช้ร่วมกันในหน้า Admin (โทนน้ำเงินเข้ม)
-========================================================= */
-
-// ส่วนหัวของหน้า admin: ไอคอน หัวข้อ คำอธิบาย และปุ่มด้านขวา (ถ้ามี)
+// ส่วนหัวของหน้า Admin: ไอคอน ชื่อหน้า คำอธิบาย และปุ่ม action
 export function PageHeader({
   icon,
   title,
@@ -35,7 +31,7 @@ export function PageHeader({
   );
 }
 
-// กล่องการ์ดพื้นขาวมุมโค้ง ใช้ห่อเนื้อหาในหน้า admin
+// กล่อง Card พื้นหลังขาวสำหรับจัดกลุ่มเนื้อหาในหน้า Admin
 export function Card({
   children,
   className = "",
@@ -52,7 +48,7 @@ export function Card({
   );
 }
 
-// การ์ดแสดงตัวเลขสถิติ พร้อมไอคอน ป้ายชื่อ และคำอธิบายเพิ่มเติม
+// การ์ดแสดงตัวเลขสถิติพร้อมป้ายชื่อและไอคอน
 export function StatCard({
   icon,
   label,
@@ -78,15 +74,17 @@ export function StatCard({
   );
 }
 
+// ระดับสถานะที่ใช้ทั่วหน้า Admin
 export type Status = "ok" | "warning" | "error";
 
+// สี ข้อความ และไอคอนของแต่ละสถานะ
 const STATUS_STYLE: Record<Status, { cls: string; text: string; Icon: typeof CheckCircle2 }> = {
   ok: { cls: "bg-[#e7f6ee] text-[#15803d]", text: "ปกติ", Icon: CheckCircle2 },
   warning: { cls: "bg-[#fef5e2] text-[#b45309]", text: "ควรตรวจสอบ", Icon: AlertTriangle },
   error: { cls: "bg-[#fdecec] text-[#b91c1c]", text: "มีปัญหา", Icon: XCircle },
 };
 
-// ป้ายสถานะสี ok / warning / error พร้อมไอคอน
+// ป้ายสถานะ ok/warning/error พร้อมสีตามระดับ
 export function StatusBadge({ status, label }: { status: Status; label?: string }) {
   const s = STATUS_STYLE[status];
   return (
@@ -99,7 +97,7 @@ export function StatusBadge({ status, label }: { status: Status; label?: string 
   );
 }
 
-// ปุ่มหลักสีน้ำเงิน แสดงไอคอนหมุนและปิดการกดระหว่างโหลด
+// ปุ่มหลัก (สีน้ำเงินทึบ) ที่ใช้ในหน้า Admin
 export function PrimaryButton({
   children,
   loading,
@@ -118,7 +116,7 @@ export function PrimaryButton({
   );
 }
 
-// ปุ่มรองแบบขอบเส้น พื้นขาว
+// ปุ่มรอง (แบบมีขอบ พื้นโปร่ง) ที่ใช้ในหน้า Admin
 export function GhostButton({
   children,
   className = "",
@@ -134,7 +132,7 @@ export function GhostButton({
   );
 }
 
-// กล่องข้อความแจ้งผลสำเร็จ (เขียว) หรือผิดพลาด (แดง)
+// กล่องข้อความแจ้งผลสำเร็จ/ผิดพลาด
 export function Notice({
   kind,
   children,
@@ -155,7 +153,7 @@ export function Notice({
   );
 }
 
-// กล่องแสดงสถานะ "กำลังโหลด..." พร้อมไอคอนหมุน
+// แสดงไอคอนหมุนและข้อความระหว่างกำลังโหลดข้อมูล
 export function LoadingBlock() {
   return (
     <div className="flex items-center justify-center gap-2 py-20 text-[#64748b]">

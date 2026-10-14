@@ -1,10 +1,4 @@
-/* =========================================================
-   ชื่อแบบประเมินภาษาไทยสำหรับหน้าฝั่งผู้ใช้
-   - assessment_types.assessment_name ในฐานข้อมูลเป็นภาษาอังกฤษ (ใช้เป็น key ในโค้ด)
-   - ชื่อไทยตรงกับชื่อในหน้าเมนูแบบประเมิน (assessment-menu*)
-   - แบบประเมินที่ staff สร้างเพิ่ม ชื่อเป็นภาษาไทยอยู่แล้ว → แสดงตามเดิม
-========================================================= */
-
+// ตารางแปลงชื่อแบบประเมินภาษาอังกฤษในฐานข้อมูลเป็นชื่อไทย
 const THAI_NAMES: Record<string, string> = {
   "Thai CVD": "ความเสี่ยงโรคหัวใจและหลอดเลือด",
   "Diabetes TDS": "ความเสี่ยงโรคเบาหวาน",
@@ -22,21 +16,21 @@ const THAI_NAMES: Record<string, string> = {
   "9Q": "ภาวะซึมเศร้า (9Q)",
 };
 
-// เทียบแบบไม่สนตัวพิมพ์ เพราะบางหน้าส่งชื่อมาเป็นตัวพิมพ์เล็ก
+// ตารางเดียวกันแต่ใช้ key ตัวพิมพ์เล็ก เพื่อค้นแบบไม่สนตัวพิมพ์
 const BY_LOWER = new Map(Object.entries(THAI_NAMES).map(([k, v]) => [k.toLowerCase(), v]));
 
-// แปลงชื่อแบบประเมิน (อังกฤษ) เป็นชื่อไทย ถ้าไม่รู้จักคืนชื่อเดิม
+// แปลงชื่อแบบประเมินภาษาอังกฤษเป็นชื่อไทย (ไม่สนตัวพิมพ์) ถ้าไม่รู้จักคืนชื่อเดิม
 export const assessmentThaiName = (name: string | null | undefined) => {
   const raw = String(name ?? "").trim();
   return BY_LOWER.get(raw.toLowerCase()) ?? raw;
 };
 
-// ระดับผลที่เก็บเป็นภาษาอังกฤษ → ข้อความไทย (แบบอื่นเก็บเป็นภาษาไทยอยู่แล้ว)
+// แปลงรหัสระดับความเสี่ยงภาษาอังกฤษเป็นไทย แยกตามแบบประเมิน
 const RISK_TEXT: Record<string, Record<string, string>> = {
   "diabetes tds": { low: "เสี่ยงน้อย", moderate: "เสี่ยงปานกลาง", high: "เสี่ยงสูง", very_high: "เสี่ยงสูงมาก" },
 };
 
-// แปลงระดับผลที่เก็บเป็นภาษาอังกฤษเป็นข้อความไทยตามแบบประเมิน ถ้าไม่มีในตารางคืนค่าเดิม
+// แปลงรหัสระดับความเสี่ยงเป็นภาษาไทยตามแบบประเมิน (เช่น Diabetes TDS) ถ้าไม่มีคืนค่าเดิม
 export const riskLevelThai = (name: string | null | undefined, riskLevel: string | null | undefined) => {
   const risk = String(riskLevel ?? "").trim();
   return RISK_TEXT[String(name ?? "").trim().toLowerCase()]?.[risk] ?? risk;

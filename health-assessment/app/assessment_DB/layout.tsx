@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 
-// แบบประเมินความดันโลหิต (assessment_type_id = 2) แจ้งผู้ใช้เมื่อ staff ปิดแบบประเมินนี้อยู่
+// เลย์เอาต์: ห่อหน้าประเมินความดันโลหิตและแสดงประกาศเมื่อแบบประเมินถูกปิด
 export default function AssessmentDbLayout({ children }: { children: ReactNode }) {
   return (
     <>

@@ -16,12 +16,15 @@ import { markAssessmentSaved } from "../_lib/assessmentVersion";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+// รหัสแบบประเมินซึมเศร้า 2Q และ 9Q ในตาราง assessment_types
 const TYPE_2Q = 13;
 const TYPE_9Q = 14;
 
+// รหัสคำแนะนำของผล 2Q (ไม่เสี่ยง / เสี่ยง)
 const REC_2Q_NO_RISK = 59;
 const REC_2Q_RISK = 60;
 
+// รหัสคำแนะนำของผล 9Q ตามระดับความรุนแรง
 const REC_9Q = {
   NO_RISK: 61,
   MILD: 62,
@@ -29,12 +32,13 @@ const REC_9Q = {
   SEVERE: 64,
 };
 
+// คำตอบหนึ่งข้อที่ส่งมาจากหน้าเว็บ
 type Answer = {
   question_id: number;
   choice_id: number;
 };
 
-/* หน้าเว็บ 2Q/9Q อ่านข้อความผิดพลาดจาก key "error" จึงส่งทั้ง error และ message */
+// สร้าง response แจ้งข้อผิดพลาด (มีทั้ง error และ message) พร้อม status
 function fail(message: string, status = 400) {
   return NextResponse.json(
     { success: false, error: message, message },
@@ -42,7 +46,7 @@ function fail(message: string, status = 400) {
   );
 }
 
-/* ตรวจ session แล้วแปลงคำตอบ 401/403 ให้มี key "error" ด้วย */
+// ตรวจการล็อกอินของผู้ใช้ คืน userId ถ้าผ่าน หรือ response ผิดพลาดในรูปแบบของไฟล์นี้
 async function authorize(request: NextRequest, claimedUserId?: unknown) {
   const auth = requireUser(request, claimedUserId);
   if (auth.ok) return { ok: true as const, userId: auth.userId };
@@ -54,16 +58,12 @@ async function authorize(request: NextRequest, claimedUserId?: unknown) {
   };
 }
 
-/* =========================================================
-   GET
-   ========================================================= */
-
-// GET: ส่ง assessmentId = คืนผล 2Q/9Q พร้อมคำแนะนำ, ไม่ส่ง = คืนคำถามตาม stage
+// API: คืนชุดคำถามซึมเศร้า 2Q/9Q ตาม stage หรือผลประเมินที่บันทึกไว้ตาม assessmentId
 export async function GET(request: NextRequest) {
   const rawStage = request.nextUrl.searchParams.get("stage");
   const assessmentIdParam = request.nextUrl.searchParams.get("assessmentId");
 
-  // ดูผลการประเมินได้เฉพาะของตัวเอง (?userId= ถ้าส่งมาต้องตรงกับ session)
+  // ถ้าขอดูผลประเมิน ต้องตรวจสิทธิ์ผู้ใช้ก่อน
   let sessionUserId: number | null = null;
 
   if (assessmentIdParam) {
@@ -75,9 +75,7 @@ export async function GET(request: NextRequest) {
   const client = await pool.connect();
 
   try {
-    /* -----------------------------------------------------
-       1. กรณีขอผลการประเมิน (Result / Recommendation)
-    ----------------------------------------------------- */
+    // มี assessmentId → ดึงผลประเมินของผู้ใช้
     if (assessmentIdParam) {
       const assessmentId = Number(assessmentIdParam);
 
@@ -132,7 +130,7 @@ export async function GET(request: NextRequest) {
       const detectedStage =
         Number(assessment.assessment_type_id) === TYPE_9Q ? "9q" : "2q";
 
-      /* ถ้า recommendation_text เป็น null ให้หาจากตาราง recommendation ตาม risk_level */
+      // ไม่มีคำแนะนำผูกไว้ → หาคำแนะนำสำรองตามระดับความเสี่ยง
       let recommendationText = assessment.recommendation_text;
       if (!recommendationText) {
         const fallbackRec = await client.query(
@@ -159,7 +157,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      /* ดึงคำตอบทั้งหมด */
+      // ดึงคำตอบรายข้อ
       const answersResult = await client.query(
         `
         SELECT
@@ -182,7 +180,7 @@ export async function GET(request: NextRequest) {
         [assessmentId]
       );
 
-      /* ตรวจข้อทำร้ายตนเองของ 9Q */
+      // 9Q: ถ้าตอบข้อเกี่ยวกับทำร้ายตนเองมีคะแนน → ต้องดูแลเร่งด่วน
       let needsUrgentAttention = false;
       if (detectedStage === "9q") {
         needsUrgentAttention = answersResult.rows.some((answer) => {
@@ -212,9 +210,7 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    /* -----------------------------------------------------
-       2. กรณีโหลดคำถาม (Questions & Choices)
-    ----------------------------------------------------- */
+    // ไม่มี assessmentId → คืนคำถามและตัวเลือกของ stage ที่ขอ (2Q หรือ 9Q)
     const stage = rawStage === "9q" ? "9q" : "2q";
     const assessmentTypeId = stage === "9q" ? TYPE_9Q : TYPE_2Q;
 
@@ -278,6 +274,7 @@ export async function GET(request: NextRequest) {
       questions,
     });
   } catch (error) {
+    // จัดการ error → บันทึก log และคืน 500
     void logSystemError("GET /api/assessments/depression", error);
     console.error("Depression GET error:", error);
 
@@ -287,16 +284,12 @@ export async function GET(request: NextRequest) {
   }
 }
 
-/* =========================================================
-   POST
-   ========================================================= */
-
-// POST: บันทึกคำตอบ 2Q หรือ 9Q (ตาม stage) พร้อมคิดคะแนนและระดับความเสี่ยง
+// API: ตรวจคำตอบ 2Q หรือ 9Q คำนวณคะแนน/ระดับซึมเศร้า แล้วบันทึกผลประเมินลงฐานข้อมูล
 export async function POST(request: NextRequest) {
+  // อ่าน body ตรวจสิทธิ์ stage สถานะแบบประเมิน ความยินยอม และคำตอบ
   const body = await readJsonObject(request);
   if (!body) return fail("รูปแบบข้อมูลไม่ถูกต้อง");
 
-  // ผู้ใช้มาจาก session เท่านั้น (userId ที่ส่งมาต้องตรงกับ session)
   const auth = await authorize(request, body.userId ?? body.user_id);
   if (!auth.ok) return auth.response;
   const numericUserId = auth.userId;
@@ -309,10 +302,8 @@ export async function POST(request: NextRequest) {
     return fail("Stage ไม่ถูกต้อง (ต้องเป็น 2q หรือ 9q)");
   }
 
-  // staff ปิดแบบประเมินนี้อยู่ ไม่รับผลใหม่
   const closed = await rejectIfAssessmentClosed(stage === "2q" ? TYPE_2Q : TYPE_9Q);
   if (closed) return closed;
-  // ผู้ใช้ถอนความยินยอมเก็บข้อมูลสุขภาพ ไม่รับผลใหม่
   const noConsent = await rejectIfNoHealthConsent(numericUserId);
   if (noConsent) return noConsent;
 
@@ -328,11 +319,9 @@ export async function POST(request: NextRequest) {
       return fail("ไม่พบข้อมูลผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
     }
 
+    // ดึงคำถาม แล้วตรวจคำตอบกับตัวเลือกใน DB และรวมคะแนน
     const assessmentTypeId = stage === "2q" ? TYPE_2Q : TYPE_9Q;
 
-    /* -----------------------------------------------------
-       โหลดคำถามที่ active ทั้งหมดของประเภทนี้
-    ----------------------------------------------------- */
     const questionsResult = await client.query(
       `
       SELECT
@@ -354,11 +343,6 @@ export async function POST(request: NextRequest) {
       return fail("ไม่พบคำถามของแบบประเมิน กรุณาลองใหม่อีกครั้ง");
     }
 
-    /* -----------------------------------------------------
-       ตรวจ choices และคำนวณคะแนนจากฐานข้อมูล
-       - ต้องตอบครบทุกข้อ ข้อละ 1 คำตอบ (เดิมตอบซ้ำได้ ทำให้คะแนนเกินเต็ม)
-       - ตัวเลือกต้องเป็นของคำถามนั้นในแบบประเมินนี้
-    ----------------------------------------------------- */
     const resolved = resolveChoiceAnswers(
       await loadActiveChoices(client, assessmentTypeId),
       answers.map((answer) => ({
@@ -380,13 +364,10 @@ export async function POST(request: NextRequest) {
       score: choice.score,
     }));
 
-    /* -----------------------------------------------------
-       STAGE: 2Q
-    ----------------------------------------------------- */
+    // 2Q: คะแนน > 0 = เสี่ยง → บันทึกผลและคำตอบ แล้วบอกให้ทำ 9Q ต่อ
     if (stage === "2q") {
       const isRisk = totalScore > 0;
 
-      // ตามมาตรฐาน DB rec_id 59 & 60
       const riskLevel = isRisk
         ? "มีความเสี่ยงหรือมีแนวโน้มเป็นโรคซึมเศร้า"
         : "ไม่เป็นโรคซึมเศร้า";
@@ -445,10 +426,8 @@ export async function POST(request: NextRequest) {
       await client.query("COMMIT");
       inTransaction = false;
 
-      /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
       await markAssessmentSaved(client, { userId: numericUserId, typeId: TYPE_2Q, assessmentId: assessmentId });
 
-      /* ถ้า 2Q เสี่ยง → แนะนำให้ทำ 9Q ต่อ */
       if (isRisk) {
         return NextResponse.json({
           success: true,
@@ -462,7 +441,6 @@ export async function POST(request: NextRequest) {
         });
       }
 
-      /* ถ้า 2Q ไม่เสี่ยง → ไปหน้าผลการประเมิน 2Q */
       return NextResponse.json({
         success: true,
         stage: "2q",
@@ -475,11 +453,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    /* -----------------------------------------------------
-       STAGE: 9Q
-    ----------------------------------------------------- */
+    // 9Q: ตรวจว่ามีผล 2Q ที่เสี่ยงของผู้ใช้คนเดียวกันอ้างอิงอยู่
     if (stage === "9q") {
-      /* ตรวจสอบ previousAssessmentId ถ้ามีส่งมา */
       if (
         previousAssessmentId !== undefined &&
         previousAssessmentId !== null &&
@@ -527,7 +502,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      /* แปลผลคะแนน 9Q ตามเกณฑ์กรมสุขภาพจิต */
+      // แปลคะแนน 9Q เป็นระดับซึมเศร้าและรหัสคำแนะนำ
       let riskLevel = "";
       let recommendationId = 0;
 
@@ -597,10 +572,9 @@ export async function POST(request: NextRequest) {
       await client.query("COMMIT");
       inTransaction = false;
 
-      /* ===== ผูกเวอร์ชัน + ปิด session (หลัง COMMIT, ไม่ throw) ===== */
       await markAssessmentSaved(client, { userId: numericUserId, typeId: TYPE_9Q, assessmentId: assessmentId });
 
-      /* ตรวจข้อ 9 คิดทำร้ายตนเอง หรือคิดว่าถ้าตายไปคงจะดี */
+      // เช็กคำตอบข้อทำร้ายตนเองเพื่อแจ้งเตือนเร่งด่วน แล้วคืนผล
       const needsUrgentAttention = validatedAnswers.some((answer) => {
         const question = questions.find(
           (q) => Number(q.question_id) === Number(answer.question_id)
@@ -633,6 +607,7 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   } catch (error) {
+    // จัดการ error → บันทึก log, rollback และคืน 500
     void logSystemError("POST /api/assessments/depression", error);
     if (inTransaction) {
       await client.query("ROLLBACK").catch(() => {});

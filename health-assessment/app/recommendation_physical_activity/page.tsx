@@ -12,9 +12,11 @@ import RecommendationLayout, {
   type RiskColor,
 } from "@/app/components/recommendation/RecommendationLayout";
 
+// โทนสีของหน้าและลิงก์กลับไปทำแบบประเมินใหม่
 const TONE = "teal";
 const EDIT_HREF = "/assessment_physical_activity";
 
+// คำตอบรายข้อของผู้ใช้
 type Answer = {
   answer_id: number;
   question_text: string;
@@ -23,6 +25,7 @@ type Answer = {
   answer_score: number;
 };
 
+// ผลประเมินกิจกรรมทางกายจาก API (รวมผลพฤติกรรมเนือยนิ่งถ้ามี)
 type Result = {
   assessment_id: number;
   username: string;
@@ -38,24 +41,21 @@ type Result = {
   } | null;
 };
 
-/* =========================================================
-   สีตามความหมายของผล
-   กิจกรรมทางกาย (ตารางที่ 18): เพียงพอ เขียว / ไม่เพียงพอ เหลือง / ไม่มีกิจกรรมทางกาย แดง
-   พฤติกรรมเนือยนิ่ง (ตารางที่ 20): ปกติ เขียว / เสี่ยงปานกลาง เหลือง / เสี่ยงสูง แดง
-========================================================= */
-
+// สีตามระดับกิจกรรมทางกาย
 const ACTIVITY_COLOR: Record<string, RiskColor> = {
   เพียงพอ: "green",
   ไม่เพียงพอ: "yellow",
   ไม่มีกิจกรรมทางกาย: "red",
 };
 
+// สีตามระดับความเสี่ยงพฤติกรรมเนือยนิ่ง
 const SEDENTARY_COLOR: Record<string, RiskColor> = {
   ปกติ: "green",
   เสี่ยงปานกลาง: "yellow",
   เสี่ยงสูง: "red",
 };
 
+// คลาสสีของป้ายระดับ (badge) ตามสีความเสี่ยง
 const BADGE: Record<RiskColor, string> = {
   green: "bg-[#eaf7e8] text-[#4f9857]",
   yellow: "bg-[#fff6d6] text-[#9a7300]",
@@ -64,11 +64,8 @@ const BADGE: Record<RiskColor, string> = {
   gray: "bg-[#f3f3f4] text-[#6b6c74]",
 };
 
-/* =========================================================
-   MAIN CONTENT
-========================================================= */
-
-// เนื้อหาหน้าผลกิจกรรมทางกาย: โหลดผลตาม assessmentId แล้วแสดงระดับและคำแนะนำ
+// เนื้อหาหน้า: แสดงผลกิจกรรมทางกาย ระดับความเพียงพอ และคำแนะนำ
+// แสดงวงคะแนนกิจกรรม (เต็ม 3) และการ์ดผลแยกส่วน: กิจกรรมทางกาย + พฤติกรรมเนือยนิ่ง
 function PhysicalActivityResultContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -76,18 +73,17 @@ function PhysicalActivityResultContent() {
   const assessmentId =
     searchParams.get("assessmentId");
 
+  // state ของหน้า: ผลประเมิน สถานะโหลด และ error
   const [result, setResult] =
     useState<Result | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  /* =========================================================
-     LOAD RESULT
-  ========================================================= */
-
+  // โหลดผลประเมินจาก API ตอนเปิดหน้า
   useEffect(() => {
-    // ตรวจ assessmentId แล้วโหลดผลประเมินกิจกรรมทางกายของผู้ใช้จาก API
+    // ดึงผลประเมินจาก /api/assessments/physical_activity (401 → ไปหน้า login)
+    // ขั้นตอน: ตรวจ assessmentId และ userId ใน localStorage → fetch → เก็บผลลง state
     const loadResult = async () => {
       try {
         setLoading(true);
@@ -118,7 +114,6 @@ function PhysicalActivityResultContent() {
           }
         );
 
-        // session หมดอายุ → กลับไปหน้า login
         if (response.status === 401) {
           localStorage.removeItem("userId");
           router.replace("/login");
@@ -151,10 +146,7 @@ function PhysicalActivityResultContent() {
     loadResult();
   }, [assessmentId, router]);
 
-  /* =========================================================
-     LOADING / ERROR
-  ========================================================= */
-
+  // สถานะกำลังโหลด / error
   if (loading) {
     return <RecommendationLoading tone={TONE} />;
   }
@@ -169,13 +161,7 @@ function PhysicalActivityResultContent() {
     );
   }
 
-  /* =========================================================
-     SCORE
-
-     เอกสารอ้างอิงแปลผลกิจกรรมทางกายจากข้อ 1 (ตารางที่ 18) เต็ม 3 คะแนน
-     ใช้คะแนนจากคำตอบข้อแรก เพราะผลเก่าบันทึก total_score เป็นผลรวม 2 ข้อ
-  ========================================================= */
-
+  // ค่าที่คำนวณสำหรับแสดงผล (คะแนนกิจกรรมจากข้อแรก, สี, ผลเนือยนิ่ง)
   const maxScore = 3;
 
   const activityScore =
@@ -188,10 +174,7 @@ function PhysicalActivityResultContent() {
 
   const t = RECOMMENDATION_TONES[TONE];
 
-  /* =========================================================
-     MAIN UI
-  ========================================================= */
-
+  // ส่วนแสดงผล: วงคะแนน ระดับ และคำแนะนำ
   return (
     <RecommendationLayout
       tone={TONE}
@@ -217,12 +200,13 @@ function PhysicalActivityResultContent() {
       editHref={EDIT_HREF}
       menuHref="/assessment-menu-behavior"
     >
+      {/* ผลแยกตามส่วนของแบบประเมิน */}
       <RecommendationSection
         icon={<Activity size={27} className={t.eyebrow} />}
         title="ผลแยกตามส่วนของแบบประเมิน"
       >
         <div className="grid gap-5 md:grid-cols-2">
-          {/* ===== กิจกรรมทางกาย (ตารางที่ 18) ===== */}
+          {/* การ์ดผลกิจกรรมทางกาย */}
           <article className="rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="flex items-center gap-3">
@@ -245,7 +229,7 @@ function PhysicalActivityResultContent() {
             </p>
           </article>
 
-          {/* ===== พฤติกรรมเนือยนิ่ง (ตารางที่ 20) ===== */}
+          {/* การ์ดผลพฤติกรรมเนือยนิ่ง (ถ้ามี) */}
           {sedentary && (
             <article className="rounded-[25px] border border-[#eee8e9] bg-white p-6 shadow-[0_14px_35px_rgba(35,25,30,0.04)]">
               <div className="flex flex-wrap items-center justify-between gap-4">
@@ -280,11 +264,7 @@ function PhysicalActivityResultContent() {
   );
 }
 
-/* =========================================================
-   SUSPENSE
-========================================================= */
-
-// หน้าผลและคำแนะนำกิจกรรมทางกาย: ครอบเนื้อหาด้วย Suspense
+// หน้า: ผลประเมินกิจกรรมทางกาย ครอบด้วย Suspense
 export default function PhysicalActivityRecommendationPage() {
   return (
     <Suspense fallback={<RecommendationLoading tone={TONE} />}>

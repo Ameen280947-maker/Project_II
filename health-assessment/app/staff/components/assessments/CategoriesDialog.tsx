@@ -8,17 +8,10 @@ import { ErrorBox, btnGhost, btnPrimary, inputCls } from "../ui";
 import { ThemePicker } from "./Dialogs";
 import type { CategoryOption } from "./shared";
 
-/* =========================================================
-   จัดการหมวดหมู่แบบประเมิน
-   - หมวดที่เจ้าหน้าที่สร้าง: แก้ชื่อ / คำอธิบายสั้น / สี และลบได้
-     ลบแล้วแบบประเมินในหมวดถูกย้ายไปหมวดที่เลือก (หรือไม่มีหมวด)
-   - หมวดหลัก 3 หมวดแก้ไขไม่ได้ (หน้าเมนูและการ์ดของหมวดเขียนไว้ในโค้ด)
-   - มีผลกับหน้าผู้ใช้ทันที (ไม่ผ่านฉบับร่าง)
-========================================================= */
-
+// โหมดของแถวหมวดหมู่: กำลังแก้ไข / กำลังลบ / ปกติ (null)
 type Mode = { kind: "edit"; id: number } | { kind: "delete"; id: number } | null;
 
-// หน้าต่างจัดการหมวดหมู่: แสดงรายการหมวด และสลับเป็นฟอร์มแก้ไข/ลบของแต่ละหมวด
+// กล่องจัดการหมวดหมู่แบบประเมิน: แสดงรายการ แก้ไข หรือลบหมวดที่สร้างเพิ่ม
 export default function CategoriesDialog({
   categories,
   onClose,
@@ -26,12 +19,11 @@ export default function CategoriesDialog({
 }: {
   categories: CategoryOption[];
   onClose: () => void;
-  // โหลดรายการแบบประเมิน/หมวดใหม่ (หน้าต่างนี้ยังเปิดอยู่ จัดการต่อได้)
   onChanged: () => void;
 }) {
   const [mode, setMode] = useState<Mode>(null);
   const [message, setMessage] = useState("");
-  // เมื่อแก้ไข/ลบสำเร็จ: ปิดฟอร์ม แสดงข้อความ และโหลดข้อมูลใหม่
+  // ปิดฟอร์มย่อย แสดงข้อความผลลัพธ์ และแจ้งหน้าแม่ให้โหลดข้อมูลใหม่
   const done = (m: string) => {
     setMode(null);
     setMessage(m);
@@ -53,6 +45,7 @@ export default function CategoriesDialog({
           </p>
         )}
 
+        {/* รายการหมวดหมู่: แต่ละแถวสลับเป็นฟอร์มแก้ไข/ลบได้ */}
         <ul className="mt-4 flex flex-col gap-2">
           {categories.map((c) => (
             <li key={c.id} className="rounded-2xl border border-staff-line p-3">
@@ -114,7 +107,7 @@ export default function CategoriesDialog({
   );
 }
 
-/* ===== แก้ชื่อ / คำอธิบายสั้น / สี ===== */
+// ฟอร์มแก้ไขชื่อ คำอธิบาย และสีของหมวดหมู่ (กันชื่อซ้ำ)
 function EditForm({
   category,
   categories,
@@ -135,7 +128,7 @@ function EditForm({
   const nameTaken = categories.some((c) => c.id !== category.id && c.name.trim().toLowerCase() === name.trim().toLowerCase());
   const unchanged = name.trim() === category.name && subtitle.trim() === (category.subtitle ?? "") && theme === category.theme;
 
-  // บันทึกชื่อ คำอธิบาย และสีของหมวดผ่าน API
+  // บันทึกการแก้ไขหมวดหมู่ผ่าน PATCH /api/staff/categories
   const save = async () => {
     setSaving(true);
     setError("");
@@ -176,7 +169,7 @@ function EditForm({
   );
 }
 
-/* ===== ลบหมวด: เลือกว่าจะย้ายแบบประเมินในหมวดไปไหน ===== */
+// ฟอร์มยืนยันลบหมวดหมู่ พร้อมเลือกหมวดปลายทางสำหรับย้ายแบบประเมินที่มีอยู่
 function DeleteForm({
   category,
   categories,
@@ -188,12 +181,11 @@ function DeleteForm({
   onCancel: () => void;
   onDeleted: (message: string) => void;
 }) {
-  // "" = ไม่มีหมวดหมู่
   const [moveTo, setMoveTo] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState("");
 
-  // ลบหมวดและย้ายแบบประเมินในหมวดไปหมวดที่เลือก (หรือไม่มีหมวด)
+  // ลบหมวดหมู่ผ่าน DELETE /api/staff/categories และย้ายแบบประเมินไปหมวดที่เลือก
   const remove = async () => {
     setDeleting(true);
     setError("");

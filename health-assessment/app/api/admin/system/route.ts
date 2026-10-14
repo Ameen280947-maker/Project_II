@@ -5,13 +5,10 @@ import { requireAdmin, serverError, ADMIN_ROLE } from "@/lib/adminAuth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   GET /api/admin/system   → ตรวจสอบระบบ
-   คืนค่า: รายการตรวจ (checks) + สถิติ (stats)
-========================================================= */
-
+// ระดับสถานะของผลตรวจ
 type CheckStatus = "ok" | "warning" | "error";
 
+// ผลตรวจหนึ่งรายการ
 type Check = {
   key: string;
   label: string;
@@ -19,6 +16,7 @@ type Check = {
   detail: string;
 };
 
+// ตารางหลักที่ระบบต้องมี
 const REQUIRED_TABLES = [
   "users",
   "roles",
@@ -32,10 +30,10 @@ const REQUIRED_TABLES = [
   "backup_history",
 ];
 
-// เริ่มต้นวันนี้ตามเวลาไทย แปลงเป็น UTC (คอลัมน์เวลาเก็บเป็น timestamp UTC)
+// SQL เวลาเริ่มต้นของ "วันนี้" ตามเวลาไทย (แปลงเป็น UTC)
 const THAI_TODAY_START = `((date_trunc('day', NOW() AT TIME ZONE 'Asia/Bangkok') AT TIME ZONE 'Asia/Bangkok') AT TIME ZONE 'UTC')`;
 
-// GET: ตรวจสถานะระบบ (DB, ตารางที่จำเป็น, สถิติ, ข้อผิดพลาดค้าง, การสำรองล่าสุด)
+// API: ตรวจสุขภาพระบบ (การเชื่อมต่อ DB, ตารางที่จำเป็น, ผู้ใช้ตาม role) แล้วสรุปสถานะรวม
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);
@@ -43,11 +41,10 @@ export async function GET(request: NextRequest) {
 
     const checks: Check[] = [];
 
-    /* ---------- 1) การเชื่อมต่อฐานข้อมูล ---------- */
+    // ตรวจการเชื่อมต่อ DB และวัดเวลาตอบสนอง
     const started = Date.now();
     const ping = await pool.query(`SHOW server_version`);
     const latencyMs = Date.now() - started;
-    // เช่น "17.6" หรือ "17.6 (Ubuntu ...)" → เอาเฉพาะเลขเวอร์ชัน
     const dbVersion = String(ping.rows[0]?.server_version ?? "").split(" ")[0];
 
     checks.push({
@@ -57,7 +54,7 @@ export async function GET(request: NextRequest) {
       detail: `PostgreSQL ${dbVersion} · ตอบสนองใน ${latencyMs} ms`,
     });
 
-    /* ---------- 2) ตารางที่จำเป็น ---------- */
+    // ตรวจว่ามีตารางหลักครบหรือไม่
     const tableRes = await pool.query(
       `SELECT table_name FROM information_schema.tables
        WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
@@ -75,7 +72,7 @@ export async function GET(request: NextRequest) {
         : `ครบทั้ง ${REQUIRED_TABLES.length} ตาราง`,
     });
 
-    /* ---------- 3) สถิติผู้ใช้ / การประเมิน ---------- */
+    // ดึงสถิติ: ผู้ใช้ตาม role, จำนวนการประเมิน, error ค้าง, backup ล่าสุด
     const [rolesRes, assessRes, errorRes, backupRes] = await Promise.all([
       pool.query(
         `SELECT COALESCE(r.role_name, 'ไม่ระบุ') AS role_name, COUNT(*)::int AS total
@@ -99,6 +96,7 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
+    // ตรวจว่ามีบัญชีผู้ดูแลระบบอย่างน้อย 1 บัญชี
     const usersByRole = rolesRes.rows as { role_name: string; total: number }[];
     const totalUsers = usersByRole.reduce((sum, r) => sum + r.total, 0);
     const adminCount =
@@ -111,7 +109,7 @@ export async function GET(request: NextRequest) {
       detail: `มีผู้ดูแลระบบ ${adminCount} บัญชี`,
     });
 
-    /* ---------- 4) ข้อผิดพลาดที่ยังไม่แก้ ---------- */
+    // ตรวจจำนวน error ที่ยังไม่แก้ (>10 = error)
     const openErrors: number = errorRes.rows[0].open;
     checks.push({
       key: "errors",
@@ -123,7 +121,7 @@ export async function GET(request: NextRequest) {
           : `ค้างอยู่ ${openErrors} รายการ (เกิดใหม่ใน 24 ชม. ${errorRes.rows[0].last24h})`,
     });
 
-    /* ---------- 5) การสำรองข้อมูลล่าสุด ---------- */
+    // ตรวจอายุ backup ล่าสุด (เกิน 7 วัน = warning, ไม่เคย = error)
     const lastBackup: Date | null = backupRes.rows[0]?.created_at ?? null;
     const backupAgeDays = lastBackup
       ? (Date.now() - new Date(lastBackup).getTime()) / 86_400_000
@@ -142,6 +140,7 @@ export async function GET(request: NextRequest) {
             : `สำรองล่าสุดเมื่อ ${Math.floor(backupAgeDays)} วันก่อน`,
     });
 
+    // สรุปสถานะรวมจากผลตรวจที่แย่ที่สุด แล้วคืน JSON
     const overall: CheckStatus = checks.some((c) => c.status === "error")
       ? "error"
       : checks.some((c) => c.status === "warning")

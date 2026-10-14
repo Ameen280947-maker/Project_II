@@ -25,20 +25,17 @@ import type { ReactNode } from "react";
 
 import { countAlerts, NOTIFICATIONS_UPDATED_EVENT } from "@/app/components/NotificationBell";
 
-/* =========================================================
-   CONSTANTS
-========================================================= */
-
+// key ใน localStorage สำหรับจำว่า sidebar ถูกย่อไว้หรือไม่
 const COLLAPSE_KEY = "sidebarCollapsed";
 
-// ต้องตรงกับ FONT_SIZE_PX ในหน้าตั้งค่า
+// ขนาดฟอนต์ฐานของหน้าเว็บตามค่าที่ผู้ใช้ตั้งในหน้าการตั้งค่า
 const FONT_SIZE_PX: Record<string, string> = {
   normal: "16px",
   large: "18px",
   xl: "20px",
 };
 
-// ข้อมูลผู้ใช้ที่เก็บไว้ในเครื่อง (ลบทิ้งตอนออกจากระบบ)
+// key ข้อมูลผู้ใช้ใน localStorage ที่ต้องล้างตอนออกจากระบบ
 const USER_STORAGE_KEYS = [
   "userId",
   "username",
@@ -50,36 +47,31 @@ const USER_STORAGE_KEYS = [
   "rememberLogin",
 ];
 
-// ลบข้อมูลผู้ใช้ทั้งหมดที่เก็บไว้ใน localStorage
+// ลบข้อมูลผู้ใช้ทั้งหมดที่เก็บใน localStorage (ใช้ตอนออกจากระบบหรือ session หมดอายุ)
 function clearUserStorage() {
   for (const key of USER_STORAGE_KEYS) {
     localStorage.removeItem(key);
   }
 }
 
-/* =========================================================
-   SIDEBAR
-========================================================= */
-
-/* เปิดหน้าผลจาก "ดูรายละเอียด" ในหน้าประวัติ → ไฮไลต์เมนู "ประวัติการประเมิน"
-   จำ path ปลายทางไว้ก่อนเปลี่ยนหน้า แถบเมนูของหน้าใหม่จึงไฮไลต์ถูกตั้งแต่แรก ไม่กระพริบ */
+// key ใน sessionStorage จำ path ที่เปิดมาจากหน้าประวัติ
 const FROM_HISTORY_KEY = "sidebarFromHistory";
 
-// จำ path หน้าผลที่เปิดมาจากหน้าประวัติไว้ใน sessionStorage (ใช้ไฮไลต์เมนูประวัติ)
+// จำใน sessionStorage ว่าเปิดหน้านี้มาจากหน้าประวัติ เพื่อให้ไฮไลต์เมนูประวัติแทนเมนูแบบประเมิน
 export function markFromHistory(href: string) {
   try {
     sessionStorage.setItem(FROM_HISTORY_KEY, href.split("?")[0]);
   } catch {
-    /* ignore */
   }
 }
 
-// ฟังก์ชัน subscribe เปล่าสำหรับ useSyncExternalStore (ค่าไม่ต้องติดตามการเปลี่ยนแปลง)
+// subscribe เปล่าสำหรับ useSyncExternalStore (อ่าน sessionStorage อย่างเดียว ไม่ต้องฟังการเปลี่ยนแปลง)
 const noopSubscribe = () => () => {};
 
-// คอมโพเนนต์แถบเมนูด้านซ้ายฝั่งผู้ใช้ (ย่อ/ขยายได้, ลิ้นชักบนมือถือ) พร้อมจำนวนแจ้งเตือนที่ยังไม่อ่าน
+// แถบเมนูด้านข้าง: ตรวจ session, ย่อ/ขยายเมนู, เมนูมือถือ, จำนวนแจ้งเตือน และปุ่มออกจากระบบ
 export default function Sidebar() {
   const pathname = usePathname();
+  // อ่านจาก sessionStorage ว่าหน้านี้เปิดมาจากหน้าประวัติหรือไม่
   const fromHistory = useSyncExternalStore(
     noopSubscribe,
     () => {
@@ -92,38 +84,36 @@ export default function Sidebar() {
     () => false,
   );
 
-  // ออกจากหน้าผลนั้นแล้ว ลืมค่าที่จำไว้
+  // เปลี่ยนไปหน้าอื่นแล้ว → ล้างค่า "มาจากประวัติ" ทิ้ง
   useEffect(() => {
     try {
       const path = sessionStorage.getItem(FROM_HISTORY_KEY);
       if (path && path !== pathname) sessionStorage.removeItem(FROM_HISTORY_KEY);
     } catch {
-      /* ignore */
     }
   }, [pathname]);
   const router = useRouter();
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
-  // สถานะย่อ/ขยาย (จำค่าไว้ใน localStorage)
+  // state ย่อ/ขยาย sidebar และ ready (เปิด animation หลัง render แรกเพื่อไม่ให้กระพริบ)
   const [collapsed, setCollapsed] = useState(false);
-  // เปิด animation หลังอ่านค่าที่จำไว้แล้ว กันไม่ให้แถบ "กระตุก" ตอนเปิดหน้า
   const [ready, setReady] = useState(false);
 
-  // เมนูแบบลิ้นชักบนมือถือ/แท็บเล็ต (จอแคบกว่า lg)
+  // state เมนูมือถือ และ path ตอนเปิดเมนู
   const [mobileOpen, setMobileOpen] = useState(false);
   const [openedAt, setOpenedAt] = useState(pathname);
 
-  // เปลี่ยนหน้าแล้วปิดลิ้นชัก (ปรับ state ระหว่าง render ตามแนวทาง React แทน useEffect)
   if (openedAt !== pathname) {
     setOpenedAt(pathname);
     setMobileOpen(false);
   }
 
-  // ตอนเปิดลิ้นชัก: ล็อกการเลื่อนหน้าด้านหลัง และกด Esc เพื่อปิด
+  // ตอนเมนูมือถือเปิด: ล็อกการเลื่อนหน้า และฟังปุ่ม Escape
   useEffect(() => {
     if (!mobileOpen) return;
     const previous = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+    // ปิดเมนูมือถือเมื่อกด Escape
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") setMobileOpen(false);
     };
@@ -134,8 +124,7 @@ export default function Sidebar() {
     };
   }, [mobileOpen]);
 
-  // ตรวจ session ฝั่ง server ทุกครั้งที่เปิดหน้า
-  // ถ้าไม่มี (เช่น login ไว้ก่อนมีระบบ session หรือ session หมดอายุ) ให้เข้าสู่ระบบใหม่
+  // ตรวจ session กับ API /api/auth/session ถ้า 401 ล้างข้อมูลแล้วไปหน้า login
   useEffect(() => {
     let cancelled = false;
 
@@ -147,7 +136,6 @@ export default function Sidebar() {
         }
       })
       .catch(() => {
-        /* เครือข่ายมีปัญหา ไม่ต้องเด้งออก */
       });
 
     return () => {
@@ -155,37 +143,35 @@ export default function Sidebar() {
     };
   }, [router]);
 
+  // ตอนเปิดหน้า: อ่านสถานะย่อเมนูและขนาดฟอนต์จาก localStorage
   useEffect(() => {
     try {
       setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
 
-      // ขนาดตัวอักษรที่เลือกไว้ในหน้าตั้งค่า (Tailwind ใช้หน่วย rem จึงขยายได้ทั้งหน้า)
       const fontSize = localStorage.getItem("fontSize");
       if (fontSize && fontSize in FONT_SIZE_PX) {
         document.documentElement.style.fontSize = FONT_SIZE_PX[fontSize];
       }
     } catch {
-      /* ignore */
     }
     const t = requestAnimationFrame(() => setReady(true));
     return () => cancelAnimationFrame(t);
   }, []);
 
-  // สลับสถานะย่อ/ขยายแถบเมนู และจำค่าไว้ใน localStorage
+  // สลับย่อ/ขยาย sidebar และบันทึกสถานะลง localStorage
   const toggleCollapsed = () => {
     setCollapsed((prev) => {
       const next = !prev;
       try {
         localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
       } catch {
-        /* ignore */
       }
       return next;
     });
   };
 
-  // คีย์ลัด Ctrl + B (Windows) / ⌘ + B (Mac) เพื่อย่อ/ขยาย
   useEffect(() => {
+    // คีย์ลัด Ctrl/Cmd+B ย่อ/ขยาย sidebar (ยกเว้นตอนกำลังพิมพ์ในช่อง input)
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
       const typing =
@@ -201,8 +187,9 @@ export default function Sidebar() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
+  // โหลดจำนวนแจ้งเตือนทุกครั้งที่เปลี่ยนหน้า และฟัง event อัปเดตจากกระดิ่ง
   useEffect(() => {
-    // โหลดจำนวนแจ้งเตือนที่ต้องสนใจมาแสดงเป็นตัวเลขบนเมนู
+    // ดึงแจ้งเตือนจาก API /api/notifications แล้วนับจำนวนที่ต้องแสดงบน badge
     const fetchUnread = async () => {
       try {
         const userId = localStorage.getItem("userId");
@@ -212,17 +199,15 @@ export default function Sidebar() {
         });
         const data = await res.json();
         if (data.success) {
-          // แจ้งเตือนรายการที่ครบกำหนดหรือยังไม่ได้อ่าน (นับเหมือนกระดิ่ง)
           setUnreadNotifs(countAlerts(data.notifications || []));
         }
       } catch (err) {
-        // silent fail in sidebar
       }
     };
 
     fetchUnread();
 
-    // อัปเดตทันทีเมื่อกระดิ่งโหลดใหม่หรือมีการกดอ่าน
+    // อัปเดตจำนวน badge เมื่อ NotificationBell ส่ง event notifications:updated มา
     const handleUpdate = (e: Event) => {
       setUnreadNotifs((e as CustomEvent<number>).detail);
     };
@@ -230,17 +215,11 @@ export default function Sidebar() {
     return () => window.removeEventListener(NOTIFICATIONS_UPDATED_EVENT, handleUpdate);
   }, [pathname]);
 
-  /* =========================================================
-     LOGOUT
-  ========================================================= */
-
-  // ออกจากระบบ: ลบ session ฝั่ง server และข้อมูลในเครื่อง แล้วกลับไปหน้า login
+  // ออกจากระบบ: เรียก API logout ล้าง localStorage แล้วกลับไปหน้า login
   const logout = async () => {
-    // ลบ session cookie ฝั่ง server ก่อน (ถ้าเรียกไม่สำเร็จก็ยังออกจากระบบในเครื่องต่อ)
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
-      /* ignore */
     }
 
     clearUserStorage();
@@ -248,15 +227,11 @@ export default function Sidebar() {
     router.replace("/login");
   };
 
-  /* =========================================================
-     ACTIVE ROUTES
-  ========================================================= */
-
+  // คำนวณว่าเมนูไหน active ตาม pathname ปัจจุบัน
   const isProfileActive =
     pathname === "/profile" ||
     pathname.startsWith("/profile/");
 
-  // แบบประเมินทุกแบบ และหน้าผลของแต่ละแบบ (/recommendation_xxx, /recommendation-CVD) อยู่ในเมนู "แบบประเมินสุขภาพ"
   const isAssessmentActive =
     !fromHistory &&
     (pathname.startsWith("/assessment") ||
@@ -290,7 +265,7 @@ export default function Sidebar() {
 
   const badge = unreadNotifs > 0 ? (unreadNotifs > 9 ? "9+" : unreadNotifs) : undefined;
 
-  // ใช้ร่วมกันทั้งแถบด้านข้าง (จอใหญ่) และลิ้นชัก (มือถือ)
+  // รายการเมนูหลักทั้งหมดของ sidebar
   const menuItems: Omit<SidebarItemProps, "collapsed">[] = [
     { href: "/profile", icon: <UserRound size={21} />, label: "ข้อมูลสุขภาพของคุณ", active: isProfileActive },
     { href: "/assessment-type", icon: <ClipboardList size={21} />, label: "แบบประเมินสุขภาพ", active: isAssessmentActive },
@@ -301,17 +276,10 @@ export default function Sidebar() {
     { href: "/settings", icon: <Settings size={21} />, label: "ตั้งค่า", active: isSettingsActive },
   ];
 
-  /* =========================================================
-     UI
-  ========================================================= */
-
   return (
     <>
-    {/* =====================================================
-        MOBILE TOP BAR (จอแคบกว่า lg)
-        globals.css เว้นที่ด้านบนของหน้าให้แถบนี้ (.mobile-topbar)
-    ===================================================== */}
 
+    {/* แถบด้านบนสำหรับมือถือ: ปุ่มเปิดเมนูและโลโก้ */}
     <header className="mobile-topbar fixed inset-x-0 top-0 z-40 flex h-14 items-center gap-3 border-b border-[#eee5e6] bg-white/95 px-3 backdrop-blur lg:hidden">
       <button
         type="button"
@@ -335,15 +303,11 @@ export default function Sidebar() {
       </Link>
     </header>
 
-    {/* =====================================================
-        MOBILE DRAWER
-    ===================================================== */}
-
+    {/* เมนูแบบ drawer สำหรับมือถือ พร้อมพื้นหลังทึบ */}
     <div
       className={`fixed inset-0 z-50 lg:hidden ${mobileOpen ? "" : "pointer-events-none"}`}
       aria-hidden={!mobileOpen}
     >
-      {/* พื้นหลังมืด กดเพื่อปิด */}
       <div
         onClick={() => setMobileOpen(false)}
         className={`absolute inset-0 bg-[#2f3037]/40 transition-opacity duration-300 ${mobileOpen ? "opacity-100" : "opacity-0"}`}
@@ -379,6 +343,7 @@ export default function Sidebar() {
           </button>
         </div>
 
+        {/* รายการเมนูในมือถือ */}
         <nav className="mt-8 space-y-2" aria-label="เมนูหลัก">
           {menuItems.map((item) => (
             <SidebarItem key={item.href} {...item} />
@@ -396,16 +361,13 @@ export default function Sidebar() {
       </aside>
     </div>
 
+    {/* sidebar สำหรับจอใหญ่ ย่อ/ขยายได้ */}
     <aside
       data-collapsed={collapsed}
       className={`group/sidebar sticky top-0 hidden h-screen shrink-0 border-r border-[#eee5e6] bg-white py-7 lg:flex lg:flex-col ${
         ready ? "transition-[width,padding] duration-300 ease-[cubic-bezier(.4,0,.2,1)]" : ""
       } ${collapsed ? "w-[88px] px-3" : "w-[235px] px-5"}`}
     >
-
-      {/* =====================================================
-          COLLAPSE TOGGLE (ปุ่มกลมที่ขอบแถบ)
-      ===================================================== */}
 
       <button
         type="button"
@@ -422,10 +384,7 @@ export default function Sidebar() {
         />
       </button>
 
-      {/* =====================================================
-          LOGO
-      ===================================================== */}
-
+      {/* โลโก้และชื่อระบบ */}
       <Link
         href="/assessment-type"
         className={`flex items-center gap-3 ${collapsed ? "justify-center px-0" : "px-3"}`}
@@ -452,19 +411,12 @@ export default function Sidebar() {
         </div>
       </Link>
 
-      {/* =====================================================
-          MENU
-      ===================================================== */}
-
+      {/* รายการเมนูหลัก */}
       <nav className="mt-12 space-y-2" aria-label="เมนูหลัก">
         {menuItems.map((item) => (
           <SidebarItem key={item.href} {...item} collapsed={collapsed} />
         ))}
       </nav>
-
-      {/* =====================================================
-          LOGOUT
-      ===================================================== */}
 
       <button
         type="button"
@@ -492,10 +444,7 @@ export default function Sidebar() {
   );
 }
 
-/* =========================================================
-   SIDEBAR ITEM
-========================================================= */
-
+// props ของเมนูหนึ่งรายการ: ลิงก์ ไอคอน ชื่อ สถานะ active badge และโหมดย่อ
 type SidebarItemProps = {
   href: string;
   icon: ReactNode;
@@ -505,7 +454,7 @@ type SidebarItemProps = {
   collapsed?: boolean;
 };
 
-// รายการเมนูหนึ่งรายการในแถบด้านซ้าย (ไอคอน ชื่อ badge และ tooltip ตอนย่อ)
+// ลิงก์เมนูหนึ่งรายการใน sidebar พร้อมไอคอน สถานะ active, badge และ tooltip ตอนย่อ
 function SidebarItem({
   href,
   icon,
@@ -527,7 +476,6 @@ function SidebarItem({
           : "text-[#666770] hover:bg-[#f8f5f5] hover:text-[#2f3037]"
       }`}
     >
-      {/* แถบสีด้านซ้ายเมื่ออยู่หน้านี้ (ช่วยให้เห็นชัดตอนย่อ) */}
       {active && collapsed && (
         <span className="absolute -left-3 top-1/2 h-7 w-1 -translate-y-1/2 rounded-r-full bg-[#b91c2b]" />
       )}
@@ -536,7 +484,6 @@ function SidebarItem({
         <span className="relative shrink-0">
           {icon}
 
-          {/* ตอนย่อ: badge เล็กติดมุมไอคอน */}
           {collapsed && badge != null && (
             <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#b91c2b] px-1 text-[10px] font-bold text-white ring-2 ring-white">
               {badge}
@@ -553,7 +500,6 @@ function SidebarItem({
         </span>
       </div>
 
-      {/* ตอนขยาย: badge ด้านขวาเหมือนเดิม */}
       {!collapsed && badge != null && (
         <span className="ml-2 flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#b91c2b] px-1 text-[11px] font-bold text-white shadow-sm">
           {badge}
@@ -565,10 +511,7 @@ function SidebarItem({
   );
 }
 
-/* =========================================================
-   TOOLTIP (แสดงชื่อเมนูเมื่อชี้ตอนย่อแถบ)
-========================================================= */
-
+// กล่องข้อความชื่อเมนูที่โผล่เมื่อ hover ตอน sidebar ถูกย่อ
 function Tooltip({ label }: { label: string }) {
   return (
     <span

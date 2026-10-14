@@ -16,28 +16,10 @@ import {
 } from "@/lib/staff/assessmentVersions";
 import { diffSnapshots, type Change } from "@/lib/staff/assessmentHistory";
 
-/* =========================================================
-   /api/staff/assessments
-   GET                      → รายการแบบประเมิน (จำนวนข้อ, เวอร์ชันล่าสุด, ระดับที่ขาดคำแนะนำ, หมวดหมู่) + categories
-   GET ?type=<id>           → เนื้อหาสำหรับแก้ไข (ฉบับร่างถ้ามี ไม่งั้นเนื้อหาที่ใช้งานอยู่) + ข้อมูลเวอร์ชัน
-   GET ?type=<id>&changes=1 → ประวัติการแก้ไข (แต่ละครั้งที่เผยแพร่เทียบกับครั้งก่อน + เปิด/ปิดใช้งาน)
-   GET ?version=<id>        → snapshot ของเวอร์ชันนั้น (ดูอย่างเดียว)
-   GET ?history=<rec_id>    → ประวัติการแก้คำแนะนำ (recommendation_history)
-   PUT   { typeId, snapshot }               → บันทึกฉบับร่าง
-   POST  { action: "discard", typeId }      → ทิ้งฉบับร่าง
-   POST  { action: "publish", typeId, snapshot? } → เผยแพร่ (เขียนลงตารางจริง + เวอร์ชันใหม่)
-   POST  { name, description, categoryId }  → สร้างแบบประเมินใหม่ (เริ่มแบบปิดใช้งาน) ในหมวดที่มีอยู่
-   POST  { name, description, newCategory: { name, subtitle?, theme } }
-                                            → สร้างหมวดใหม่ + แบบประเมิน ใน transaction เดียว
-   PATCH { typeId, isActive }               → เปิด/ปิดแบบประเมิน (มีผลทันที ไม่ผ่านฉบับร่าง)
-   PATCH { typeId, categoryId }             → ย้ายหมวดหมู่ (มีผลทันที, เฉพาะแบบประเมินที่สร้างเพิ่ม)
-   DELETE { typeId, confirmName }           → ลบแบบประเมินที่สร้างใหม่และยังไม่มีใครทำ
-========================================================= */
-
-// สร้าง response JSON แจ้งข้อผิดพลาด (ค่าเริ่มต้น status 400)
+// สร้าง JSON response แจ้งข้อผิดพลาดพร้อม status code
 const fail = (message: string, status = 400) => NextResponse.json({ success: false, message }, { status });
 
-// GET: คืนรายการแบบประเมิน / รายละเอียด / ประวัติการแก้ไข / เวอร์ชัน ตาม query
+// API (เจ้าหน้าที่): คืนรายการแบบประเมินทั้งหมด หรือรายละเอียด/เวอร์ชัน/ประวัติคำแนะนำตามพารามิเตอร์
 export async function GET(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -47,11 +29,13 @@ export async function GET(request: NextRequest) {
   const historyId = Number(p.get("history"));
 
   try {
+    // เลือกคืนข้อมูลตามพารามิเตอร์: history / version / changes / type
     if (historyId) return NextResponse.json({ success: true, history: await recHistory(historyId) });
     if (versionId) return getVersion(versionId);
     if (typeId && p.get("changes")) return NextResponse.json({ success: true, entries: await listChanges(typeId) });
     if (typeId) return getDetail(typeId);
 
+    // ไม่ระบุ → รายการแบบประเมินทั้งหมดพร้อมจำนวนคำถาม เวอร์ชัน และสถานะฉบับร่าง
     const ids = await pool.query("SELECT assessment_type_id FROM assessment_types WHERE NOT (assessment_name = ANY($1))", [
       EXCLUDED_TYPES,
     ]);
@@ -70,6 +54,7 @@ export async function GET(request: NextRequest) {
         ORDER BY t.assessment_type_id`,
       [EXCLUDED_TYPES]
     );
+    // แนบหมวดหมู่ (พร้อมจำนวนแบบประเมิน) และแปลงแถวเป็นรูปแบบที่หน้าเว็บใช้
     const categories = await listCategories();
     return NextResponse.json({
       success: true,
@@ -95,13 +80,14 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// ดึงเนื้อหาสำหรับแก้ไข (ฉบับร่างถ้ามี ไม่งั้นเนื้อหาที่ใช้งานอยู่) พร้อมข้อมูลเวอร์ชัน
+// ดึงรายละเอียดแบบประเมิน: snapshot ปัจจุบัน ฉบับร่าง เวอร์ชันที่เผยแพร่ และจำนวนการใช้งาน
 async function getDetail(typeId: number) {
   const t = await pool.query("SELECT assessment_name, is_active, category_id FROM assessment_types WHERE assessment_type_id = $1", [typeId]);
   const type = t.rows[0];
   if (!type) return fail("ไม่พบแบบประเมิน", 404);
   await ensureBaselines([typeId]);
 
+  // ดึง snapshot ปัจจุบัน ฉบับร่าง เวอร์ชันล่าสุด จำนวนผล และผู้แก้คำแนะนำพร้อมกัน
   const [live, draftRes, pubRes, usedRes, metaRes] = await Promise.all([
     buildSnapshot(pool, typeId),
     pool.query(
@@ -128,11 +114,11 @@ async function getDetail(typeId: number) {
   ]);
   if (!live) return fail("ไม่พบแบบประเมิน", 404);
 
+  // ประกอบข้อมูลตอบกลับ (ใช้ฉบับร่างถ้ายังเข้ากับโครงสร้างปัจจุบัน)
   const name: string = type.assessment_name;
   const resultCount: number = usedRes.rows[0].n;
   const draft = draftRes.rows[0];
   const pub = pubRes.rows[0];
-  // ฉบับร่างที่สร้างก่อนเกณฑ์แปลผลเปลี่ยนรูปแบบ ใช้ต่อไม่ได้ → แสดงเนื้อหาปัจจุบันแทน
   const draftOk = draft && (draft.snapshot as Snapshot).generic === live.generic;
 
   return NextResponse.json({
@@ -146,7 +132,6 @@ async function getDetail(typeId: number) {
       generic: live.generic,
       builtIn: BUILT_IN.has(name),
       resultCount,
-      // แบบประเมินที่สร้างเพิ่มลบได้เสมอ (ถ้ามีผลประเมิน หน้ายืนยันจะแจ้งว่าผลจะถูกลบด้วย)
       deletable: live.generic && !BUILT_IN.has(name),
       content: draftOk ? { ...(draft.snapshot as Snapshot), name } : live,
       live,
@@ -159,9 +144,7 @@ async function getDetail(typeId: number) {
   });
 }
 
-// ประวัติการแก้ไข ใหม่ → เก่า
-// - เผยแพร่: เทียบเนื้อหากับครั้งที่เผยแพร่ก่อนหน้า (ครั้งแรก = เนื้อหาตั้งต้น ไม่มีให้เทียบ)
-// - เปิด/ปิดใช้งาน: จาก access_logs (มีผลทันที ไม่ผ่านการเผยแพร่)
+// รายการในไทม์ไลน์การเปลี่ยนแปลงของแบบประเมิน
 type HistoryEntry = {
   kind: "publish" | "baseline" | "enable" | "disable";
   at: string;
@@ -170,7 +153,7 @@ type HistoryEntry = {
   changes?: Change[];
 };
 
-// รวมประวัติการเผยแพร่แต่ละเวอร์ชัน (เทียบกับครั้งก่อน) และการเปิด/ปิดใช้งาน
+// รวมประวัติการเผยแพร่เวอร์ชันและการเปิด/ปิดแบบประเมินเป็นไทม์ไลน์การเปลี่ยนแปลง
 async function listChanges(typeId: number): Promise<HistoryEntry[]> {
   const [versions, toggles] = await Promise.all([
     pool.query<{ version_id: number; published_at: Date; published_by: number | null; username: string | null; snapshot: Snapshot }>(
@@ -188,8 +171,8 @@ async function listChanges(typeId: number): Promise<HistoryEntry[]> {
     ),
   ]);
 
+  // แปลงเวอร์ชันเป็นรายการ (เทียบ diff กับเวอร์ชันก่อน) รวมกับการเปิด/ปิด แล้วเรียงใหม่สุดก่อน
   const entries: HistoryEntry[] = versions.rows.map((v, i) => {
-    // lib/db.ts อ่าน timestamp เป็นเวลา UTC ให้แล้ว
     const at = new Date(v.published_at).toISOString();
     if (i === 0) return { kind: "baseline", at, by: v.username, versionId: v.version_id };
     return { kind: "publish", at, by: v.username, versionId: v.version_id, changes: diffSnapshots(versions.rows[i - 1].snapshot, v.snapshot) };
@@ -200,7 +183,7 @@ async function listChanges(typeId: number): Promise<HistoryEntry[]> {
   return entries.sort((a, b) => b.at.localeCompare(a.at));
 }
 
-// คืน snapshot ของเวอร์ชันที่เผยแพร่แล้ว (ดูอย่างเดียว)
+// ดึง snapshot ของเวอร์ชันที่เผยแพร่แล้วตาม versionId
 async function getVersion(versionId: number) {
   const { rows } = await pool.query(
     `SELECT v.version_id, v.assessment_type_id, v.version_no, v.published_at, v.snapshot, u.username
@@ -216,7 +199,7 @@ async function getVersion(versionId: number) {
   });
 }
 
-// ฉบับเดิมของคำแนะนำ (trigger เก็บไว้ทุกครั้งที่แก้) ใหม่ → เก่า
+// ดึงประวัติการแก้ไขคำแนะนำ (recommendation_history) ล่าสุด 30 รายการของ recId
 async function recHistory(recId: number) {
   const { rows } = await pool.query(
     `SELECT h.history_id, h.risk_level, h.recommendation_text, h.reassess_days, h.hotline, h.source,
@@ -240,9 +223,7 @@ async function recHistory(recId: number) {
   }));
 }
 
-/* ---------- บันทึกฉบับร่าง ---------- */
-
-// ดึงชื่อแบบประเมินและเช็กว่าเป็นแบบทั่วไป (generic) หรือไม่ (lock = ล็อกแถวไว้)
+// ดึงชื่อแบบประเมินและเช็กว่าคำแนะนำมีช่วงคะแนนครบ (generic) โดยเลือก lock แถวได้
 async function liveBase(db: Pick<typeof pool, "query">, typeId: number, lock = false) {
   const { rows } = await db.query(
     `SELECT t.assessment_name,
@@ -254,7 +235,7 @@ async function liveBase(db: Pick<typeof pool, "query">, typeId: number, lock = f
   return rows[0] ? { name: rows[0].assessment_name as string, generic: rows[0].generic as boolean } : null;
 }
 
-// PUT: ตรวจและบันทึก snapshot เป็นฉบับร่างของแบบประเมิน
+// API (เจ้าหน้าที่): บันทึกฉบับร่างของแบบประเมินลง assessment_versions (status = draft)
 export async function PUT(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -285,9 +266,7 @@ export async function PUT(request: NextRequest) {
   }
 }
 
-/* ---------- เปิด/ปิดใช้งาน ---------- */
-
-// PATCH: เปิด/ปิดใช้งานแบบประเมิน หรือย้ายหมวดหมู่ (ถ้าส่ง categoryId)
+// API (เจ้าหน้าที่): เปิด/ปิดใช้งานแบบประเมิน หรือย้ายหมวดหมู่
 export async function PATCH(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -297,7 +276,7 @@ export async function PATCH(request: NextRequest) {
   if (typeId && "categoryId" in body) return changeCategory(typeId, body.categoryId, auth.staff.userId);
   if (!typeId || typeof body.isActive !== "boolean") return fail("ข้อมูลไม่ถูกต้อง");
   try {
-    // เปิดใช้งานได้เมื่อมีคำถามและเกณฑ์แปลผลแล้ว
+    // ก่อนเปิดใช้งาน ต้องมีคำถามและเกณฑ์แปลผลแล้ว
     if (body.isActive) {
       const { rows } = await pool.query(
         `SELECT (SELECT COUNT(*) FROM questions WHERE assessment_type_id = $1 AND is_active)::int AS q,
@@ -319,9 +298,7 @@ export async function PATCH(request: NextRequest) {
   }
 }
 
-/* ---------- ย้ายหมวดหมู่ (มีผลทันที) ---------- */
-
-// ย้ายแบบประเมินไปหมวดอื่น (แบบประเมินหลักของระบบย้ายไม่ได้)
+// ย้ายแบบประเมินไปหมวดหมู่ใหม่และบันทึก access log
 async function changeCategory(typeId: number, rawCategoryId: unknown, staffId: number) {
   const categoryId = Number(rawCategoryId);
   if (!Number.isInteger(categoryId) || categoryId <= 0) return fail("กรุณาเลือกหมวดหมู่");
@@ -333,7 +310,6 @@ async function changeCategory(typeId: number, rawCategoryId: unknown, staffId: n
     const type = t.rows[0];
     if (!type) return fail("ไม่พบแบบประเมิน", 404);
     if (!c.rows[0]) return fail("ไม่พบหมวดหมู่นี้", 404);
-    // แบบประเมินหลักของระบบมีการ์ดเขียนไว้ในหน้าเมนูของหมวดเดิม ย้ายหมวดไม่ได้
     if (BUILT_IN.has(type.assessment_name)) return fail("แบบประเมินหลักของระบบย้ายหมวดหมู่ไม่ได้");
     if (type.category_id === categoryId) return NextResponse.json({ success: true });
 
@@ -347,9 +323,7 @@ async function changeCategory(typeId: number, rawCategoryId: unknown, staffId: n
   }
 }
 
-/* ---------- สร้างใหม่ / ทิ้งฉบับร่าง / เผยแพร่ ---------- */
-
-// POST: เผยแพร่ / ทิ้งฉบับร่าง ตาม action หรือสร้างแบบประเมินใหม่ (สร้างหมวดใหม่พร้อมกันได้)
+// API (เจ้าหน้าที่): เผยแพร่/ทิ้งฉบับร่าง หรือสร้างแบบประเมินใหม่พร้อมหมวดหมู่
 export async function POST(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -357,11 +331,11 @@ export async function POST(request: NextRequest) {
   if (body.action === "publish") return publish(Number(body.typeId), body.snapshot, auth.staff.userId);
   if (body.action === "discard") return discard(Number(body.typeId), auth.staff.userId);
 
+  // สร้างแบบประเมินใหม่: ตรวจชื่อ คำอธิบาย และหมวดหมู่ (เลือกเดิมหรือสร้างใหม่)
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 100) : "";
   const description = typeof body.description === "string" ? body.description.trim().slice(0, 500) : "";
   if (!name) return fail("กรุณากรอกชื่อแบบประเมิน");
 
-  /* ===== หมวดหมู่: เลือกหมวดที่มีอยู่ หรือสร้างหมวดใหม่ (ต้องมีอย่างใดอย่างหนึ่ง) ===== */
   const nc = body.newCategory && typeof body.newCategory === "object" ? body.newCategory : null;
   const newCat = nc
     ? {
@@ -382,6 +356,7 @@ export async function POST(request: NextRequest) {
 
   const staffId = auth.staff.userId;
   const client = await pool.connect();
+  // ยกเลิก transaction แล้วตอบข้อผิดพลาด
   const refuse = async (message: string, status = 400) => {
     await client.query("ROLLBACK");
     return fail(message, status);
@@ -391,6 +366,7 @@ export async function POST(request: NextRequest) {
     const dup = await client.query("SELECT 1 FROM assessment_types WHERE LOWER(assessment_name) = LOWER($1)", [name]);
     if (dup.rowCount) return await refuse("มีแบบประเมินชื่อนี้แล้ว", 409);
 
+    // สร้างหมวดหมู่ใหม่หรือใช้หมวดที่เลือก
     let catId: number;
     let catName: string;
     if (newCat) {
@@ -411,6 +387,7 @@ export async function POST(request: NextRequest) {
       catName = c.rows[0].name;
     }
 
+    // บันทึกแบบประเมินใหม่ (ปิดใช้งานไว้ก่อน) แล้ว commit และบันทึก log
     const { rows } = await client.query(
       `INSERT INTO assessment_types (assessment_name, description, is_active, category_id, created_at, updated_at)
        VALUES ($1, $2, FALSE, $3, NOW(), NOW()) RETURNING assessment_type_id`,
@@ -423,7 +400,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, id: rows[0].assessment_type_id, categoryId: catId });
   } catch (error) {
     await client.query("ROLLBACK").catch(() => {});
-    // ชื่อหมวดชนกับที่เพิ่งสร้างพร้อมกัน (unique index LOWER(name))
     if ((error as { code?: string }).code === "23505") return fail("มีหมวดหมู่ชื่อนี้แล้ว เลือกจากรายการแทนได้", 409);
     void logSystemError("POST /api/staff/assessments", error);
     console.error("POST /api/staff/assessments error:", error);
@@ -433,7 +409,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// ลบฉบับร่างของแบบประเมิน และบันทึก access log
+// ลบฉบับร่างของแบบประเมินทิ้งและบันทึก access log
 async function discard(typeId: number, staffId: number) {
   if (!typeId) return fail("ข้อมูลไม่ถูกต้อง");
   try {
@@ -447,20 +423,21 @@ async function discard(typeId: number, staffId: number) {
   }
 }
 
-// เผยแพร่: เขียนเนื้อหาลงตารางจริงและสร้างเวอร์ชันใหม่ใน transaction เดียว
+// เผยแพร่ฉบับร่างเป็นเวอร์ชันใหม่ อัปเดตคำถาม/คำแนะนำจริงใน transaction
 async function publish(typeId: number, rawSnapshot: unknown, staffId: number) {
   if (!typeId) return fail("ข้อมูลไม่ถูกต้อง");
   const client = await pool.connect();
+  // ยกเลิก transaction แล้วตอบข้อผิดพลาด
   const refuse = async (message: string, status = 400) => {
     await client.query("ROLLBACK");
     return fail(message, status);
   };
   try {
     await client.query("BEGIN");
-    // ล็อกแบบประเมินไว้ กันเผยแพร่ซ้อนกันจนเลขเวอร์ชันชน
     const base = await liveBase(client, typeId, true);
     if (!base) return await refuse("ไม่พบแบบประเมิน", 404);
 
+    // ตรวจฉบับร่างที่จะเผยแพร่: มีอยู่ โครงสร้างตรง และผ่านเงื่อนไข
     const draft = await client.query(
       "SELECT version_id, snapshot, created_by FROM assessment_versions WHERE assessment_type_id = $1 AND status = 'draft' FOR UPDATE",
       [typeId]
@@ -475,10 +452,10 @@ async function publish(typeId: number, rawSnapshot: unknown, staffId: number) {
     const invalid = validateForPublish(snap);
     if (invalid) return await refuse(invalid);
 
+    // นำ snapshot ไปใช้จริง และปฏิเสธถ้าไม่ต่างจากเวอร์ชันล่าสุด
     const applyError = await applySnapshot(client, typeId, snap, staffId);
     if (applyError) return await refuse(applyError, 409);
 
-    // snapshot ที่เก็บเป็นเวอร์ชัน = เนื้อหาจริงหลังเผยแพร่ (มี id ของคำถาม/ตัวเลือก/ระดับครบ)
     const published = await buildSnapshot(client, typeId);
     const latest = await client.query(
       `SELECT snapshot = $2::jsonb AS same FROM assessment_versions
@@ -487,6 +464,7 @@ async function publish(typeId: number, rawSnapshot: unknown, staffId: number) {
     );
     if (latest.rows[0]?.same) return await refuse("ไม่มีการเปลี่ยนแปลงจากเวอร์ชันล่าสุด");
 
+    // บันทึกเวอร์ชันใหม่ ลบฉบับร่าง แล้ว commit
     const ver = await client.query(
       `INSERT INTO assessment_versions (assessment_type_id, version_no, status, snapshot, created_by, updated_by, published_by, published_at)
        SELECT $1, COALESCE(MAX(version_no), 0) + 1, 'published', $2::jsonb, $3, $4, $4, NOW()
@@ -510,9 +488,7 @@ async function publish(typeId: number, rawSnapshot: unknown, staffId: number) {
   }
 }
 
-/* ---------- ลบแบบประเมิน ---------- */
-
-// DELETE: ลบแบบประเมินที่สร้างใหม่และยังไม่มีใครทำ
+// API (เจ้าหน้าที่): ลบแบบประเมินที่สร้างเอง หลังยืนยันชื่อ (แบบประเมินหลักของระบบลบไม่ได้)
 export async function DELETE(request: NextRequest) {
   const auth = await requireStaff(request);
   if (auth.error) return auth.error;
@@ -524,14 +500,15 @@ export async function DELETE(request: NextRequest) {
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
-    // ล็อกแถวไว้ กันมีคนส่งแบบประเมินเข้ามาระหว่างลบ
     const t = await client.query("SELECT assessment_name FROM assessment_types WHERE assessment_type_id = $1 FOR UPDATE", [typeId]);
     const name: string | undefined = t.rows[0]?.assessment_name;
+    // ยกเลิก transaction แล้วตอบข้อผิดพลาด
     const refuse = async (message: string, status = 400) => {
       await client.query("ROLLBACK");
       return fail(message, status);
     };
 
+    // ตรวจเงื่อนไขการลบ: ชื่อยืนยันตรง ไม่ใช่แบบหลัก และไม่ใช้สูตรในระบบ
     if (!name) return refuse("ไม่พบแบบประเมิน", 404);
     if (String(body.confirmName ?? "").trim() !== name) return refuse("ชื่อที่พิมพ์ยืนยันไม่ตรงกับชื่อแบบประเมิน");
     if (BUILT_IN.has(name)) return refuse("แบบประเมินหลักของระบบลบไม่ได้");
@@ -542,8 +519,7 @@ export async function DELETE(request: NextRequest) {
     );
     if (legacy.rowCount) return refuse("แบบประเมินนี้แปลผลด้วยสูตรในระบบ ลบไม่ได้");
 
-    // ผลประเมินของผู้ใช้ในแบบนี้ถูกลบไปด้วย (หน้ายืนยันแจ้งจำนวนไว้แล้ว)
-    // ลบตารางที่อ้างถึงก่อน: การแจ้งเตือน / เคสเดิม (notes ลบตาม cascade) / log แดชบอร์ด แล้วจึงลบผล (คำตอบลบตาม cascade)
+    // ลบข้อมูลที่เกี่ยวข้องทั้งหมด (แจ้งเตือน ผลประเมิน คำถาม คำแนะนำ เวอร์ชัน) แล้ว commit
     const used = await client.query("SELECT COUNT(*)::int AS n FROM assessment WHERE assessment_type_id = $1", [typeId]);
     const results: number = used.rows[0].n;
     await client.query("DELETE FROM user_notifications WHERE assessment_type_id = $1", [typeId]);

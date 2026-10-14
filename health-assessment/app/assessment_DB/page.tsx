@@ -13,6 +13,7 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
+// รูปแบบ response จาก POST /api/assessments/blood-pressure
 type SubmitResponse = {
   success: boolean;
   assessmentId?: number;
@@ -23,11 +24,11 @@ type SubmitResponse = {
   message?: string;
 };
 
-// หน้าแบบประเมินความดันโลหิต: กรอกค่าตัวบน/ตัวล่าง แล้วส่งไปประเมินผล
+// หน้า: กรอกค่าความดันตัวบน/ตัวล่างเพื่อประเมินระดับความดันโลหิต
 export default function BloodPressureAssessmentPage() {
   const router = useRouter();
 
-  // เริ่มว่าง (แสดง placeholder) แทน 0 เพราะโปรไฟล์ไม่มีค่าความดัน
+  // state ค่าความดันที่ผู้ใช้กรอก สถานะกำลังส่ง และข้อความ error
   const [systolic, setSystolic] =
     useState("");
 
@@ -40,17 +41,14 @@ export default function BloodPressureAssessmentPage() {
   const [error, setError] =
     useState("");
 
-  /* =========================================================
-     บันทึกลง Database
-  ========================================================= */
-
-  // ตรวจค่าความดันที่กรอก แล้ว POST ไปบันทึกผลและพาไปหน้าคำแนะนำความดัน
+  // ตรวจค่าความดันที่กรอก ส่ง POST /api/assessments/blood-pressure แล้วไปหน้าผลลัพธ์
   const handleAssessment =
     async () => {
       try {
         setSubmitting(true);
         setError("");
 
+        // ตรวจ userId ใน localStorage ถ้าไม่มีหรือไม่ถูกต้องให้กลับไปหน้า login
         const storedUserId =
           localStorage.getItem(
             "userId",
@@ -76,6 +74,7 @@ export default function BloodPressureAssessmentPage() {
           return;
         }
 
+        // ตรวจว่ากรอกครบ อยู่ในช่วงที่รับได้ และตัวบนมากกว่าตัวล่าง
         if (
           !systolic.trim() ||
           !diastolic.trim()
@@ -91,7 +90,6 @@ export default function BloodPressureAssessmentPage() {
         const diastolicValue =
           Number(diastolic);
 
-        // ช่วงค่าเดียวกับ API (จำนวนเต็ม SBP 60-250, DBP 30-150 และตัวบนต้องมากกว่าตัวล่าง)
         if (
           !Number.isInteger(systolicValue) ||
           systolicValue < 60 ||
@@ -118,6 +116,7 @@ export default function BloodPressureAssessmentPage() {
           );
         }
 
+        // ส่งค่าความดันไปบันทึกและประเมินที่ API
         const response =
           await fetch(
             "/api/assessments/blood-pressure",
@@ -138,13 +137,14 @@ export default function BloodPressureAssessmentPage() {
             },
           );
 
-        // session หมดอายุ → กลับไปหน้า login
+        // session หมดอายุ (401) → ลบ userId แล้วไปหน้า login
         if (response.status === 401) {
           localStorage.removeItem("userId");
           router.push("/login");
           return;
         }
 
+        // อ่านผลลัพธ์ ตรวจว่าสำเร็จและได้ assessmentId แล้วไปหน้าคำแนะนำ
         const data =
           (await response.json()) as SubmitResponse;
 
@@ -158,26 +158,16 @@ export default function BloodPressureAssessmentPage() {
           );
         }
 
-        /*
-          จุดสำคัญ
-
-          API ต้องส่ง assessmentId
-          กลับมา
-        */
-
         if (!data.assessmentId) {
           throw new Error(
             "ระบบบันทึกข้อมูลแล้ว แต่ไม่ได้รับ assessmentId",
           );
         }
 
-        /*
-          ส่ง assessmentId ไปหน้า Recommendation
-        */
-
         router.push(
           `/recommendation_DB?assessmentId=${data.assessmentId}`,
         );
+        // error → แสดงข้อความให้ผู้ใช้เห็นบนหน้า
       } catch (submitError) {
         console.error(
           "Blood Pressure submit error:",
@@ -200,10 +190,9 @@ export default function BloodPressureAssessmentPage() {
 
         <Sidebar />
 
-        {/* Content */}
-
         <section className="flex min-h-screen min-w-0 flex-1 flex-col px-5 py-7 sm:px-8 lg:px-12">
 
+          {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ปุ่มความยินยอม และปุ่มย้อนกลับ */}
           <header className="flex items-start justify-between gap-4">
             <div className="min-w-0">
 
@@ -220,20 +209,16 @@ export default function BloodPressureAssessmentPage() {
 
             </div>
 
-            {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
             <HealthConsentNotice />
             <AssessmentBackLink href="/assessment-menu" />
           </header>
-          {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
           <AssessmentSourceNote typeId={2} className="mt-3" />
 
-          {/* จัดฟอร์มให้อยู่กลางพื้นที่ที่เหลือ (ขยับขึ้นเล็กน้อยให้ดูสมดุล) */}
           <div className="flex flex-1 items-center py-10 lg:pb-24">
 
             <div className="mx-auto w-full max-w-2xl space-y-7">
 
-              {/* Input card */}
-
+              {/* การ์ดกรอกค่าความดันตัวบนและตัวล่าง */}
               <section className="rounded-[28px] border border-[#eee5e6] bg-white p-8 shadow-[0_16px_45px_rgba(35,25,30,0.05)]">
 
                 <div className="flex items-center gap-4">
@@ -286,8 +271,7 @@ export default function BloodPressureAssessmentPage() {
                 </div>
               )}
 
-              {/* Submit */}
-
+              {/* ปุ่มเริ่มประเมิน */}
               <button
                 type="button"
                 disabled={
@@ -325,11 +309,7 @@ export default function BloodPressureAssessmentPage() {
   );
 }
 
-/* =========================================================
-   Pressure input
-========================================================= */
-
-// ช่องกรอกค่าความดันโลหิต (mmHg) พร้อมป้ายชื่อ
+// คอมโพเนนต์: ช่องกรอกค่าความดัน (mmHg) พร้อมป้ายชื่อ
 function PressureInput({
   label,
   value,
@@ -375,5 +355,4 @@ function PressureInput({
     </label>
   );
 }
-
 

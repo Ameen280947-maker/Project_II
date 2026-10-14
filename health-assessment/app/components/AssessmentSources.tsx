@@ -3,19 +3,15 @@
 import { useEffect, useState } from "react";
 import { BookOpen } from "lucide-react";
 
-/* =========================================================
-   แหล่งอ้างอิงที่เจ้าหน้าที่กรอกในหน้า staff
-   - AssessmentSourceNote : หน้าทำแบบประเมิน (แหล่งอ้างอิงของแบบประเมิน)
-   - ResultSources        : หน้าผล (แหล่งอ้างอิงคำแนะนำ + ของแบบประเมิน)
-   ไม่ได้กรอกไว้ = ไม่แสดงอะไร
-========================================================= */
-
+// โครงข้อมูลแหล่งอ้างอิงที่ได้จาก API (แบบประเมิน/คำแนะนำ)
 type Sources = { assessmentSource?: string | null; recommendationSource?: string | null };
 
-// hook โหลดแหล่งอ้างอิงจาก API ตาม query (คืน null ถ้ายังไม่มีข้อมูลของ query นี้)
+// Hook: ดึงแหล่งอ้างอิงของแบบประเมิน/คำแนะนำจาก API /api/assessments/sources ตาม query ที่ส่งมา
 function useSources(query: string | null) {
+  // state เก็บผลลัพธ์พร้อม query ที่ใช้ดึง เพื่อกันแสดงข้อมูลของ query เก่า
   const [data, setData] = useState<{ query: string; sources: Sources } | null>(null);
 
+  // ดึงแหล่งอ้างอิงใหม่ทุกครั้งที่ query เปลี่ยน และยกเลิกผลถ้า component ถูก unmount
   useEffect(() => {
     if (!query) return;
     let cancelled = false;
@@ -33,7 +29,7 @@ function useSources(query: string | null) {
   return data?.query === query ? data.sources : null;
 }
 
-// แสดงบรรทัดแหล่งอ้างอิงของแบบประเมินในหน้าทำแบบประเมิน
+// แสดงข้อความแหล่งอ้างอิงของแบบประเมินตาม typeId (ใช้ในหน้าทำแบบประเมิน)
 export function AssessmentSourceNote({ typeId, className = "" }: { typeId: number | null | undefined; className?: string }) {
   const sources = useSources(typeId ? `typeId=${typeId}` : null);
   if (!sources?.assessmentSource) return null;
@@ -46,7 +42,7 @@ export function AssessmentSourceNote({ typeId, className = "" }: { typeId: numbe
   );
 }
 
-// แสดงแหล่งอ้างอิงของคำแนะนำและแบบประเมินในหน้าผลการประเมิน
+// แสดงแหล่งอ้างอิงของคำแนะนำและแบบประเมินในหน้าผลลัพธ์ตาม assessmentId
 export function ResultSources({ assessmentId, className = "" }: { assessmentId: string | number | null | undefined; className?: string }) {
   const sources = useSources(assessmentId ? `assessmentId=${assessmentId}` : null);
   if (!sources || (!sources.recommendationSource && !sources.assessmentSource)) return null;

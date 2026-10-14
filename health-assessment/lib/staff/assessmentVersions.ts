@@ -2,23 +2,10 @@ import type { PoolClient } from "pg";
 import pool from "@/lib/db";
 import { EXCLUDED_TYPES, TYPE_LABELS, severityForRank, severityOf } from "@/lib/staff/riskLevels";
 
-/* =========================================================
-   ฉบับร่าง / เวอร์ชันของแบบประเมิน (ตาราง assessment_versions)
-
-   snapshot = เนื้อหาที่แก้ได้ทั้งชุดของแบบประเมินหนึ่งแบบ
-     { name, description, source, generic,
-       questions: [{ id?, text, type, choices: [{ id?, text, score }] }],
-       levels:    [{ id?, riskLevel, min, max, severity, text, reassessDays, hotline, source }] }
-   - id = question_id / choice_id / rec_id ของตารางจริง (ไม่มี = รายการใหม่ที่ยังไม่เผยแพร่)
-   - generic = แปลผลด้วยช่วงคะแนน (แบบประเมินที่เจ้าหน้าที่สร้างเอง)
-     แบบประเมินหลักคำนวณผลในโค้ด จึงแก้ได้เฉพาะข้อความคำแนะนำ รอบประเมินซ้ำ สายด่วน แหล่งอ้างอิง
-   ตารางเดิม (questions / question_choices / recommendation) ยังเป็นเนื้อหาที่ใช้งานอยู่
-   การเผยแพร่ = applySnapshot ลงตารางเดิม แล้วเก็บ snapshot ที่อ่านกลับมาเป็นเวอร์ชันใหม่
-========================================================= */
-
-// แบบประเมินเดิมที่มีหน้าและโค้ดเฉพาะ ห้ามลบเด็ดขาด
+// ชื่อแบบประเมินหลักที่มีในระบบตั้งแต่แรก (ไม่ใช่ที่เจ้าหน้าที่สร้างเอง)
 export const BUILT_IN = new Set([...Object.keys(TYPE_LABELS), ...EXCLUDED_TYPES]);
 
+// โครง snapshot ของแบบประเมินหนึ่งเวอร์ชัน: ตัวเลือก คำถาม ระดับผล และข้อมูลทั่วไป
 export type SnapChoice = { id?: number; text: string; score: number };
 export type SnapQuestion = { id?: number; text: string; type: "choice" | "number"; choices: SnapChoice[] };
 export type SnapLevel = {
@@ -41,14 +28,15 @@ export type Snapshot = {
   levels: SnapLevel[];
 };
 
+// อะไรก็ได้ที่มีเมธอด query
 type Db = Pick<PoolClient, "query">;
 
+// ขีดจำกัดจำนวนคำถาม ตัวเลือก และระดับผล
 export const LIMITS = { questions: 60, choices: 20, levels: 20, genericLevels: [2, 8] as const };
 
-/* ---------- อ่านเนื้อหาที่ใช้งานอยู่ → snapshot ---------- */
-
-// อ่านข้อมูลแบบประเมิน คำถาม ตัวเลือก และระดับผลจากตารางจริง แล้วรวมเป็น snapshot (ไม่พบคืน null)
+// อ่านเนื้อหาปัจจุบันของแบบประเมิน (คำถาม ตัวเลือก เกณฑ์ผล คำแนะนำ) จาก DB มาประกอบเป็น snapshot
 export async function buildSnapshot(db: Db, typeId: number): Promise<Snapshot | null> {
+  // ดึงข้อมูลแบบประเมิน คำถาม ตัวเลือก และคำแนะนำจาก DB พร้อมกัน
   const [t, q, c, r] = await Promise.all([
     db.query("SELECT assessment_name, description, source FROM assessment_types WHERE assessment_type_id = $1", [typeId]),
     db.query(
@@ -74,6 +62,7 @@ export async function buildSnapshot(db: Db, typeId: number): Promise<Snapshot | 
   const name: string = type.assessment_name;
   const generic = r.rows.every((x) => x.min_score !== null && x.max_score !== null);
 
+  // แปลงแถวคำแนะนำเป็นระดับผล (generic = ทุกระดับมีช่วงคะแนน)
   const levels: SnapLevel[] = r.rows.map((x, i) => ({
     id: x.rec_id,
     riskLevel: x.risk_level ?? "",
@@ -85,7 +74,6 @@ export async function buildSnapshot(db: Db, typeId: number): Promise<Snapshot | 
     hotline: x.hotline ?? "",
     source: x.source ?? "",
   }));
-  // แบบประเมินหลัก เรียงจากปกติไปเสี่ยงสูง (sort คงลำดับ rec_id เดิมเมื่อเท่ากัน)
   if (!generic) levels.sort((a, b) => a.severity - b.severity);
 
   return {
@@ -105,9 +93,7 @@ export async function buildSnapshot(db: Db, typeId: number): Promise<Snapshot | 
   };
 }
 
-/* ---------- เวอร์ชันตั้งต้น (v1) จากเนื้อหาปัจจุบัน ----------
-   สร้างครั้งแรกที่หน้า staff โหลดแบบประเมินที่ยังไม่มีเวอร์ชัน (ข้ามแบบที่ยังว่างเปล่า) */
-
+// สร้างเวอร์ชันตั้งต้น (version 1) ใน assessment_versions ให้แบบประเมินที่ยังไม่เคยเผยแพร่
 export async function ensureBaselines(typeIds: number[]) {
   if (!typeIds.length) return;
   const { rows } = await pool.query(
@@ -122,7 +108,6 @@ export async function ensureBaselines(typeIds: number[]) {
   for (const { id } of rows) {
     const snap = await buildSnapshot(pool, id);
     if (!snap) continue;
-    // ON CONFLICT: ถ้ามีอีกคำขอสร้าง v1 พร้อมกัน ให้ข้ามไป
     await pool.query(
       `INSERT INTO assessment_versions (assessment_type_id, version_no, status, snapshot, published_by, published_at)
        SELECT $1, 1, 'published', $2::jsonb, NULL, NOW()
@@ -133,31 +118,28 @@ export async function ensureBaselines(typeIds: number[]) {
   }
 }
 
-/* ---------- ตรวจข้อมูลจากหน้าเว็บ ----------
-   normalizeSnapshot: ผ่อนปรน (ฉบับร่างยังกรอกไม่ครบได้) แต่รูปแบบและความยาวต้องถูก
-   validateForPublish: เข้มงวด ใช้ตอนเผยแพร่ */
-
-// แปลงเป็นข้อความ ตัดช่องว่าง และจำกัดความยาวไม่เกิน max ตัวอักษร
+// แปลงค่าเป็นข้อความตัดช่องว่างและจำกัดความยาว
 const str = (v: unknown, max: number) => String(v ?? "").trim().slice(0, max);
-// แปลงเป็นจำนวนเต็ม (ว่างหรือไม่ใช่ตัวเลข = null)
+// แปลงค่าเป็นจำนวนเต็ม หรือ null ถ้าว่าง/ไม่ใช่ตัวเลข
 const intOrNull = (v: unknown) => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : null;
 };
-// แปลงเป็น id ที่เป็นจำนวนเต็มบวก ไม่ถูกต้องคืน undefined
+// คืน id ถ้าเป็นจำนวนเต็มบวก ไม่งั้น undefined (ถือเป็นรายการใหม่)
 const idOf = (v: unknown) => {
   const n = Number(v);
   return Number.isInteger(n) && n > 0 ? n : undefined;
 };
 
-// ตรวจและจัดรูปแบบ snapshot ที่ส่งมาจากหน้าเว็บ คืน Snapshot หรือข้อความผิดพลาด
+// ทำความสะอาดและตรวจ snapshot ที่ส่งมาจาก client (จำนวน คะแนน รอบประเมินซ้ำ) คืน snapshot หรือข้อความ error
 export function normalizeSnapshot(raw: unknown, base: { name: string; generic: boolean }): Snapshot | string {
   const s = (raw ?? {}) as Record<string, unknown>;
   if (!Array.isArray(s.questions) || !Array.isArray(s.levels)) return "ข้อมูลไม่ถูกต้อง";
   if (s.questions.length > LIMITS.questions) return "คำถามมากเกินไป";
   if (s.levels.length > LIMITS.levels) return "ระดับผลมากเกินไป";
 
+  // ตรวจและทำความสะอาดคำถาม/ตัวเลือก
   const questions: SnapQuestion[] = [];
   for (const [i, item] of s.questions.entries()) {
     const q = (item ?? {}) as Record<string, unknown>;
@@ -174,6 +156,7 @@ export function normalizeSnapshot(raw: unknown, base: { name: string; generic: b
     questions.push({ id: idOf(q.id), text: str(q.text, 1000), type, choices: type === "choice" ? choices : [] });
   }
 
+  // ตรวจและทำความสะอาดระดับผล
   const levels: SnapLevel[] = [];
   for (const item of s.levels) {
     const l = (item ?? {}) as Record<string, unknown>;
@@ -191,7 +174,7 @@ export function normalizeSnapshot(raw: unknown, base: { name: string; generic: b
       source: str(l.source, 300),
     });
   }
-  // ความรุนแรงกำหนดโดยระบบ: แบบทั่วไป = ตามลำดับช่วงคะแนน, แบบหลัก = ตามชื่อระดับในโค้ด
+  // คำนวณความรุนแรงของแต่ละระดับใหม่
   if (base.generic) {
     const order = [...levels].sort((a, b) => (a.min ?? 0) - (b.min ?? 0));
     order.forEach((l, i) => (l.severity = severityForRank(i, order.length)));
@@ -209,7 +192,7 @@ export function normalizeSnapshot(raw: unknown, base: { name: string; generic: b
   };
 }
 
-// ตรวจความครบถ้วนก่อนเผยแพร่ (คำถาม ตัวเลือก ช่วงคะแนนต่อกัน ชื่อระดับไม่ซ้ำ) คืนข้อความผิดพลาดหรือ null
+// ตรวจความพร้อมก่อนเผยแพร่: คำถาม/ตัวเลือกครบ ระดับผล 2–8 ระดับ ช่วงคะแนนต่อกันและชื่อไม่ซ้ำ
 export function validateForPublish(snap: Snapshot): string | null {
   if (!snap.questions.length) return "ต้องมีคำถามอย่างน้อย 1 ข้อ";
   for (const [i, q] of snap.questions.entries()) {
@@ -221,6 +204,7 @@ export function validateForPublish(snap: Snapshot): string | null {
   }
   if (!snap.generic || !snap.levels.length) return null;
 
+  // ตรวจระดับผล: จำนวน ชื่อ ช่วงคะแนนต่อกัน และชื่อไม่ซ้ำ
   const [lo, hi] = LIMITS.genericLevels;
   if (snap.levels.length < lo || snap.levels.length > hi) return `ต้องมีระดับผล ${lo}–${hi} ระดับ`;
   for (const [i, l] of snap.levels.entries()) {
@@ -237,16 +221,15 @@ export function validateForPublish(snap: Snapshot): string | null {
   return null;
 }
 
-/* ---------- เขียน snapshot ลงตารางที่ใช้งานอยู่ (เรียกภายใน transaction) ----------
-   คืนข้อความผิดพลาด (ให้ผู้เรียก ROLLBACK) หรือ null เมื่อสำเร็จ */
-
+// เขียน snapshot ลงตารางจริง (assessment_types, questions, question_choices, recommendation) ภายใน transaction
 export async function applySnapshot(client: PoolClient, typeId: number, snap: Snapshot, staffId: number): Promise<string | null> {
+  // อัปเดตคำอธิบายและแหล่งอ้างอิงของแบบประเมิน
   await client.query(
     "UPDATE assessment_types SET description = $2, source = $3, updated_at = NOW() WHERE assessment_type_id = $1",
     [typeId, snap.description || null, snap.source || null]
   );
 
-  /* คำถามและตัวเลือก — คำถาม/ตัวเลือกที่ถูกลบ → is_active = false (ไม่ลบจริง ผลเก่ายังอ้างอิงได้) */
+  // คำถาม/ตัวเลือก: อัปเดตของเดิม เพิ่มของใหม่ และปิดใช้งานที่ถูกลบ
   const qRows = await client.query("SELECT question_id, is_active FROM questions WHERE assessment_type_id = $1", [typeId]);
   const ownQ = new Set(qRows.rows.map((r) => r.question_id as number));
   const cRows = await client.query(
@@ -278,7 +261,6 @@ export async function applySnapshot(client: PoolClient, typeId: number, snap: Sn
     }
     keepQ.add(qid);
 
-    // คำถามแบบกรอกตัวเลขไม่มีตัวเลือกให้แก้ จึงไม่แตะตัวเลือกเดิม
     if (q.type !== "choice") continue;
     const keepC: number[] = [];
     for (const [j, c] of q.choices.entries()) {
@@ -313,14 +295,13 @@ export async function applySnapshot(client: PoolClient, typeId: number, snap: Sn
     ]);
   }
 
-  /* เกณฑ์ผลและคำแนะนำ — trigger recommendation_archive เก็บฉบับเดิมไว้ใน recommendation_history */
+  // คำแนะนำ: ตรวจว่าชนิดเกณฑ์ไม่เปลี่ยน แล้วอัปเดต (แบบสูตรเฉพาะแก้ได้แค่ข้อความ)
   const recRows = await client.query("SELECT rec_id, min_score, max_score FROM recommendation WHERE assessment_type_id = $1", [typeId]);
   const ownRec = new Set(recRows.rows.map((r) => r.rec_id as number));
   const liveGeneric = recRows.rows.every((r) => r.min_score !== null && r.max_score !== null);
   if (snap.generic !== liveGeneric) return "เกณฑ์แปลผลของแบบประเมินนี้เปลี่ยนไปแล้ว กรุณาทิ้งฉบับร่างแล้วแก้ไขใหม่";
 
   if (!liveGeneric) {
-    // แบบประเมินหลัก: ชื่อระดับและเกณฑ์คะแนนอยู่ในโค้ด แก้ได้เฉพาะคำแนะนำ ไม่เพิ่ม/ลบระดับ
     for (const l of snap.levels) {
       if (!l.id || !ownRec.has(l.id)) continue;
       await client.query(
@@ -334,8 +315,7 @@ export async function applySnapshot(client: PoolClient, typeId: number, snap: Sn
     return null;
   }
 
-  // ลบระดับที่ไม่ใช้แล้วก่อน (ชื่อระดับต้องไม่ซ้ำในแบบประเมินเดียวกัน ระดับใหม่จึงใช้ชื่อเดิมได้)
-  // ถ้ามีผลประเมินอ้างถึงอยู่จะลบไม่ได้
+  // แบบทั่วไป: ลบระดับที่ถูกเอาออก (ถ้าไม่มีผลประเมินอ้างอิง) แล้วอัปเดต/เพิ่มระดับ
   const wanted = new Set(snap.levels.map((l) => l.id).filter((id): id is number => !!id && ownRec.has(id)));
   const removed = [...ownRec].filter((id) => !wanted.has(id));
   if (removed.length) {

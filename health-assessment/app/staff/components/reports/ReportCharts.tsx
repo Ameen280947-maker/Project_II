@@ -2,38 +2,33 @@
 
 import { useState } from "react";
 
-/* =========================================================
-   กราฟของหน้า "รายงานและสถิติ" (HTML ล้วน ยืดตามความกว้างการ์ด ไม่ต้องเลื่อนบนมือถือ)
-   - โทนเทา-ดำของ Staff · แยกชุดข้อมูลด้วยลวดลาย (ทึบ / เส้นทแยง) แทนสี
-   - ค่า null = กลุ่มเล็กกว่าเกณฑ์ แสดง "–"
-========================================================= */
-
+// สีแท่งกราฟหลัก และลายทแยงสำหรับช่วงที่ยังไม่ครบ / แท่งรอง
 export const C_BAR = "#2b2a28";
 export const HATCH = `repeating-linear-gradient(135deg, ${C_BAR} 0 2px, #ffffff 2px 6px)`;
 const HATCH_SOFT = "repeating-linear-gradient(135deg, #77746d 0 2px, #ffffff 2px 6px)";
 
-// จัดรูปแบบตัวเลขพร้อมหน่วย (ค่า null แสดง –)
+// จัดรูปแบบตัวเลขพร้อมหน่วย (ค่าเริ่มต้น %) และแสดง "–" เมื่อไม่มีค่า
 export const fmt = (v: number | null | undefined, suffix = "%") =>
   v === null || v === undefined ? "–" : `${v.toLocaleString("th-TH")}${suffix}`;
 
+// ชนิดข้อมูลของกราฟแนวโน้ม กราฟช่วงอายุ และกราฟกรวย
 export type TrendPoint = { key: string; label: string; total: number; highPct: number | null; partial: boolean };
 export type AgePoint = { label: string; physical: { pct: number | null; n: number }; mental: { pct: number | null; n: number } };
 export type FunnelStep = { label: string; n: number; pct: number | null };
 
-/* ---------- แนวโน้ม: กราฟแท่งตามช่วงย่อย ---------- */
-
-// กราฟแท่งแนวโน้มตามช่วงย่อย (จำนวนครั้งหรือ % เสี่ยงสูง) ไฮไลต์แท่งที่ชี้
+// กราฟแท่งแนวโน้มตามช่วงเวลา แสดงจำนวนครั้งหรือ % เสี่ยงสูง ช่วงที่ยังไม่ครบเป็นลายทแยง
 export function TrendBars({ data, metric }: { data: TrendPoint[]; metric: "total" | "highPct" }) {
+  // แท่งที่เมาส์ชี้อยู่ และค่าที่ใช้คำนวณสเกล/ป้ายแกน
   const [hover, setHover] = useState<number | null>(null);
   const vals = data.map((d) => (metric === "total" ? d.total : d.highPct));
   const max = Math.max(metric === "total" ? 1 : 10, ...vals.map((v) => v ?? 0));
   const unit = metric === "total" ? "" : "%";
-  // ช่วงย่อยเยอะ (เช่น รายวัน 30 วัน) → ซ่อนตัวเลขบนแท่งที่เป็น 0 และแสดงป้ายแกนเว้นระยะ
   const dense = data.length > 14;
   const labelEvery = data.length > 20 ? Math.ceil(data.length / 10) : 1;
 
   return (
     <div className="relative">
+      {/* แท่งกราฟแต่ละช่วงเวลา พร้อมตัวเลขบนแท่ง */}
       <div className="flex h-56 items-end gap-[2px] border-b border-staff-line sm:gap-1.5" onMouseLeave={() => setHover(null)}>
         {data.map((d, i) => {
           const v = vals[i];
@@ -65,6 +60,7 @@ export function TrendBars({ data, metric }: { data: TrendPoint[]; metric: "total
           );
         })}
       </div>
+      {/* ป้ายแกนเวลา */}
       <div className="mt-2 flex gap-[2px] sm:gap-1.5">
         {data.map((d, i) => (
           <span key={d.key} className="min-w-0 flex-1 truncate text-center text-[10px] text-staff-muted sm:text-xs">
@@ -76,12 +72,10 @@ export function TrendBars({ data, metric }: { data: TrendPoint[]; metric: "total
   );
 }
 
-/* ---------- ความเสี่ยงสูงตามช่วงอายุ: แท่งคู่ กาย (ทึบ) / จิต (เส้นทแยง) ---------- */
-
-// กราฟแท่งคู่ % ความเสี่ยงสูง แยกกาย/จิต ตามช่วงอายุ
+// กราฟแท่งคู่ % เสี่ยงด้านสุขภาพกายและสุขภาพจิตแยกตามช่วงอายุ
 export function AgeBars({ data }: { data: AgePoint[] }) {
   const max = Math.max(10, ...data.flatMap((d) => [d.physical.pct ?? 0, d.mental.pct ?? 0]));
-  // วาดแท่งเดียวพร้อมตัวเลขและ tooltip
+  // วาดแท่งเดียวของกลุ่มอายุ พร้อม tooltip และตัวเลข % (ว่างถ้าผู้ใช้น้อยกว่าเกณฑ์)
   const bar = (v: { pct: number | null; n: number }, fill: string, kind: string, group: string) => (
     <div
       className="flex h-full w-full max-w-[44px] flex-col items-center justify-end gap-1"
@@ -100,6 +94,7 @@ export function AgeBars({ data }: { data: AgePoint[] }) {
   );
   return (
     <div>
+      {/* แท่งคู่ (กาย/จิต) ของแต่ละช่วงอายุ */}
       <div className="flex h-52 items-end gap-3 border-b border-staff-line sm:gap-4">
         {data.map((d) => (
           <div key={d.label} className="flex h-full min-w-0 flex-1 items-end justify-center gap-[2px]">
@@ -108,6 +103,7 @@ export function AgeBars({ data }: { data: AgePoint[] }) {
           </div>
         ))}
       </div>
+      {/* ชื่อช่วงอายุใต้แท่ง */}
       <div className="mt-2 flex gap-3 sm:gap-4">
         {data.map((d) => (
           <span key={d.label} className="min-w-0 flex-1 text-center text-xs text-staff-muted">
@@ -119,7 +115,7 @@ export function AgeBars({ data }: { data: AgePoint[] }) {
   );
 }
 
-// คำอธิบายลวดลายแท่งกราฟ
+// สัญลักษณ์สี/ลายของแท่งกราฟพร้อมป้ายชื่อ
 export function BarLegend({ fill, label }: { fill: string; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
@@ -129,9 +125,7 @@ export function BarLegend({ fill, label }: { fill: string; label: string }) {
   );
 }
 
-/* ---------- อันดับปัญหาสุขภาพ ---------- */
-
-// รายการอันดับปัญหาสุขภาพพร้อมแถบร้อยละ
+// รายการจัดอันดับพร้อมแถบเปอร์เซ็นต์ (เช่น ปัญหาสุขภาพที่พบบ่อย)
 export function RankedBars({ items }: { items: { label: string; pct: number }[] }) {
   return (
     <ol className="flex flex-col gap-3.5">
@@ -153,9 +147,7 @@ export function RankedBars({ items }: { items: { label: string; pct: number }[] 
   );
 }
 
-/* ---------- เส้นทางผู้ใช้ (funnel) ---------- */
-
-// แสดงเส้นทางผู้ใช้ (funnel) เป็นแถบยาวตามสัดส่วนเทียบขั้นแรก
+// กราฟกรวยแสดงจำนวนผู้ใช้ที่ผ่านแต่ละขั้น เทียบกับขั้นแรก
 export function Funnel({ steps }: { steps: FunnelStep[] }) {
   const base = Math.max(1, steps[0]?.n ?? 0);
   return (

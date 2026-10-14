@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 
-// แบบประเมินการนอนหลับ (assessment_type_id = 9) แจ้งผู้ใช้เมื่อ staff ปิดแบบประเมินนี้อยู่
+// เลย์เอาต์: ครอบหน้าประเมินการนอนและแสดงประกาศถ้าแบบประเมิน (typeId 9) ถูกปิด
 export default function SleepAssessmentLayout({ children }: { children: ReactNode }) {
   return (
     <>

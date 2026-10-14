@@ -13,18 +13,10 @@ import CategoriesDialog from "../components/assessments/CategoriesDialog";
 import QuestionsTab from "../components/assessments/QuestionsTab";
 import { isMissing, toEditable, toSnapshot, type CategoryOption, type Detail, type EState, type TypeRow } from "../components/assessments/shared";
 
-/* =========================================================
-   จัดการแบบประเมิน
-   - แก้ไขทุกอย่างลง "ฉบับร่าง" (assessment_versions status = draft) ก่อน
-   - "เผยแพร่" = เขียนลงตารางที่ใช้งานอยู่ + บันทึกเป็นเวอร์ชันใหม่ (v1, v2, …)
-   - เปิด/ปิดใช้งานมีผลทันที ไม่ผ่านฉบับร่าง
-   - ?type=<id> เลือกแบบประเมินไว้ล่วงหน้า (ลิงก์จากหน้าภาพรวม)
-   - หมวดหมู่ (หน้าที่ผู้ใช้พบแบบประเมิน) เลือกตอนสร้าง และย้ายได้ทันทีในหน้าแก้ไข ไม่ผ่านฉบับร่าง
-========================================================= */
-
+// แท็บในตัวแก้ไขแบบประเมิน
 type Tab = "questions" | "levels" | "preview" | "history";
 
-// หน้าจัดการแบบประเมิน: ห่อด้วย Suspense เพราะใช้ useSearchParams
+// หน้า (staff): จัดการแบบประเมิน ครอบด้วย Suspense เพราะใช้ useSearchParams
 export default function StaffAssessmentsPage() {
   return (
     <Suspense>
@@ -33,8 +25,9 @@ export default function StaffAssessmentsPage() {
   );
 }
 
-// รายการแบบประเมิน เปิด/ปิดใช้งาน สร้างใหม่ จัดการหมวดหมู่ และเปิดตัวแก้ไข
+// รายการแบบประเมินทั้งหมด (เปิด/ปิดใช้งาน เลือกแก้ไข สร้างใหม่ จัดการหมวดหมู่)
 function Assessments() {
+  // state ของหน้า: รายการแบบประเมิน หมวดหมู่ ตัวที่เลือก dialog และธงมีงานค้าง
   const params = useSearchParams();
   const [types, setTypes] = useState<TypeRow[]>([]);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -42,10 +35,9 @@ function Assessments() {
   const [error, setError] = useState("");
   const [creating, setCreating] = useState(false);
   const [managingCategories, setManagingCategories] = useState(false);
-  // มีการแก้ไขที่ยังไม่บันทึกในตัวแก้ไขหรือไม่ (ใช้เตือนก่อนเปลี่ยนแบบประเมิน)
   const dirtyRef = useRef(false);
 
-  // โหลดรายการแบบประเมินและหมวดหมู่ แล้วเลือกแบบเริ่มต้น (9Q หรือตัวแรก)
+  // ดึงรายการแบบประเมินและหมวดหมู่จาก /api/staff/assessments แล้วเลือกรายการเริ่มต้น
   const loadTypes = useCallback(() => {
     staffFetch<{ types: TypeRow[]; categories: CategoryOption[] }>("/api/staff/assessments")
       .then((d) => {
@@ -56,12 +48,14 @@ function Assessments() {
       .catch((e) => setError(e.message));
   }, []);
 
+  // โหลดรายการแบบประเมินตอนเปิดหน้า
   useEffect(() => {
     loadTypes();
   }, [loadTypes]);
 
+  // ผูก event beforeunload เพื่อเตือนเมื่อออกจากหน้าโดยยังไม่บันทึก
   useEffect(() => {
-    // เตือนก่อนปิด/รีโหลดหน้าเมื่อยังมีการแก้ไขที่ไม่ได้บันทึก
+    // เตือนก่อนปิด/รีเฟรชหน้าถ้ามีการแก้ไขที่ยังไม่บันทึก
     const warn = (e: BeforeUnloadEvent) => {
       if (dirtyRef.current) e.preventDefault();
     };
@@ -69,7 +63,7 @@ function Assessments() {
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
 
-  // เลือกแบบประเมิน (ถามยืนยันถ้ายังไม่บันทึก) และอัปเดต ?type ใน URL
+  // เลือกแบบประเมินที่จะแก้ไข (ถามยืนยันถ้ามีงานค้าง) และอัปเดต ?type= ใน URL
   const select = (id: number) => {
     if (id === selected) return;
     if (dirtyRef.current && !confirm("มีการแก้ไขที่ยังไม่บันทึกเป็นฉบับร่าง ต้องการออกจากหน้านี้หรือไม่?")) return;
@@ -78,7 +72,7 @@ function Assessments() {
     window.history.replaceState(null, "", `?type=${id}`);
   };
 
-  // สลับเปิด/ปิดใช้งานแบบประเมินทันที (อัปเดตจอก่อน ถ้าพลาดโหลดใหม่)
+  // เปิด/ปิดใช้งานแบบประเมินผ่าน PATCH (อัปเดตหน้าจอก่อน ล้มเหลวจะโหลดใหม่)
   const toggle = async (t: TypeRow) => {
     setTypes((all) => all.map((x) => (x.id === t.id ? { ...x, isActive: !x.isActive } : x)));
     try {
@@ -93,6 +87,7 @@ function Assessments() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* หัวข้อหน้า + ปุ่มจัดการหมวดหมู่/สร้างแบบประเมินใหม่ */}
       <PageHeader
         eyebrow="Assessments"
         title="จัดการ"
@@ -111,6 +106,7 @@ function Assessments() {
       <ErrorBox message={error} />
 
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        {/* รายการแบบประเมินทั้งหมด พร้อมสวิตช์เปิด/ปิดใช้งาน */}
         <Card className="!p-3 lg:w-[300px] lg:shrink-0">
           <p className="px-3 pb-2 pt-1 text-sm font-semibold text-staff-muted">แบบประเมินทั้งหมด ({types.length})</p>
           <ul className="flex max-h-[340px] flex-col gap-1.5 overflow-y-auto lg:max-h-none">
@@ -138,6 +134,7 @@ function Assessments() {
           </ul>
         </Card>
 
+        {/* ตัวแก้ไขของแบบประเมินที่เลือก */}
         <div className="min-w-0 flex-1">
           {selected && (
             <Editor
@@ -159,6 +156,7 @@ function Assessments() {
         </div>
       </div>
 
+      {/* dialog จัดการหมวดหมู่ / สร้างแบบประเมินใหม่ */}
       {managingCategories && (
         <CategoriesDialog
           categories={categories}
@@ -182,11 +180,7 @@ function Assessments() {
   );
 }
 
-/* =========================================================
-   EDITOR
-========================================================= */
-
-// ตัวแก้ไขแบบประเมิน: แก้คำถาม/เกณฑ์ บันทึกร่าง ทิ้งร่าง เผยแพร่ ย้ายหมวด และลบ
+// ตัวแก้ไขแบบประเมิน: คำถาม เกณฑ์ผล/คำแนะนำ ตัวอย่าง ประวัติ พร้อมฉบับร่างและเผยแพร่
 function Editor({
   typeId,
   isActive: listActive,
@@ -204,6 +198,7 @@ function Editor({
   onChanged: () => void;
   onDeleted: () => void;
 }) {
+  // state ของตัวแก้ไข: รายละเอียด ข้อมูลที่แก้ แท็บ สถานะ busy/error/ข้อความ
   const [detail, setDetail] = useState<Detail | null>(null);
   const [edit, setEdit] = useState<EState | null>(null);
   const [dirty, setDirtyState] = useState(false);
@@ -213,7 +208,7 @@ function Editor({
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState<"" | "save" | "discard" | "publish" | "category">("");
 
-  // ตั้งสถานะมีการแก้ไขค้าง ทั้งใน state และ ref ของหน้าแม่
+  // ตั้งสถานะมีการแก้ไขค้าง ทั้งใน state และ ref ที่หน้าแม่ใช้เตือน
   const setDirty = useCallback(
     (v: boolean) => {
       dirtyRef.current = v;
@@ -222,7 +217,7 @@ function Editor({
     [dirtyRef]
   );
 
-  // โหลดรายละเอียดแบบประเมิน (รวมฉบับร่าง) แล้วแปลงเป็น state สำหรับแก้ไข
+  // ดึงรายละเอียดแบบประเมินจาก /api/staff/assessments?type= แล้วแปลงเป็นข้อมูลแก้ไขได้
   const load = useCallback(() => {
     return staffFetch<{ assessment: Detail }>(`/api/staff/assessments?type=${typeId}`)
       .then((d) => {
@@ -233,6 +228,7 @@ function Editor({
       .catch((e) => setError(e.message));
   }, [typeId, setDirty]);
 
+  // โหลดรายละเอียดเมื่อเปลี่ยนแบบประเมิน
   useEffect(() => {
     load();
   }, [load]);
@@ -243,7 +239,7 @@ function Editor({
     setTimeout(() => setMsg(""), 3000);
   };
 
-  // รวมการแก้ไขบางส่วนเข้า state และทำเครื่องหมายว่ามีการแก้ไข
+  // รวมการแก้ไขบางส่วนเข้ากับข้อมูลที่กำลังแก้ และตั้งสถานะมีงานค้าง
   const change = (patch: Partial<EState>) => {
     setEdit((e) => (e ? { ...e, ...patch } : e));
     setDirty(true);
@@ -251,14 +247,15 @@ function Editor({
 
   if (!detail || !edit) return error ? <ErrorBox message={error} /> : <Card><Empty>กำลังโหลด…</Empty></Card>;
 
-  // แปลง state ที่แก้ไขเป็น snapshot สำหรับส่งไป API
+  // แปลงข้อมูลที่แก้ไขเป็น snapshot สำหรับส่งบันทึก/เผยแพร่
   const snapshot = () => toSnapshot(edit, { name: detail.name, generic: detail.generic });
+  // ค่าที่คำนวณสำหรับแสดงผล (มีร่าง, ระดับที่ขาดคำแนะนำ, สถานะเปิดใช้, หมวด)
   const hasDraft = Boolean(detail.draft);
   const missing = edit.levels.filter(isMissing).length;
   const active = listActive ?? detail.isActive;
   const categoryId = listCategoryId !== undefined ? listCategoryId : detail.categoryId;
 
-  // รันงาน async พร้อมตั้งสถานะ busy และจับข้อผิดพลาด
+  // ตัวช่วยรันงาน async: ตั้งสถานะ busy และเก็บ error ให้แสดงผล
   const run = async (kind: typeof busy, fn: () => Promise<void>) => {
     setBusy(kind);
     setError("");
@@ -271,7 +268,7 @@ function Editor({
     }
   };
 
-  // บันทึกการแก้ไขเป็นฉบับร่าง (ยังไม่มีผลกับผู้ใช้)
+  // บันทึกฉบับร่างผ่าน PUT /api/staff/assessments (ยังไม่มีผลกับผู้ใช้)
   const saveDraft = () =>
     run("save", async () => {
       await staffFetch("/api/staff/assessments", { method: "PUT", body: JSON.stringify({ typeId, snapshot: snapshot() }) });
@@ -280,7 +277,7 @@ function Editor({
       flash("บันทึกฉบับร่างแล้ว ยังไม่มีผลกับผู้ใช้จนกว่าจะเผยแพร่");
     });
 
-  // ทิ้งฉบับร่าง/ยกเลิกการแก้ไข แล้วโหลดเนื้อหาเดิมกลับมา
+  // ทิ้งฉบับร่าง (POST action=discard) หรือยกเลิกการแก้ไขที่ยังไม่บันทึก แล้วโหลดใหม่
   const discardDraft = () => {
     if (!confirm(hasDraft ? "ทิ้งฉบับร่างนี้? การแก้ไขที่ยังไม่เผยแพร่ทั้งหมดจะหายไป" : "ยกเลิกการแก้ไขที่ยังไม่บันทึก?")) return;
     run("discard", async () => {
@@ -291,7 +288,7 @@ function Editor({
     });
   };
 
-  // เผยแพร่การแก้ไขเป็นเวอร์ชันใหม่ (เตือนถ้ามีระดับที่ยังไม่มีคำแนะนำ)
+  // เผยแพร่การแก้ไข (POST action=publish) มีผลกับการประเมินครั้งใหม่ทันที
   const publish = () => {
     const warn = missing ? `\n\nมี ${missing} ระดับที่ยังไม่มีข้อความคำแนะนำ ผู้ใช้ที่ได้ผลระดับนั้นจะไม่เห็นคำแนะนำ` : "";
     if (!confirm(`เผยแพร่การแก้ไข? มีผลกับการประเมินครั้งใหม่ทันที ผลเดิมของผู้ใช้ยังผูกกับเนื้อหาเดิม${warn}`)) return;
@@ -306,7 +303,7 @@ function Editor({
     });
   };
 
-  // ย้ายหมวดหมู่: มีผลกับหน้าผู้ใช้ทันที (ไม่ผ่านฉบับร่าง)
+  // ย้ายแบบประเมินไปหมวดหมู่อื่นผ่าน PATCH /api/staff/assessments
   const moveCategory = (id: number) =>
     run("category", async () => {
       await staffFetch("/api/staff/assessments", { method: "PATCH", body: JSON.stringify({ typeId, categoryId: id }) });
@@ -314,6 +311,7 @@ function Editor({
       flash(`ย้ายไปหมวด "${categories.find((c) => c.id === id)?.name ?? ""}" แล้ว · มีผลกับหน้าผู้ใช้ทันที`);
     });
 
+  // รายการแท็บ (แท็บเกณฑ์ผลมีจุดแดงถ้ามีระดับที่ขาดคำแนะนำ)
   const tabs: { key: Tab; label: string; dot?: boolean }[] = [
     { key: "questions", label: "คำถามและคะแนน" },
     { key: "levels", label: "เกณฑ์ผลและคำแนะนำ", dot: missing > 0 },
@@ -323,6 +321,7 @@ function Editor({
 
   return (
     <Card>
+      {/* ส่วนหัว: ชื่อ สถานะ/ฉบับร่าง และปุ่มลบ/ทิ้งร่าง/บันทึกร่าง/เผยแพร่ */}
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -374,7 +373,7 @@ function Editor({
         />
       )}
 
-      {/* ===== หมวดหมู่ (มีผลทันที) ===== */}
+      {/* เลือกหมวดหมู่ (มีผลทันที, แบบประเมินหลักย้ายไม่ได้) */}
       <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
         <span className="font-semibold">หมวดหมู่</span>
         {detail.builtIn ? (
@@ -406,6 +405,7 @@ function Editor({
         )}
       </div>
 
+      {/* ช่องคำอธิบายสั้นและแหล่งอ้างอิง + คำเตือนเรื่องเวอร์ชัน */}
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="flex min-w-0 flex-col gap-1.5 text-sm font-semibold">
           คำอธิบายสั้นที่ผู้ใช้เห็น
@@ -433,6 +433,7 @@ function Editor({
         <ErrorBox message={error} />
       </div>
 
+      {/* แถบแท็บและเนื้อหาของแท็บที่เลือก */}
       <div role="tablist" aria-label="ส่วนของแบบประเมิน" className="mt-4 flex gap-1 overflow-x-auto border-b border-staff-line">
         {tabs.map((t) => (
           <button
@@ -465,7 +466,6 @@ function Editor({
       {tab === "preview" && (
         <PreviewTab label={detail.label} description={edit.description} questions={edit.questions} levels={edit.levels} generic={detail.generic} />
       )}
-      {/* โหลดใหม่หลังเผยแพร่ หรือเปิด/ปิดใช้งาน */}
       {tab === "history" && <HistoryTab typeId={detail.id} refreshKey={`${detail.published?.versionId ?? ""}|${active}`} />}
     </Card>
   );

@@ -5,16 +5,12 @@ import { ClipboardList } from "lucide-react";
 import AssessmentMenuCard from "@/app/components/AssessmentMenuCard";
 import { cardToneFor, type AssessmentCategory, type CategoryAssessment } from "@/lib/assessmentCategories";
 
-/* =========================================================
-   การ์ดแบบประเมินที่เจ้าหน้าที่สร้างเพิ่มในหมวดเดิม
-   - ใส่ไว้ใน grid ของหน้าเมนูหมวดเดิม ต่อท้ายการ์ดที่เขียนไว้ในโค้ด
-   - หาหมวดจาก route_path ของหน้านั้น (เช่น /assessment-menu)
-========================================================= */
-
-// โหลดแบบประเมินที่เจ้าหน้าที่เพิ่มในหมวดของ routePath นี้ แล้วแสดงเป็นการ์ด
+// ดึงแบบประเมินเพิ่มเติมของหมวดตาม routePath จาก API categories แล้วแสดงเป็นการ์ดเมนู
 export default function CategoryAssessmentCards({ routePath }: { routePath: string }) {
+  // state เก็บแบบประเมินที่ผู้ดูแลเพิ่มไว้ในหมวดนี้
   const [items, setItems] = useState<CategoryAssessment[]>([]);
 
+  // โหลดหมวดทั้งหมดแล้วเลือกเฉพาะหมวดที่ตรงกับ routePath
   useEffect(() => {
     fetch("/api/assessments/categories", { cache: "no-store" })
       .then((r) => r.json())
@@ -27,6 +23,7 @@ export default function CategoryAssessmentCards({ routePath }: { routePath: stri
 
   return (
     <>
+      {/* การ์ดเมนูของแต่ละแบบประเมิน ลิงก์ไป /assessment/[id] */}
       {items.map((a) => (
         <AssessmentMenuCard key={a.id} title={a.name} href={`/assessment/${a.id}`} icon={ClipboardList} tone={cardToneFor(a.id)} />
       ))}

@@ -11,24 +11,27 @@ import AssessmentBackLink from "@/app/components/AssessmentBackLink";
 import HealthConsentNotice from "@/app/components/HealthConsentNotice";
 import { AssessmentSourceNote } from "@/app/components/AssessmentSources";
 
+// คำถามหนึ่งข้อ พร้อมตัวเลือกเป็นข้อความ
 type SmokingQuestion = {
   id: number;
   question: string;
   options: string[];
 };
 
-// ตัวเลือกข้อ 2 ที่แปลว่าไม่เคยสูบตลอดชีวิต
+// คำตอบข้อ 2 ที่หมายถึงไม่เคยสูบ (ใช้ซ่อนข้อที่เหลือ)
 const NEVER_SMOKED = "ไม่สูบ";
 
+// ข้อมูลแบบประเมินที่ได้จาก GET /api/assessments/smoking
 type SmokingAssessment = {
   assessment_id?: number;
   questions?: SmokingQuestion[];
 };
 
-// หน้าแบบประเมินการสูบบุหรี่: แสดงคำถาม (ข้ามข้อที่เหลือถ้าไม่เคยสูบ) แล้วส่งผล
+// หน้า: แบบประเมินการสูบบุหรี่ (ซ่อนข้อที่เหลือถ้าตอบว่าไม่เคยสูบ)
 export default function SmokingAssessmentPage() {
   const router = useRouter();
 
+  // state แบบประเมิน คำตอบ (questionId → ข้อความตัวเลือก) และสถานะโหลด/ส่ง/error
   const [assessment, setAssessment] =
     useState<SmokingAssessment | null>(null);
 
@@ -44,12 +47,9 @@ export default function SmokingAssessmentPage() {
   const [error, setError] =
     useState("");
 
-  /* =====================================================
-     LOAD ASSESSMENT
-  ===================================================== */
-
+  // โหลดแบบประเมินตอนเปิดหน้า
   useEffect(() => {
-    // โหลดชุดคำถามแบบประเมินการสูบบุหรี่จาก API
+    // โหลดแบบประเมินและคำถามจาก GET /api/assessments/smoking
     const loadAssessment = async () => {
       try {
         setLoading(true);
@@ -98,11 +98,7 @@ export default function SmokingAssessmentPage() {
     void loadAssessment();
   }, []);
 
-  /* =====================================================
-     SELECT ANSWER
-  ===================================================== */
-
-  // บันทึกคำตอบที่ผู้ใช้เลือกของข้อนั้น
+  // บันทึกคำตอบของแต่ละข้อลง state
   const handleAnswer = (
     questionId: number,
     answer: string
@@ -113,11 +109,7 @@ export default function SmokingAssessmentPage() {
     }));
   };
 
-  /* =====================================================
-     SKIP
-     ข้อ 2 ตอบ "ไม่สูบ" (ไม่เคยสูบตลอดชีวิต) → ไม่ถามข้อถัดไป
-  ===================================================== */
-
+  // ถ้าข้อ 2 ตอบ "ไม่สูบ" ให้แสดงแค่ 2 ข้อแรก นอกนั้นแสดงทุกข้อ
   const questions = assessment?.questions ?? [];
   const lifetimeQuestion = questions[1];
   const neverSmoked =
@@ -127,16 +119,13 @@ export default function SmokingAssessmentPage() {
     ? questions.slice(0, 2)
     : questions;
 
-  /* =====================================================
-     SUBMIT
-  ===================================================== */
-
-  // ตรวจว่าตอบครบเฉพาะข้อที่แสดง แล้ว POST ผลและพาไปหน้าคำแนะนำ
+  // ส่งคำตอบ POST /api/assessments/smoking แล้วพาไปหน้าผลลัพธ์
   const handleSubmit = async () => {
     if (visibleQuestions.length === 0) {
       return;
     }
 
+    // ตรวจว่าตอบครบทุกข้อที่แสดงอยู่
     const unanswered =
       visibleQuestions.some(
         (question) =>
@@ -153,6 +142,7 @@ export default function SmokingAssessmentPage() {
     try {
       setSubmitting(true);
 
+      // ไม่มี userId → ไปหน้า login
       const storedUserId =
         localStorage.getItem("userId");
 
@@ -161,6 +151,7 @@ export default function SmokingAssessmentPage() {
         return;
       }
 
+      // ส่งเฉพาะคำตอบของข้อที่แสดงไปบันทึกที่ API
       const response = await fetch(
         "/api/assessments/smoking",
         {
@@ -173,7 +164,6 @@ export default function SmokingAssessmentPage() {
             userId: Number(
               storedUserId
             ),
-            // ส่งเฉพาะข้อที่แสดงอยู่ (ไม่ส่งคำตอบของข้อที่ถูกข้าม)
             answers: Object.fromEntries(
               visibleQuestions.map((question) => [
                 question.id,
@@ -194,10 +184,6 @@ export default function SmokingAssessmentPage() {
         );
       }
 
-      /*
-       * ส่ง assessment id ไปหน้า recommendation
-       */
-
       router.push(
         `/recommendation_smoking?assessmentId=${data.assessment_id}`
       );
@@ -217,10 +203,7 @@ export default function SmokingAssessmentPage() {
     }
   };
 
-  /* =====================================================
-     LOADING
-  ===================================================== */
-
+  // หน้าระหว่างโหลดแบบประเมิน
   if (loading) {
     return (
       <main className="min-h-screen bg-[#fbf9f9] flex items-center justify-center">
@@ -235,10 +218,7 @@ export default function SmokingAssessmentPage() {
     );
   }
 
-  /* =====================================================
-     ERROR
-  ===================================================== */
-
+  // โหลดไม่สำเร็จ → แสดงหน้า error พร้อมปุ่มลองใหม่
   if (error) {
     return (
       <main className="min-h-screen bg-[#fbf9f9] flex items-center justify-center px-5">
@@ -264,16 +244,11 @@ export default function SmokingAssessmentPage() {
     );
   }
 
-  /* =====================================================
-     MAIN
-  ===================================================== */
-
   return (
     <main className="min-h-screen bg-[#fbf9f9] text-[#2f3037]">
       <div className="mx-auto w-full max-w-5xl px-5 py-8 sm:px-8 lg:py-12">
 
-        {/* HEADER */}
-
+        {/* ส่วนหัวหน้า: ชื่อแบบประเมิน ความยินยอม และปุ่มย้อนกลับ */}
         <header className="flex items-start justify-between gap-4">
           <div className="min-w-0">
           <p className="text-sm font-bold uppercase tracking-[0.18em] text-[#3f7a2e]">
@@ -288,15 +263,12 @@ export default function SmokingAssessmentPage() {
           </h1>
           </div>
 
-          {/* ถอนความยินยอมเก็บข้อมูลสุขภาพ → แจ้งก่อนเริ่มทำ */}
           <HealthConsentNotice />
           <AssessmentBackLink href="/assessment-menu-behavior" />
         </header>
-        {/* แหล่งอ้างอิงของแบบประเมิน (เจ้าหน้าที่กรอก) */}
         <AssessmentSourceNote typeId={6} className="mt-3" />
 
-        {/* ICON */}
-
+        {/* การ์ดหัวข้อหมวดการสูบบุหรี่ */}
         <section className="mt-8 rounded-[28px] border border-[#cde0c0] bg-white p-6 shadow-[0_15px_40px_rgba(35,25,30,0.04)]">
 
           <div className="flex items-center gap-4">
@@ -315,10 +287,9 @@ export default function SmokingAssessmentPage() {
           </div>
         </section>
 
-        {/* QUESTIONS */}
-
         <section className="mt-6 space-y-5">
 
+          {/* รายการคำถามที่แสดง แต่ละข้อมีปุ่มตัวเลือก */}
           {visibleQuestions.map(
             (question, index) => (
               <article
@@ -387,6 +358,7 @@ export default function SmokingAssessmentPage() {
             )
           )}
 
+          {/* แจ้งว่าข้ามข้อที่เหลือเมื่อเลือก "ไม่สูบ" */}
           {neverSmoked && (
             <div className="rounded-2xl bg-[#ebf3e2] p-5 text-sm leading-7 text-[#3f7a2e]">
               คุณเลือก “ไม่สูบ” ในข้อ 2
@@ -397,8 +369,7 @@ export default function SmokingAssessmentPage() {
 
         </section>
 
-        {/* BUTTONS */}
-
+        {/* ปุ่มส่งคำตอบเพื่อดูผลการประเมิน */}
         <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-end">
           <button
             type="button"

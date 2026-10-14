@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import AssessmentClosedNotice from "@/app/components/AssessmentClosedNotice";
 
-// แบบประเมินการสูบบุหรี่ (assessment_type_id = 6) แจ้งผู้ใช้เมื่อ staff ปิดแบบประเมินนี้อยู่
+// เลย์เอาต์: ห่อหน้าประเมินการสูบบุหรี่และแสดงประกาศเมื่อแบบประเมินถูกปิด
 export default function AssessmentSmokingLayout({ children }: { children: ReactNode }) {
   return (
     <>

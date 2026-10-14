@@ -4,13 +4,7 @@ import { requireAdmin, serverError } from "@/lib/adminAuth";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   GET /api/admin/me
-   ใช้ตอนเปิดหน้า /admin เพื่อตรวจสิทธิ์จาก session cookie
-   - เป็น admin → 200 { success, admin: { user_id, username } }
-   - ไม่มี session → 401, ไม่ใช่ admin → 403
-========================================================= */
-
+// API: ตรวจสิทธิ์ Admin ของผู้ที่ล็อกอินอยู่ และคืนข้อมูลผู้ดูแล
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdmin(request);

@@ -6,20 +6,14 @@ import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import AdminSidebar from "./components/AdminSidebar";
 
-/* =========================================================
-   LAYOUT ของทุกหน้า /admin/*
-   - ถามสิทธิ์จาก server (/api/admin/me อ่าน session cookie)
-     ไม่ใช้ค่า role ใน localStorage เพราะแก้เองได้
-   - ยังไม่ login หรือไม่ใช่ system_admin → กลับไปหน้า /login
-   - API ทุกตัวของ admin ตรวจสิทธิ์ซ้ำอีกชั้น (lib/adminAuth.ts)
-========================================================= */
-
-// เลย์เอาต์ของหน้า /admin/*: ตรวจสิทธิ์แอดมินจาก server ก่อนแสดงเมนูและเนื้อหา
+// Layout ของหน้า Admin: ตรวจสิทธิ์ผ่าน /api/admin/me ก่อนแสดง ถ้าไม่ผ่านพาไปหน้า login
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
+  // state: ผ่านการตรวจสิทธิ์แล้วหรือยัง และชื่อผู้ดูแล
   const [allowed, setAllowed] = useState(false);
   const [username, setUsername] = useState("");
 
+  // ตรวจสิทธิ์ Admin ตอนเปิดหน้า ไม่ผ่านให้กลับไปหน้า login
   useEffect(() => {
     let cancelled = false;
 
@@ -43,6 +37,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     };
   }, [router]);
 
+  // ระหว่างตรวจสิทธิ์ แสดงหน้ารอ
   if (!allowed) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f5f7fb] text-[#64748b]">

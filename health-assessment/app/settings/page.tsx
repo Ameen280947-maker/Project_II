@@ -23,10 +23,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// ค่าตั้งค่าของผู้ใช้จาก /api/settings (แจ้งเตือน การแสดงผล ผู้ติดต่อฉุกเฉิน ความยินยอม)
 type Settings = {
   notify_reassess: boolean;
   notify_weekly: boolean;
@@ -46,6 +43,7 @@ type Settings = {
   consent_health_at: string | null;
 };
 
+// ข้อมูลโปรไฟล์ที่ใช้แสดงในการ์ดบัญชี
 type Profile = {
   username: string;
   name: string;
@@ -54,17 +52,14 @@ type Profile = {
   createdAt: string | null;
 };
 
-// ข้อมูลจาก /api/settings/export (แต่ละแถวเป็น object ตามคอลัมน์)
+// ข้อมูลที่ได้จาก /api/settings/export สำหรับดาวน์โหลด
 type ExportData = {
   profiles: Record<string, unknown>[];
   assessments: Record<string, unknown>[];
   answers: Record<string, unknown>[];
 };
 
-/* =========================================================
-   CONSTANTS
-========================================================= */
-
+// เมนูหมวดการตั้งค่าด้านซ้าย (id ตรงกับ anchor ของแต่ละการ์ด)
 const SECTIONS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "account", label: "บัญชีผู้ใช้", icon: User },
   { id: "security", label: "ความปลอดภัย", icon: Shield },
@@ -75,23 +70,14 @@ const SECTIONS: { id: string; label: string; icon: LucideIcon }[] = [
   { id: "danger", label: "จัดการข้อมูลถาวร", icon: Trash2 },
 ];
 
+// ขนาดฟอนต์ (px) ของแต่ละตัวเลือกขนาดตัวอักษร
 const FONT_SIZE_PX: Record<Settings["font_size"], string> = {
   normal: "16px",
   large: "18px",
   xl: "20px",
 };
 
-/*
-  หมายเหตุ: ซ่อนตัวเลือกที่บันทึกได้แต่ยังไม่มีผลกับระบบจริง
-  (การแจ้งเตือน/ช่องทาง/เวลา/รอบประเมินซ้ำ, OTP ตอนเข้าสู่ระบบ, ภาษา, รูปแบบปี)
-  ฟิลด์ยังอยู่ใน DB และ API ถ้าเชื่อมใช้งานจริงแล้วค่อยเปิดกลับมา
-*/
-
-/* =========================================================
-   HELPERS
-========================================================= */
-
-// แปลงวันที่เป็นรูปแบบไทย เลือกแสดงปี พ.ศ. หรือ ค.ศ. ตามการตั้งค่า
+// แปลงวันที่เป็นรูปแบบไทยแบบย่อ ตามการตั้งค่าปี พ.ศ./ค.ศ.
 const formatDate = (d?: string | null, yearFormat: Settings["year_format"] = "be") => {
   if (!d) return "-";
   return new Date(d).toLocaleDateString(yearFormat === "be" ? "th-TH" : "th-TH-u-ca-gregory", {
@@ -101,9 +87,7 @@ const formatDate = (d?: string | null, yearFormat: Settings["year_format"] = "be
   });
 };
 
-// อ่านข้อมูลบัญชีจาก /api/profile
-// ข้อมูลบัญชี (username, email, วันที่สมัคร) อยู่ใน raw.user
-// ส่วน raw.profile เป็นข้อมูลสุขภาพ จึงต้องอ่าน user ก่อน
+// แปลงข้อมูลจาก /api/profile (หลายรูปแบบ) ให้เป็นโปรไฟล์ที่ใช้แสดงผล
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const readProfile = (raw: any): Profile => {
   const u = raw?.user ?? {};
@@ -120,7 +104,7 @@ const readProfile = (raw: any): Profile => {
   };
 };
 
-// ไฟล์ CSV เดียว แบ่ง 3 ส่วน (โปรไฟล์สุขภาพ / ประวัติการประเมิน / คำตอบรายข้อ) คั่นด้วยบรรทัดว่าง
+// โครงสร้างไฟล์ CSV ที่ export: แต่ละส่วนมีชื่อ key ข้อมูล และคอลัมน์ (ชื่อฟิลด์, หัวคอลัมน์ไทย)
 const CSV_SECTIONS: { title: string; key: keyof ExportData; columns: [string, string][] }[] = [
   {
     title: "โปรไฟล์สุขภาพ (แถวบนสุดคือข้อมูลปัจจุบัน)",
@@ -163,9 +147,9 @@ const CSV_SECTIONS: { title: string; key: keyof ExportData; columns: [string, st
   },
 ];
 
-// แปลงข้อมูลที่ส่งออกเป็นข้อความ CSV ไฟล์เดียว แบ่งเป็น 3 ส่วนคั่นด้วยบรรทัดว่าง
+// แปลงข้อมูลที่ export (โปรไฟล์ ประวัติ คำตอบ) เป็นข้อความ CSV แยกเป็นส่วน ๆ
 const toCsv = (data: ExportData) => {
-  // ครอบค่าด้วยเครื่องหมายคำพูดและ escape " ให้ถูกรูปแบบ CSV
+  // ครอบค่าด้วยเครื่องหมายคำพูดและ escape เครื่องหมายคำพูดภายในสำหรับ CSV
   const escape = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   return CSV_SECTIONS.map(({ title, key, columns }) =>
     [
@@ -176,14 +160,11 @@ const toCsv = (data: ExportData) => {
   ).join("\n\n");
 };
 
-/* =========================================================
-   PAGE
-========================================================= */
-
-// หน้าตั้งค่า: บัญชี การแสดงผล ผู้ติดต่อฉุกเฉิน ส่งออกข้อมูล และลบข้อมูล/บัญชี
+// หน้า: ตั้งค่าบัญชี การแสดงผล การแจ้งเตือน ผู้ติดต่อฉุกเฉิน และจัดการข้อมูลส่วนตัว
 export default function SettingsPage() {
   const router = useRouter();
 
+  // state ของหน้า: ผู้ใช้ ค่าตั้งค่า โปรไฟล์ สถานะโหลด toast หมวดที่เลือก และ dialog ยืนยัน
   const [userId, setUserId] = useState<string | null>(null);
   const [settings, setSettings] = useState<Settings | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -195,27 +176,25 @@ export default function SettingsPage() {
 
   const [emergency, setEmergency] = useState({ name: "", relation: "", phone: "" });
 
+  // state ของการแก้ไขชื่อผู้ใช้และอีเมล
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [savingUsername, setSavingUsername] = useState(false);
 
-  // เปลี่ยนอีเมลต้องยืนยันรหัสผ่าน เพราะอีเมลใช้รับ OTP ตอนลืมรหัสผ่าน
   const [editingEmail, setEditingEmail] = useState(false);
   const [emailDraft, setEmailDraft] = useState("");
   const [emailPassword, setEmailPassword] = useState("");
   const [savingEmail, setSavingEmail] = useState(false);
 
-  // ประกาศก่อน useEffect ที่เรียกใช้
-  // ปรับขนาดตัวอักษรทั้งหน้า และจำค่าไว้ใน localStorage
+  // ปรับขนาดตัวอักษรของทั้งหน้าและจำค่าไว้ใน localStorage
   const applyFontSize = (size: Settings["font_size"]) => {
-    // Tailwind ใช้หน่วย rem จึงขยายได้ทั้งหน้า
     document.documentElement.style.fontSize = FONT_SIZE_PX[size];
     localStorage.setItem("fontSize", size);
   };
 
-  /* ---------- load ---------- */
+  // โหลดค่าตั้งค่าและโปรไฟล์ตอนเปิดหน้า
   useEffect(() => {
-    // โหลดการตั้งค่าและข้อมูลบัญชีของผู้ใช้ แล้วปรับขนาดตัวอักษรตามที่ตั้งไว้
+    // ดึงค่าตั้งค่า (/api/settings) และโปรไฟล์ (/api/profile) ของผู้ใช้ตอนเปิดหน้า
     const load = async () => {
       try {
         const uid = localStorage.getItem("userId");
@@ -250,18 +229,18 @@ export default function SettingsPage() {
     load();
   }, []);
 
+  // ซ่อน toast อัตโนมัติหลัง 2.5 วินาที
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(t);
   }, [toast]);
 
-  /* ---------- actions ---------- */
-  // บันทึกการตั้งค่าที่เปลี่ยน (อัปเดตหน้าจอก่อน ถ้าบันทึกไม่สำเร็จคืนค่าเดิม)
+  // บันทึกค่าตั้งค่าที่เปลี่ยนผ่าน PUT /api/settings (อัปเดตหน้าจอทันที ล้มเหลวจะคืนค่าเดิม)
   const save = async (patch: Partial<Settings>, okText = "บันทึกแล้ว") => {
     if (!userId || !settings) return;
     const previous = settings;
-    setSettings({ ...settings, ...patch }); // อัปเดตหน้าจอทันที
+    setSettings({ ...settings, ...patch });
     try {
       const res = await fetch("/api/settings", {
         method: "PUT",
@@ -274,12 +253,12 @@ export default function SettingsPage() {
       setToast({ type: "ok", text: okText });
     } catch (err) {
       console.error(err);
-      setSettings(previous); // บันทึกไม่สำเร็จ คืนค่าเดิม
+      setSettings(previous);
       setToast({ type: "error", text: err instanceof Error && err.message ? err.message : "บันทึกไม่สำเร็จ ลองอีกครั้ง" });
     }
   };
 
-  // เปลี่ยนชื่อผู้ใช้ผ่าน API แล้วอัปเดตชื่อในหน้าจอและ localStorage
+  // เปลี่ยนชื่อผู้ใช้ผ่าน PATCH /api/settings/account และอัปเดตค่าใน localStorage
   const saveUsername = async () => {
     if (!userId || !profile) return;
     const username = usernameDraft.trim();
@@ -301,17 +280,14 @@ export default function SettingsPage() {
       setProfile({
         ...profile,
         username: newName,
-        // ชื่อที่แสดงใช้ username เมื่อไม่มีชื่อจริง
         name: profile.name === profile.username ? newName : profile.name,
       });
 
-      // หน้าอื่น (Dashboard, Sidebar) อ่านชื่อจาก localStorage
       localStorage.setItem("username", newName);
       try {
         const stored = JSON.parse(localStorage.getItem("user") ?? "null");
         if (stored) localStorage.setItem("user", JSON.stringify({ ...stored, username: newName }));
       } catch {
-        // ข้อมูลเดิมเสีย ไม่ต้องอัปเดต
       }
 
       setEditingUsername(false);
@@ -324,13 +300,13 @@ export default function SettingsPage() {
     }
   };
 
-  // ยกเลิกการแก้ไขอีเมลและล้างช่องรหัสผ่าน
+  // ยกเลิกโหมดแก้ไขอีเมลและล้างช่องรหัสผ่าน
   const cancelEditEmail = () => {
     setEditingEmail(false);
     setEmailPassword("");
   };
 
-  // เปลี่ยนอีเมล (ต้องยืนยันรหัสผ่าน) แล้วอัปเดตในหน้าจอและ localStorage
+  // เปลี่ยนอีเมล (ยืนยันด้วยรหัสผ่าน) ผ่าน PATCH /api/settings/email และอัปเดต localStorage
   const saveEmail = async () => {
     if (!userId || !profile) return;
     const email = emailDraft.trim().toLowerCase();
@@ -356,7 +332,6 @@ export default function SettingsPage() {
         const stored = JSON.parse(localStorage.getItem("user") ?? "null");
         if (stored) localStorage.setItem("user", JSON.stringify({ ...stored, email: newEmail }));
       } catch {
-        // ข้อมูลเดิมเสีย ไม่ต้องอัปเดต
       }
 
       cancelEditEmail();
@@ -369,13 +344,11 @@ export default function SettingsPage() {
     }
   };
 
-  // ออกจากระบบ: ลบ session ฝั่ง server และข้อมูลผู้ใช้ในเครื่อง แล้วกลับหน้า login
+  // ออกจากระบบ: เรียก /api/auth/logout ลบข้อมูลผู้ใช้ใน localStorage แล้วไปหน้า login
   const logout = async () => {
-    // ลบ session cookie ฝั่ง server ก่อน (ถ้าเรียกไม่สำเร็จก็ยังออกจากระบบในเครื่องต่อ)
     try {
       await fetch("/api/auth/logout", { method: "POST" });
     } catch {
-      /* ignore */
     }
     for (const key of ["userId", "username", "userName", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"]) {
       localStorage.removeItem(key);
@@ -383,7 +356,7 @@ export default function SettingsPage() {
     router.replace("/login");
   };
 
-  // ดาวน์โหลดข้อมูลสุขภาพของผู้ใช้ทั้งหมดเป็นไฟล์ CSV
+  // ดึงข้อมูลส่วนตัวจาก /api/settings/export แล้วดาวน์โหลดเป็นไฟล์ CSV
   const downloadData = async () => {
     if (!userId) return;
     try {
@@ -402,7 +375,7 @@ export default function SettingsPage() {
     }
   };
 
-  // ยืนยันรหัสผ่านเพื่อล้างประวัติหรือลบบัญชี (คืนข้อความ error หรือ null ถ้าสำเร็จ)
+  // ยืนยันรหัสผ่านแล้วล้างประวัติหรือลบบัญชีผ่าน /api/settings/danger (คืนข้อความ error ถ้าไม่สำเร็จ)
   const confirmDanger = async (password: string): Promise<string | null> => {
     if (!userId || !dialog) return "ไม่พบข้อมูลผู้ใช้";
     try {
@@ -415,7 +388,6 @@ export default function SettingsPage() {
       if (!res.ok) return json.message || "ดำเนินการไม่สำเร็จ";
 
       if (dialog === "delete") {
-        // ลบเฉพาะค่าของผู้ใช้คนนี้ ไม่ลบของ staff ที่อาจเปิดอยู่ในแท็บอื่น
         for (const key of ["userId", "username", "userName", "email", "roleId", "role", "user", "hasProfile", "rememberLogin"]) {
           localStorage.removeItem(key);
         }
@@ -430,14 +402,13 @@ export default function SettingsPage() {
     }
   };
 
-  /* ---------- render ---------- */
   return (
     <div className="flex min-h-screen bg-[#faf9f7]">
       <Sidebar />
 
       <main className="flex-1 min-w-0 px-6 py-8 lg:px-10">
         <div className="max-w-7xl mx-auto">
-          {/* HEADER */}
+          {/* หัวข้อหน้า */}
           <div className="mb-8">
             <p className="text-sm font-bold tracking-[0.25em] text-[#b91c2b] uppercase">Settings</p>
             <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 mt-3">
@@ -445,6 +416,7 @@ export default function SettingsPage() {
             </h1>
           </div>
 
+          {/* สถานะกำลังโหลด / error / เนื้อหาการตั้งค่า */}
           {loading ? (
             <div className="py-24 text-center" role="status">
               <div className="w-10 h-10 border-4 border-gray-200 border-t-[#b91c2b] rounded-full animate-spin mx-auto mb-4" />
@@ -457,7 +429,7 @@ export default function SettingsPage() {
             </div>
           ) : (
             <div className="flex flex-col lg:flex-row gap-6 items-start">
-              {/* SUB NAV */}
+              {/* เมนูหมวดการตั้งค่า (เลื่อนไปยังการ์ด) */}
               <nav
                 aria-label="หมวดการตั้งค่า"
                 className="w-full lg:w-60 shrink-0 bg-white border border-gray-100 rounded-3xl p-2 shadow-sm flex lg:flex-col gap-1 overflow-x-auto"
@@ -481,9 +453,8 @@ export default function SettingsPage() {
                 ))}
               </nav>
 
-              {/* PANELS */}
               <div className="flex-1 min-w-0 flex flex-col gap-5 w-full">
-                {/* 1. ACCOUNT */}
+                {/* การ์ดบัญชีผู้ใช้: แก้ไขชื่อผู้ใช้/อีเมลแบบ inline และลิงก์แก้โปรไฟล์ */}
                 <Card id="account" title="บัญชีผู้ใช้">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-red-50 text-[#b91c2b] text-2xl font-bold flex items-center justify-center shrink-0">
@@ -617,7 +588,7 @@ export default function SettingsPage() {
                   </div>
                 </Card>
 
-                {/* 2. SECURITY */}
+                {/* การ์ดความปลอดภัย: เปลี่ยนรหัสผ่าน และออกจากระบบ */}
                 <Card id="security" title="ความปลอดภัย" desc="ปกป้องบัญชีและข้อมูลสุขภาพของคุณ">
                   <Row title="รหัสผ่าน" desc="ระบบจะส่งรหัส OTP ไปที่อีเมลเพื่อตั้งรหัสผ่านใหม่">
                     <Link
@@ -638,7 +609,7 @@ export default function SettingsPage() {
                   </Row>
                 </Card>
 
-                {/* 4. DISPLAY */}
+                {/* การ์ดการแสดงผล: ขนาดตัวอักษร */}
                 <Card id="display" title="การแสดงผลและการเข้าถึง" desc="ปรับให้อ่านง่ายและเหมาะกับการใช้งานของคุณ">
                   <Row title="ขนาดตัวอักษร" desc="มีผลกับทุกหน้าที่มีแถบเมนู" last>
                     <Segmented
@@ -657,7 +628,7 @@ export default function SettingsPage() {
                   </Row>
                 </Card>
 
-                {/* 5. EMERGENCY CONTACT */}
+                {/* การ์ดผู้ติดต่อฉุกเฉิน: ชื่อ ความสัมพันธ์ เบอร์โทร */}
                 <Card
                   id="emergency"
                   title="ผู้ติดต่อกรณีฉุกเฉิน"
@@ -711,7 +682,7 @@ export default function SettingsPage() {
                   </div>
                 </Card>
 
-                {/* 6. PRIVACY (PDPA) */}
+                {/* การ์ดความเป็นส่วนตัว: ความยินยอม PDPA ดาวน์โหลดข้อมูล และนโยบาย */}
                 <Card
                   id="privacy"
                   title="ความเป็นส่วนตัวและข้อมูลของฉัน"
@@ -756,7 +727,7 @@ export default function SettingsPage() {
                   </div>
                 </Card>
 
-                {/* 7. ABOUT */}
+                {/* การ์ดช่วยเหลือ: ลิงก์คู่มือ แหล่งอ้างอิง ข้อตกลง และเวอร์ชัน */}
                 <Card id="about" title="ช่วยเหลือและเกี่ยวกับระบบ">
                   {[
                     { label: "คู่มือการใช้งาน", href: "/help" },
@@ -779,7 +750,7 @@ export default function SettingsPage() {
                   </div>
                 </Card>
 
-                {/* 8. DANGER ZONE */}
+                {/* โซนอันตราย: ล้างประวัติการประเมิน / ลบบัญชี */}
                 <section id="danger" className="scroll-mt-6 bg-white border border-red-200 rounded-3xl p-6 sm:p-7">
                   <h2 className="text-xl font-bold text-red-700">จัดการข้อมูลถาวร</h2>
                   <p className="text-sm text-gray-500 mt-1 mb-2">การกระทำในส่วนนี้ย้อนกลับไม่ได้ ควรดาวน์โหลดข้อมูลเก็บไว้ก่อน</p>
@@ -806,7 +777,7 @@ export default function SettingsPage() {
         </div>
       </main>
 
-      {/* CONFIRM DIALOG */}
+      {/* dialog ยืนยันด้วยรหัสผ่านก่อนล้างประวัติ/ลบบัญชี */}
       {dialog && (
         <ConfirmDialog
           title={dialog === "clear" ? "ล้างประวัติการประเมินทั้งหมด?" : "ลบบัญชีถาวร?"}
@@ -821,7 +792,7 @@ export default function SettingsPage() {
         />
       )}
 
-      {/* TOAST */}
+      {/* toast แจ้งผลการบันทึก */}
       {toast && (
         <div
           role="status"
@@ -837,11 +808,7 @@ export default function SettingsPage() {
   );
 }
 
-/* =========================================================
-   COMPONENTS
-========================================================= */
-
-// การ์ดของแต่ละหมวดการตั้งค่า มีหัวข้อ คำอธิบาย และป้ายกำกับ
+// การ์ดหัวข้อของแต่ละส่วนในหน้าตั้งค่า (มี id ให้เลื่อนไปถึงได้)
 function Card({
   id,
   title,
@@ -880,7 +847,7 @@ function Row({ title, desc, last, children }: { title: string; desc?: string; la
   );
 }
 
-// ช่องกรอกข้อมูลพร้อมป้ายชื่อ
+// ป้ายชื่อครอบช่องกรอกข้อมูล
 function Field({ label, children }: { label: string; children: ReactNode }) {
   return (
     <label className="flex flex-col gap-1.5 text-sm font-semibold text-gray-700">
@@ -890,7 +857,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-// สวิตช์เปิด/ปิด
+// สวิตช์เปิด/ปิด (role=switch)
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -907,7 +874,7 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-// ปุ่มเลือกตัวเลือกเดียวแบบแถบแบ่งช่อง
+// ปุ่มเลือกแบบแบ่งช่อง เลือกได้หนึ่งค่า (role=radiogroup)
 function Segmented({
   label,
   value,
@@ -938,7 +905,7 @@ function Segmented({
   );
 }
 
-// กล่องยืนยันการกระทำอันตราย ต้องกรอกรหัสผ่านก่อนกดยืนยัน
+// กล่องยืนยันการกระทำอันตราย ต้องกรอกรหัสผ่านก่อนยืนยัน
 function ConfirmDialog({
   title,
   text,
@@ -950,13 +917,13 @@ function ConfirmDialog({
   text: string;
   confirmLabel: string;
   onCancel: () => void;
-  onConfirm: (password: string) => Promise<string | null>; // คืนข้อความ error หรือ null ถ้าสำเร็จ
+  onConfirm: (password: string) => Promise<string | null>;
 }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
-  // ส่งรหัสผ่านไปยืนยัน ถ้าไม่สำเร็จแสดงข้อความ error
+  // ส่งรหัสผ่านให้ onConfirm และแสดงข้อความ error ถ้าไม่สำเร็จ
   const submit = async () => {
     if (!password || busy) return;
     setBusy(true);

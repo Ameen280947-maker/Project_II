@@ -9,10 +9,7 @@ import { logSystemError } from "@/lib/errorLogger";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/* =========================================================
-   TYPES
-========================================================= */
-
+// รูปแบบ body ของโปรไฟล์สุขภาพที่ส่งมาบันทึก
 type ProfileBody = {
   user_id?: number;
   age?: number | null;
@@ -33,18 +30,11 @@ type ProfileBody = {
   family_diabetes?: boolean | null;
 };
 
-/* =========================================================
-   GET PROFILE
-
-   GET /api/profile?userId=1
-========================================================= */
-
-// GET: คืนโปรไฟล์สุขภาพล่าสุดของผู้ใช้ (?history=1 = คืนประวัติทุกเวอร์ชัน)
+// API: ดึงข้อมูลบัญชีและโปรไฟล์สุขภาพล่าสุดของผู้ใช้ (users + health_profile)
 export async function GET(
   request: NextRequest,
 ) {
   try {
-    // ใช้ผู้ใช้จาก session (userId ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(
       request,
       request.nextUrl.searchParams.get("userId"),
@@ -52,10 +42,6 @@ export async function GET(
     if (!auth.ok) return auth.response;
 
     const userId = auth.userId;
-
-    /* =========================
-       Validate userId
-    ========================= */
 
     if (
       !Number.isInteger(userId) ||
@@ -73,12 +59,7 @@ export async function GET(
       );
     }
 
-    /* =========================
-       ประวัติการแก้ไข
-       GET /api/profile?history=1
-       ทุกเวอร์ชันของข้อมูลสุขภาพ ใหม่สุดก่อน
-    ========================= */
-
+    // ?history=1 → คืนประวัติโปรไฟล์สุขภาพทุกเวอร์ชัน (สูงสุด 100)
     if (request.nextUrl.searchParams.get("history") === "1") {
       const historyResult = await pool.query(
         `
@@ -107,10 +88,7 @@ export async function GET(
       });
     }
 
-    /* =========================
-       หา User ก่อน
-    ========================= */
-
+    // ดึงข้อมูลบัญชีผู้ใช้
     const userResult =
       await pool.query(
         `
@@ -145,10 +123,7 @@ export async function GET(
     const user =
       userResult.rows[0];
 
-    /* =========================
-       หา Profile
-    ========================= */
-
+    // ดึงโปรไฟล์สุขภาพล่าสุด แล้วตอบพร้อม hasProfile
     const profileResult =
       await pool.query(
         `
@@ -173,11 +148,6 @@ export async function GET(
         `,
         [userId],
       );
-
-    /* =========================
-       สมาชิกใหม่
-       ยังไม่มี Profile
-    ========================= */
 
     if (
       (profileResult.rowCount ??
@@ -208,10 +178,6 @@ export async function GET(
           "ยังไม่มีข้อมูลสุขภาพ",
       });
     }
-
-    /* =========================
-       สมาชิกเก่า
-    ========================= */
 
     return NextResponse.json({
       success: true,
@@ -255,13 +221,7 @@ export async function GET(
   }
 }
 
-/* =========================================================
-   PUT PROFILE
-   ทุกครั้งที่บันทึกจะ INSERT เป็นเวอร์ชันใหม่ ไม่แก้แถวเดิม
-   (แถวเก่าเก็บไว้เป็นประวัติ แถวล่าสุดคือข้อมูลปัจจุบัน)
-   ถ้าค่าไม่ต่างจากเวอร์ชันล่าสุด จะไม่เพิ่มแถวซ้ำ
-========================================================= */
-
+// API: ตรวจและบันทึกโปรไฟล์สุขภาพ เพิ่มแถวใหม่ใน health_profile เฉพาะเมื่อข้อมูลเปลี่ยน (ใน transaction)
 export async function PUT(
   request: NextRequest,
 ) {
@@ -275,11 +235,6 @@ export async function PUT(
     const body =
       (await request.json()) as ProfileBody;
 
-    /* =========================
-       รับค่า
-    ========================= */
-
-    // ใช้ผู้ใช้จาก session (user_id ที่ส่งมาต้องตรงกับ session)
     const auth = requireUser(
       request,
       body.user_id,
@@ -288,6 +243,7 @@ export async function PUT(
 
     const userId = auth.userId;
 
+    // แปลงค่าจาก body เป็นตัวเลข/ค่า null
     const age =
       body.age === null ||
       body.age === undefined
@@ -333,10 +289,6 @@ export async function PUT(
     const familyDiabetes =
       body.family_diabetes;
 
-    /* =====================================================
-       USER ID
-    ===================================================== */
-
     if (
       !Number.isInteger(userId) ||
       userId <= 0
@@ -353,14 +305,7 @@ export async function PUT(
       );
     }
 
-    /* =====================================================
-       ตรวจว่ากรอกครบหรือยัง
-
-       สำคัญ:
-       boolean false ถือว่า "กรอกแล้ว"
-       ดังนั้นห้ามใช้ !smoking
-    ===================================================== */
-
+    // ตรวจข้อมูลที่ส่งมา: ครบทุกช่อง และอายุ/ส่วนสูง/น้ำหนัก/รอบเอวอยู่ในช่วงที่กำหนด
     if (
       age === null ||
       gender === null ||
@@ -389,10 +334,6 @@ export async function PUT(
       );
     }
 
-    /* =====================================================
-       AGE
-    ===================================================== */
-
     if (
       !Number.isInteger(age) ||
       age < 18 ||
@@ -411,10 +352,6 @@ export async function PUT(
       );
     }
 
-    /* =====================================================
-       GENDER
-    ===================================================== */
-
     if (
       gender !== "male" &&
       gender !== "female"
@@ -431,10 +368,6 @@ export async function PUT(
         },
       );
     }
-
-    /* =====================================================
-       HEIGHT
-    ===================================================== */
 
     if (
       !Number.isFinite(
@@ -456,10 +389,6 @@ export async function PUT(
       );
     }
 
-    /* =====================================================
-       WEIGHT
-    ===================================================== */
-
     if (
       !Number.isFinite(
         weightKg,
@@ -479,10 +408,6 @@ export async function PUT(
         },
       );
     }
-
-    /* =====================================================
-       WAIST
-    ===================================================== */
 
     if (
       !Number.isFinite(
@@ -504,20 +429,13 @@ export async function PUT(
       );
     }
 
-    /* =====================================================
-       TRANSACTION
-    ===================================================== */
-
+    // เริ่ม transaction ล็อกแถวผู้ใช้ และดึงโปรไฟล์ล่าสุดมาเทียบ
     await client.query(
       "BEGIN",
     );
 
     transactionStarted =
       true;
-
-    /* =========================
-       เช็ก User
-    ========================= */
 
     const userResult =
       await client.query(
@@ -555,11 +473,6 @@ export async function PUT(
       );
     }
 
-    /* =========================
-       หา Profile เวอร์ชันล่าสุด
-       (ล็อกแถว users ไว้แล้วด้านบน กันบันทึกซ้อนกัน)
-    ========================= */
-
     const existingProfile =
       await client.query(
         `
@@ -589,7 +502,7 @@ export async function PUT(
     const latest =
       existingProfile.rows[0];
 
-    // เทียบค่าแบบตัวเลข (numeric จากฐานข้อมูลเป็น string)
+    // เทียบค่าตัวเลขเดิมในฐานข้อมูลกับค่าใหม่ (รองรับ null)
     const sameNumber = (a: unknown, b: number | null) =>
       (a === null || a === undefined ? null : Number(a)) === b;
 
@@ -604,17 +517,10 @@ export async function PUT(
       latest.has_diabetes === hasDiabetes &&
       latest.family_diabetes === familyDiabetes;
 
-    /* =====================================================
-       ไม่มีอะไรเปลี่ยน -> ไม่เพิ่มเวอร์ชันใหม่
-    ===================================================== */
-
+    // ข้อมูลไม่เปลี่ยน → ใช้แถวเดิม, เปลี่ยน → เพิ่มแถวใหม่ (เก็บประวัติทุกเวอร์ชัน)
     if (unchanged) {
       result = existingProfile;
     }
-
-    /* =====================================================
-       มีการเปลี่ยนแปลง / ยังไม่มีข้อมูล -> INSERT เวอร์ชันใหม่
-    ===================================================== */
 
     else {
       result =
@@ -695,6 +601,7 @@ export async function PUT(
       hasProfile: true,
     });
   } catch (error) {
+    // จัดการ error: rollback ถ้า transaction ค้างอยู่ แล้วคืน 500
     if (
       transactionStarted
     ) {
